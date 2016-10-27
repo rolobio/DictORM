@@ -21,7 +21,6 @@ class TestPgPyTable(unittest.TestCase):
         self.curs = self.conn.cursor(cursor_factory=DictCursor)
         self.tearDown()
         self.curs.execute('CREATE TABLE table1 (id SERIAL PRIMARY KEY, foo TEXT)')
-        self.curs.execute('CREATE TABLE table2 (id SERIAL, group_id SERIAL, person TEXT, PRIMARY KEY(id, group_id))')
         self.conn.commit()
 
 
@@ -37,17 +36,37 @@ class TestPgPyTable(unittest.TestCase):
         Table1 = PgPyTable('table1', self.curs, ('id',))
         Table1({'foo':'bar',})
         row = Table1.getByPrimary(1)
-        assert row == {'id':1, 'foo':'bar'}
+        self.assertEqual(row, {'id':1, 'foo':'bar'})
+
+
+
+class TestPgPyDict(unittest.TestCase):
+
+    def setUp(self):
+        self.conn = psycopg2.connect(**test_db_login)
+        self.curs = self.conn.cursor(cursor_factory=DictCursor)
+        self.tearDown()
+        self.curs.execute('CREATE TABLE table1 (id SERIAL PRIMARY KEY, foo TEXT)')
+        self.curs.execute('CREATE TABLE table2 (id SERIAL, group_id SERIAL, person TEXT, PRIMARY KEY(id, group_id))')
+        self.conn.commit()
+
+
+    def tearDown(self):
+        self.curs.execute('''DROP SCHEMA public CASCADE;
+                CREATE SCHEMA public;
+                GRANT ALL ON SCHEMA public TO postgres;
+                GRANT ALL ON SCHEMA public TO public;''')
+        self.conn.commit()
 
 
     def test___setitem__(self):
         Table1 = PgPyTable('table1', self.curs, ('id',))
         Table1({'foo':'bar',})
         row = Table1.getByPrimary(1)
-        assert row == {'id':1, 'foo':'bar'}
+        self.assertEqual(row, {'id':1, 'foo':'bar'})
         row['foo'] = 'baz'
         row = Table1.getByPrimary(1)
-        assert row == {'id':1, 'foo':'baz'}
+        self.assertEqual(row, {'id':1, 'foo':'baz'})
 
 
     def test___delitem__(self):
@@ -59,7 +78,7 @@ class TestPgPyTable(unittest.TestCase):
         Table1({'foo':'bar',})
         row = Table1.getByPrimary(1)
         del row['foo']
-        assert row['foo'] == None
+        self.assertEqual(row['foo'], None)
 
 
     def test_update(self):
@@ -71,9 +90,9 @@ class TestPgPyTable(unittest.TestCase):
         row = Table1.getByPrimary(1)
         new_row = {'id':2, 'foo':'baz'}
         row.update(new_row)
-        assert row['foo'] == 'baz'
+        self.assertEqual(row['foo'], 'baz')
         # Primary key cannot be overwritten
-        assert row['id'] == 1
+        self.assertEqual(row['id'], 1)
 
 
     def test_empty(self):
@@ -82,7 +101,7 @@ class TestPgPyTable(unittest.TestCase):
         """
         Table1 = PgPyTable('table1', self.curs, ('id',))
         row = Table1()
-        assert row['id'] == 1
+        self.assertEqual(row['id'], 1)
 
 
     def test_dict(self):
@@ -91,13 +110,13 @@ class TestPgPyTable(unittest.TestCase):
         """
         Table1 = PgPyTable('table1', self.curs, ('id',))
         row = Table1({'foo':'bar',})
-        assert len(row) == 2
-        assert sorted(iter(row)) == sorted(['id', 'foo'])
+        self.assertEqual(len(row), 2)
+        self.assertEqual(sorted(iter(row)), sorted(['id', 'foo']))
 
         # Dict can be created by a list of keys and list of values
         row = Table1(zip(('foo',), ('baz',)))
-        assert len(row) == 2
-        assert sorted(iter(row)) == sorted(['id', 'foo'])
+        self.assertEqual(len(row), 2)
+        self.assertEqual(sorted(iter(row)), sorted(['id', 'foo']))
 
 
     def test_multiple_primarys(self):
