@@ -178,7 +178,7 @@ class TestSubPgPyDict(unittest.TestCase):
         Table2 = PgPyTable('table2', self.curs, ('id',))
         Table1.addReference(Table2, 'id', 'table2_id', 'table2')
         row2 = Table2({'person':'Dave',})
-        row1 = Table1({'foo':'bar'})
+        row1 = Table1({'foo':'bar',})
         # Rows have not yet been associated
         self.assertEqual(row1['table2_id'], None)
         self.assertEqual(row1['table2'], None)
@@ -196,7 +196,7 @@ class TestSubPgPyDict(unittest.TestCase):
         Table2 = PgPyTable('table2', self.curs, ('id',))
         Table1.addReference(Table2, 'id', 'table2_id', 'table2')
         row2 = Table2({'person':'Dave',})
-        row1 = Table1({'foo':'bar'})
+        row1 = Table1({'foo':'bar',})
         # Rows have not yet been associated
         self.assertEqual(row1['table2_id'], None)
         self.assertEqual(row1['table2'], None)

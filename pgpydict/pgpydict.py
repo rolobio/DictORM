@@ -124,18 +124,25 @@ class PgPyDict(dict):
         """
         if key in self._pks:
             return
-        elif val and key in self._reference_columns:
-            # Set the primary key of a referenced object
-            ref = self._reference_columns[key]
-            pgpytable, primary_key, key_name = self._references[ref]
-            super().__setitem__(ref, val.get(primary_key, None))
-        elif val and key in self._references:
-            # Set the object of a primary key
-            pgpytable, primary_key, key_name = self._references[key]
-            super().__setitem__(key_name, pgpytable.getByPrimary(val))
         ret = super().__setitem__(key, val)
         self.flush()
         return ret
+
+
+    def __getitem__(self, key):
+        if key in self._reference_columns and not super().__getitem__(key):
+            # The primary key has not yet been set, get it from the referenced
+            # object.
+            ref = self._reference_columns[key]
+            pgpytable, primary_key, key_name = self._references[ref]
+            if super().__getitem__(ref):
+                super().__setitem__(key, pgpytable.getByPrimary(super().__getitem__(ref)))
+        elif key in self._references and not super().__getitem__(key):
+            pgpytable, primary_key, key_name = self._references[key]
+            if super().get(key_name):
+                # Object has already been set, use its primary key
+                super().__setitem__(key, super().__getitem__(key_name)[primary_key])
+        return super().__getitem__(key)
 
 
     def __delitem__(self, key):
