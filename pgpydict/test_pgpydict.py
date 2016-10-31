@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+from pprint import pprint, pformat
 from pgpydict import *
 from psycopg2 import OperationalError
 from psycopg2.extras import DictCursor
@@ -147,6 +148,44 @@ class TestPgPyDict(unittest.TestCase):
         row2b = Table1a.getByPrimary(2)
         self.assertEqual(row1a, row1b)
         self.assertEqual(row2a, row2b)
+
+
+
+class TestSubPgPyDict(unittest.TestCase):
+
+    def setUp(self):
+        self.conn = psycopg2.connect(**test_db_login)
+        self.curs = self.conn.cursor(cursor_factory=DictCursor)
+        self.tearDown()
+        self.curs.execute('CREATE TABLE table2 (id SERIAL PRIMARY KEY, person TEXT)')
+        self.curs.execute('CREATE TABLE table1 (id SERIAL PRIMARY KEY, foo TEXT, table2_id INTEGER REFERENCES table2(id) )')
+        self.conn.commit()
+
+
+    def tearDown(self):
+        self.curs.execute('''DROP SCHEMA public CASCADE;
+                CREATE SCHEMA public;
+                GRANT ALL ON SCHEMA public TO postgres;
+                GRANT ALL ON SCHEMA public TO public;''')
+        self.conn.commit()
+
+
+    def test_sub_dict(self):
+        """
+        A sub-pgpydict can be specified when a reference column is specified.
+        """
+        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table2 = PgPyTable('table2', self.curs, ('id',))
+        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row2 = Table2({'person':'Dave',})
+        row1 = Table1({'foo':'bar'})
+        # Rows have not yet been associated
+        self.assertEqual(row1['table2_id'], None)
+        self.assertEqual(row1['table2'], None)
+
+        row1['table2'] = row2
+        self.assertEqual(row1['table2_id'], row2['id'])
+        self.assertEqual(row1['table2'], row2)
 
 
 
