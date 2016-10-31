@@ -124,10 +124,15 @@ class PgPyDict(dict):
         """
         if key in self._pks:
             return
-        elif key in self._reference_columns:
+        elif val and key in self._reference_columns:
+            # Set the primary key of a referenced object
             ref = self._reference_columns[key]
             pgpytable, primary_key, key_name = self._references[ref]
-            self[ref] = val.get(primary_key, None) if val else None
+            super().__setitem__(ref, val.get(primary_key, None))
+        elif val and key in self._references:
+            # Set the object of a primary key
+            pgpytable, primary_key, key_name = self._references[key]
+            super().__setitem__(key_name, pgpytable.getByPrimary(val))
         ret = super().__setitem__(key, val)
         self.flush()
         return ret

@@ -170,9 +170,9 @@ class TestSubPgPyDict(unittest.TestCase):
         self.conn.commit()
 
 
-    def test_sub_dict(self):
+    def test_sub_dict_set_obj(self):
         """
-        A sub-pgpydict can be specified when a reference column is specified.
+        A sub-pgpydict can be specified when a reference column is defined.
         """
         Table1 = PgPyTable('table1', self.curs, ('id',))
         Table2 = PgPyTable('table2', self.curs, ('id',))
@@ -184,6 +184,24 @@ class TestSubPgPyDict(unittest.TestCase):
         self.assertEqual(row1['table2'], None)
 
         row1['table2'] = row2
+        self.assertEqual(row1['table2_id'], row2['id'])
+        self.assertEqual(row1['table2'], row2)
+
+
+    def test_sub_dict_set_id(self):
+        """
+        A sub-pgpydict can be specified when a reference column is defined.
+        """
+        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table2 = PgPyTable('table2', self.curs, ('id',))
+        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row2 = Table2({'person':'Dave',})
+        row1 = Table1({'foo':'bar'})
+        # Rows have not yet been associated
+        self.assertEqual(row1['table2_id'], None)
+        self.assertEqual(row1['table2'], None)
+
+        row1['table2_id'] = row2['id']
         self.assertEqual(row1['table2_id'], row2['id'])
         self.assertEqual(row1['table2'], row2)
 
