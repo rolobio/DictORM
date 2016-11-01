@@ -121,10 +121,7 @@ class PgPyTable(object):
                 primary = {self.pks[0]:primary,}
             return self._initPgPyDict(self.getWhere(primary))
         except IndexError:
-            if not self.pks:
-                raise ValueError('No primary keys specified, use getWhere')
-            else:
-                raise ValueError('Primary does not match primary keys specified during table creation.')
+            raise ValueError('No primary keys specified, use getWhere')
 
 
     def getWhere(self, where):
