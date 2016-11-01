@@ -132,10 +132,9 @@ class PgPyTable(object):
         """
         if primary and not self.pks:
             raise ValueError('No primary keys specified, use getWhere')
-        else:
-            if type(primary) != dict:
-                primary = {self.pks[0]:primary,}
-            return self.getWhere(primary)
+        elif type(primary) != dict:
+            primary = {self.pks[0]:primary,}
+        return self.getWhere(primary)
 
 
     def getWhere(self, where):
@@ -143,8 +142,6 @@ class PgPyTable(object):
         Get a PgPyDict from the DB that matches the provided dictionary when
         it's column's match.
         """
-        if where not in (list, tuple):
-            where = (where,)
         self._execute('SELECT * FROM {} WHERE {}'.format(
                 self.table, column_value_pairs(where, join_str=' AND ')),
             where)
