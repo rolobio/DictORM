@@ -143,6 +143,8 @@ class PgPyTable(object):
         Get a PgPyDict from the DB that matches the provided dictionary when
         it's column's match.
         """
+        if where not in (list, tuple):
+            where = (where,)
         self._execute('SELECT * FROM {} WHERE {}'.format(
                 self.table, column_value_pairs(where, join_str=' AND ')),
             where)
