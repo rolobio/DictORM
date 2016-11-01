@@ -116,9 +116,15 @@ class PgPyTable(object):
             t = PgPyTable('some_table', curs, ('id', 'group_id'))
             row = t.getByPrimary({'id':8, 'group_id':12})
         """
-        if type(primary) != dict:
-            primary = {self.pks[0]:primary,}
-        return self._initPgPyDict(self.getWhere(primary))
+        try:
+            if type(primary) != dict:
+                primary = {self.pks[0]:primary,}
+            return self._initPgPyDict(self.getWhere(primary))
+        except IndexError:
+            if not self.pks:
+                raise ValueError('No primary keys specified, use getWhere')
+            else:
+                raise ValueError('Primary does not match primary keys specified during table creation.')
 
 
     def getWhere(self, where):

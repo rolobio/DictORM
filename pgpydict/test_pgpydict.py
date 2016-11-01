@@ -28,6 +28,7 @@ class TestPgPyTable(unittest.TestCase):
                 foo TEXT,
                 PRIMARY KEY(id, group_id)
             )''')
+        self.curs.execute('CREATE TABLE table3 (id INTEGER, foo TEXT)')
         self.conn.commit()
 
 
@@ -66,6 +67,18 @@ class TestPgPyTable(unittest.TestCase):
     def test_empty(self):
         Table1 = PgPyTable('table1', self.curs, ('id',))
         Table1({})
+
+
+    def test_no_pks(self):
+        Table3 = PgPyTable('table3', self.curs, ())
+        row = Table3({})
+        self.assertEqual(row, {'id':None, 'foo':None})
+        row['id'] = 12
+        row['foo'] = 'asdf'
+        self.assertEqual(row, {'id':12, 'foo':'asdf'})
+        self.conn.commit()
+        self.assertEqual(row, {'id':12, 'foo':'asdf'})
+        self.assertRaises(ValueError, Table3.getByPrimary, 12)
 
 
 
