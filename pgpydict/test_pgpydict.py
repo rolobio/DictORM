@@ -55,6 +55,14 @@ class TestPgPyTable(unittest.TestCase):
         row2 = Table2({'group_id':3, 'foo':'bar',})
         self.assertRaises(psycopg2.IntegrityError, Table2, row2)
 
+
+    def test_getByPrimary_with_multiple_pks(self):
+        Table2 = PgPyTable('table2', self.curs, ('id', 'group_id'))
+        a = Table2({'group_id':3, 'foo':'bar',})
+        b = Table2.getByPrimary({'id':1, 'group_id':3})
+        self.assertEqual(a, b)
+
+
     def test_empty(self):
         Table1 = PgPyTable('table1', self.curs, ('id',))
         Table1({})
