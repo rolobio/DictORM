@@ -177,6 +177,7 @@ class TestSubPgPyDict(unittest.TestCase):
         Table1 = PgPyTable('table1', self.curs, ('id',))
         Table2 = PgPyTable('table2', self.curs, ('id',))
         Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row3 = Table2({'person':'Bob',})
         row2 = Table2({'person':'Dave',})
         row1 = Table1({'foo':'bar',})
         # Rows have not yet been associated
@@ -187,6 +188,14 @@ class TestSubPgPyDict(unittest.TestCase):
         self.assertEqual(row1['table2_id'], row2['id'])
         self.assertEqual(row1['table2'], row2)
 
+        row1['table2'] = row3
+        self.assertEqual(row1['table2_id'], row3['id'])
+        self.assertEqual(row1['table2'], row3)
+
+        row1['table2'] = None
+        self.assertEqual(row1['table2_id'], None)
+        self.assertEqual(row1['table2'], None)
+
 
     def test_sub_dict_set_id(self):
         """
@@ -195,6 +204,7 @@ class TestSubPgPyDict(unittest.TestCase):
         Table1 = PgPyTable('table1', self.curs, ('id',))
         Table2 = PgPyTable('table2', self.curs, ('id',))
         Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row3 = Table2({'person':'Bob',})
         row2 = Table2({'person':'Dave',})
         row1 = Table1({'foo':'bar',})
         # Rows have not yet been associated
@@ -204,6 +214,78 @@ class TestSubPgPyDict(unittest.TestCase):
         row1['table2_id'] = row2['id']
         self.assertEqual(row1['table2_id'], row2['id'])
         self.assertEqual(row1['table2'], row2)
+
+        row1['table2_id'] = row3['id']
+        self.assertEqual(row1['table2_id'], row3['id'])
+        self.assertEqual(row1['table2'], row3)
+
+        row1['table2_id'] = None
+        self.assertEqual(row1['table2_id'], None)
+        self.assertEqual(row1['table2'], None)
+
+
+    def test_sub_dict_set_many(self):
+        """
+        A sub-pgpydict can be specified when a reference column is defined.
+        """
+        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table2 = PgPyTable('table2', self.curs, ('id',))
+        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row2a = Table2({'person':'Dave',})
+        row2b = Table2({'person':'Bob',})
+        row1a = Table1({'foo':'bar',})
+        row1b = Table1({'foo':'baz',})
+        # Rows have not yet been associated
+        self.assertEqual(row1a['table2_id'], None)
+        self.assertEqual(row1a['table2'], None)
+        self.assertEqual(row1b['table2_id'], None)
+        self.assertEqual(row1b['table2'], None)
+
+        # Associate a's
+        row1a['table2_id'] = row2a['id']
+        self.assertEqual(row1a['table2_id'], row2a['id'])
+        self.assertEqual(row1a['table2'], row2a)
+        # Only a's were associated
+        self.assertEqual(row1b['table2_id'], None)
+        self.assertEqual(row1b['table2'], None)
+
+        # Both sets are associated
+        row1b['table2_id'] = row2b['id']
+        self.assertEqual(row1a['table2_id'], row2a['id'])
+        self.assertEqual(row1a['table2'], row2a)
+        self.assertEqual(row1b['table2_id'], row2b['id'])
+        self.assertEqual(row1b['table2'], row2b)
+
+        # De-associate a's
+        row1a['table2_id'] = None
+        self.assertEqual(row1a['table2_id'], None)
+        self.assertEqual(row1a['table2'], None)
+        # Only b's are associated
+        self.assertEqual(row1b['table2_id'], row2b['id'])
+        self.assertEqual(row1b['table2'], row2b)
+
+        # Delete has the same effect
+        del row1a['table2_id']
+        self.assertEqual(row1a['table2_id'], None)
+        self.assertEqual(row1a['table2'], None)
+        # Only b's are associated
+        self.assertEqual(row1b['table2_id'], row2b['id'])
+        self.assertEqual(row1b['table2'], row2b)
+
+
+        # De-associate b's
+        row1b['table2_id'] = None
+        self.assertEqual(row1a['table2_id'], None)
+        self.assertEqual(row1a['table2'], None)
+        self.assertEqual(row1b['table2_id'], None)
+        self.assertEqual(row1b['table2'], None)
+
+        # Delete has the same effect
+        del row1b['table2_id']
+        self.assertEqual(row1a['table2_id'], None)
+        self.assertEqual(row1a['table2'], None)
+        self.assertEqual(row1b['table2_id'], None)
+        self.assertEqual(row1b['table2'], None)
 
 
 
