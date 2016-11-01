@@ -2,17 +2,76 @@ from psycopg2.extras import DictCursor
 
 __all__ = ['PgPyTable', 'PgPyDict']
 
-def key_value_pairs(d, join_str=', '):
+def column_value_pairs(d, join_str=', '):
+    """
+    Create a string of SQL that will instruct a Psycopg2 DictCursor to
+    interpolate the dictionary's keys into a SELECT or UPDATE SQL query.
+
+    Example:
+        d = {'id':10, 'person':'Dave'}
+
+        becomes
+
+        id=%(id)s, person=%(person)s
+    """
     return join_str.join([str(k)+'=%('+k+')s' for k in d.keys()])
 
 
+def insert_column_value_pairs(d):
+    """
+    Create a string of SQL that will instruct a Psycopg2 DictCursor to
+    interpolate the dictionary's keys into a INSERT SQL query.
+
+    Example:
+        d = {'id':10, 'person':'Dave'}
+
+        becomes
+
+        (id, person) VALUES (%(id)s, %(person)s)
+    """
+    return '({}) VALUES ({})'.format(
+            ', '.join(d),
+            ', '.join(['%('+k+')s' for k in d]),
+            )
+
+
 class PgPyTable(object):
+    """
+    I am used to specify how a Psycopg2 table is constructed.  My init'd object
+    can later be called to insert objects into that table.
+
+    Example 1:
+        Postgresql Table:
+            >>> CREATE TABLE my_table (id SERIAL PRIMARY KEY, foo TEXT)
+
+        Python:
+            >>> conn = psycopg2.connect(**db_config)
+            >>> curs = conn.cursor(cursor_factory=DictCursor)
+            >>> MyTable = PgPyTable('my_table', curs, ('id',))
+            >>> MyTable
+            PgPyTable(my_table, ('id',))
+
+            >>> row1 = MyTable({'foo':'bar',})
+            {'id':1, 'foo':'bar'}
+
+            >>> row2 = MyTable({'foo':'baz',})
+            {'id':2, 'foo':'baz'}
+
+            >>> row2_copy = MyTable.getByPrimary(2)
+            >>> row2 == row2__copy
+            True
+    """
 
     def __init__(self, table, psycopg2_cursor, primary_keys):
         self.table = table
         self.curs = psycopg2_cursor
         self.pks = primary_keys
         self.ref_info = {}
+
+
+    def __repr__(self):
+        return 'PgPyTable({}, {})'.format(self.table, self.pks)
+
 
     def _execute(self, *a, **kw):
         return self.curs.execute(*a, **kw)
@@ -34,11 +93,8 @@ class PgPyTable(object):
         d = dict(*a, **kw)
         keys = d.keys()
         if keys:
-            self._execute('INSERT INTO {} ({}) VALUES ({}) RETURNING *'.format(
-                    self.table,
-                    ', '.join(keys),
-                    ', '.join(['%('+k+')s' for k in keys]),
-                    ),
+            self._execute('INSERT INTO {} {} RETURNING *'.format(
+                        self.table, insert_column_value_pairs(keys)),
                     d)
         else:
             # Handle an empty call
@@ -68,7 +124,7 @@ class PgPyTable(object):
     def getWhere(self, where):
         self._execute('SELECT * FROM {} WHERE {}'.format(
                 self.table,
-                key_value_pairs(where, join_str=' AND ')
+                column_value_pairs(where, join_str=' AND ')
                 ),
             where)
         return self.curs.fetchone()
@@ -111,9 +167,9 @@ class PgPyDict(dict):
     def flush(self):
         if self._ref_info:
             # Do not send custom columns to the database
-            kvp = key_value_pairs(dict([(k,v) for k,v in self.items() if k not in self._primary_to_ref]))
+            kvp = column_value_pairs(dict([(k,v) for k,v in self.items() if k not in self._primary_to_ref]))
         else:
-            kvp = key_value_pairs(self)
+            kvp = column_value_pairs(self)
         self._curs.execute('UPDATE {} SET {} WHERE id=%(id)s'.format(
                 self._table, kvp), self)
 

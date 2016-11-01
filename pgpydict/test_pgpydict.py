@@ -22,10 +22,17 @@ class TestPgPyTable(unittest.TestCase):
         self.curs = self.conn.cursor(cursor_factory=DictCursor)
         self.tearDown()
         self.curs.execute('CREATE TABLE table1 (id SERIAL PRIMARY KEY, foo TEXT)')
+        self.curs.execute('''CREATE TABLE table2 (
+                id SERIAL,
+                group_id INTEGER,
+                foo TEXT,
+                PRIMARY KEY(id, group_id)
+            )''')
         self.conn.commit()
 
 
     def tearDown(self):
+        self.conn.rollback()
         self.curs.execute('''DROP SCHEMA public CASCADE;
                 CREATE SCHEMA public;
                 GRANT ALL ON SCHEMA public TO postgres;
@@ -35,9 +42,22 @@ class TestPgPyTable(unittest.TestCase):
 
     def test_init(self):
         Table1 = PgPyTable('table1', self.curs, ('id',))
-        Table1({'foo':'bar',})
-        row = Table1.getByPrimary(1)
+        row = Table1({'foo':'bar',})
+        row_copy = Table1.getByPrimary(1)
         self.assertEqual(row, {'id':1, 'foo':'bar'})
+        self.assertEqual(row, row_copy)
+        self.assertRaises(psycopg2.IntegrityError, Table1, row)
+
+
+    def test_multiple_pks(self):
+        Table2 = PgPyTable('table2', self.curs, ('id', 'group_id'))
+        row1 = Table2({'group_id':3, 'foo':'bar',})
+        row2 = Table2({'group_id':3, 'foo':'bar',})
+        self.assertRaises(psycopg2.IntegrityError, Table2, row2)
+
+    def test_empty(self):
+        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1({})
 
 
 
@@ -53,6 +73,7 @@ class TestPgPyDict(unittest.TestCase):
 
 
     def tearDown(self):
+        self.conn.rollback()
         self.curs.execute('''DROP SCHEMA public CASCADE;
                 CREATE SCHEMA public;
                 GRANT ALL ON SCHEMA public TO postgres;
@@ -303,6 +324,48 @@ class TestSubPgPyDict(unittest.TestCase):
         self.assertEqual(row1a['table2'], None)
         self.assertEqual(row1b['table2_id'], None)
         self.assertEqual(row1b['table2'], None)
+
+
+    def test_sub_dict_update(self):
+        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table2 = PgPyTable('table2', self.curs, ('id',))
+        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row2a = Table2({'person':'Dave',})
+        row2b = Table2({'person':'Bob',})
+        row1a = Table1({'foo':'bar',})
+        row1b = Table1({'foo':'baz',})
+        # Rows have not yet been associated
+        self.assertEqual(row1a['table2_id'], None)
+        self.assertEqual(row1a['table2'], None)
+        self.assertEqual(row1b['table2_id'], None)
+        self.assertEqual(row1b['table2'], None)
+
+        row1a['table2'] = row2a
+        self.assertEqual(row1a['table2_id'], row2a['id'])
+        self.assertEqual(row1a['table2'], row2a)
+        self.assertEqual(row1b['table2_id'], None)
+        self.assertEqual(row1b['table2'], None)
+
+        # Setting 1b to 2a using update, both should now be associated with 2a
+        row1b.update(row1a)
+        self.assertEqual(row1a['table2_id'], row2a['id'])
+        self.assertEqual(row1a['table2'], row2a)
+        self.assertEqual(row1b['table2_id'], row2a['id'])
+        self.assertEqual(row1b['table2'], row2a)
+
+        # Switching 1a to 2b, 1b should still be 2a
+        row1a['table2'] = row2b
+        self.assertEqual(row1a['table2_id'], row2b['id'])
+        self.assertEqual(row1a['table2'], row2b)
+        self.assertEqual(row1b['table2_id'], row2a['id'])
+        self.assertEqual(row1b['table2'], row2a)
+
+        # Updating 1b again, it should match with 2b
+        row1b.update(row1a)
+        self.assertEqual(row1a['table2_id'], row2b['id'])
+        self.assertEqual(row1a['table2'], row2b)
+        self.assertEqual(row1b['table2_id'], row2b['id'])
+        self.assertEqual(row1b['table2'], row2b)
 
 
 
