@@ -141,6 +141,9 @@ class PgPyDict(dict):
 
 
     def __getitem__(self, key):
+        """
+        Will retrieve a sub-PgPyDict if it has not yet been retrieved.
+        """
         if key in self._primary_to_ref and not super().__getitem__(key):
             # The primary key has not yet been set, get it from the referenced
             # object.
@@ -180,6 +183,7 @@ class PgPyDict(dict):
 
     __delitem__.__doc__ += dict.__delitem__.__doc__
     __setitem__.__doc__ += dict.__setitem__.__doc__
+    __getitem__.__doc__ += dict.__getitem__.__doc__
     update.__doc__ += dict.update.__doc__
 
 
