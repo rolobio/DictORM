@@ -69,6 +69,7 @@ class PgPyTable(object):
         self.curs = psycopg2_cursor
         self.pks = primary_keys
         self.ref_info = {}
+        self.primary_to_ref = {}
 
 
     def __repr__(self):
@@ -95,6 +96,17 @@ class PgPyTable(object):
         d = dict(*a, **kw)
         keys = d.keys()
         if keys:
+            for key in [k for k in keys if k in self.primary_to_ref]:
+                # Raw dictionary has been provided in the call, it needs
+                # to be added as its own row, then associated with this
+                # call.
+                table, pk, key_name = self.ref_info[self.primary_to_ref[key]]
+                pgpydict = table(d[key])
+                d[self.primary_to_ref[key]] = pgpydict[pk]
+                # Remove sub-dict reference so insert doesn't have that
+                # extra key.  Sub-dict will be retrieved entirely by
+                # __getitem__
+                del d[key]
             self._execute('INSERT INTO {} {} RETURNING *'.format(
                         self.table, insert_column_value_pairs(keys)),
                     d)
@@ -157,6 +169,10 @@ class PgPyTable(object):
         referenced by the provided parameters.
         """
         self.ref_info[ref_column] = (pgpytable, primary_key, key_name)
+        self.primary_to_ref = {}
+        for ref_column in self.ref_info:
+            i,j,k = self.ref_info[ref_column]
+            self.primary_to_ref[k] = ref_column
 
 
 

@@ -410,6 +410,22 @@ class TestSubPgPyDict(unittest.TestCase):
         self.assertEqual(row2['person'], 'Thomas')
 
 
+    def test_sub_init(self):
+        """
+        A sub-dict can be created when creating a pgpydict.
+        """
+        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table2 = PgPyTable('table2', self.curs, ('id',))
+        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row2_dict = {'person':'Alice'}
+        row1 = Table1({'foo':'bar', 'table2':row2_dict})
+        row2 = row1['table2']
+        # an id as been added by the init
+        row2_dict['id'] = row2['id']
+        print(row1)
+        self.assertEqual(row2, row2_dict)
+
+
 
 if __name__ == '__main__':
     unittest.main()
