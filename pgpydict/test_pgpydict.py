@@ -187,12 +187,21 @@ class TestSubPgPyDict(unittest.TestCase):
         row1['table2'] = row2
         self.assertEqual(row1['table2_id'], row2['id'])
         self.assertEqual(row1['table2'], row2)
+        self.conn.commit()
+        self.assertEqual(row1['table2_id'], row2['id'])
+        self.assertEqual(row1['table2'], row2)
 
         row1['table2'] = row3
         self.assertEqual(row1['table2_id'], row3['id'])
         self.assertEqual(row1['table2'], row3)
+        self.conn.commit()
+        self.assertEqual(row1['table2_id'], row3['id'])
+        self.assertEqual(row1['table2'], row3)
 
         row1['table2'] = None
+        self.assertEqual(row1['table2_id'], None)
+        self.assertEqual(row1['table2'], None)
+        self.conn.commit()
         self.assertEqual(row1['table2_id'], None)
         self.assertEqual(row1['table2'], None)
 
@@ -214,12 +223,21 @@ class TestSubPgPyDict(unittest.TestCase):
         row1['table2_id'] = row2['id']
         self.assertEqual(row1['table2_id'], row2['id'])
         self.assertEqual(row1['table2'], row2)
+        self.conn.commit()
+        self.assertEqual(row1['table2_id'], row2['id'])
+        self.assertEqual(row1['table2'], row2)
 
         row1['table2_id'] = row3['id']
         self.assertEqual(row1['table2_id'], row3['id'])
         self.assertEqual(row1['table2'], row3)
+        self.conn.commit()
+        self.assertEqual(row1['table2_id'], row3['id'])
+        self.assertEqual(row1['table2'], row3)
 
         row1['table2_id'] = None
+        self.assertEqual(row1['table2_id'], None)
+        self.assertEqual(row1['table2'], None)
+        self.conn.commit()
         self.assertEqual(row1['table2_id'], None)
         self.assertEqual(row1['table2'], None)
 
@@ -271,7 +289,6 @@ class TestSubPgPyDict(unittest.TestCase):
         # Only b's are associated
         self.assertEqual(row1b['table2_id'], row2b['id'])
         self.assertEqual(row1b['table2'], row2b)
-
 
         # De-associate b's
         row1b['table2_id'] = None
