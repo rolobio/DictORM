@@ -389,6 +389,27 @@ class TestSubPgPyDict(unittest.TestCase):
         self.assertEqual(row1b['table2'], row2b)
 
 
+    def test_sub_dict_modification(self):
+        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table2 = PgPyTable('table2', self.curs, ('id',))
+        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        row2 = Table2({'person':'Alice',})
+        row1 = Table1({'foo':'bar',})
+        row1['table2'] = row2
+
+        row1['table2']['person'] = 'Thomas'
+        self.assertEqual(row1['table2']['person'], 'Thomas')
+        self.assertEqual(row2['person'], 'Thomas')
+        self.conn.commit()
+        self.assertEqual(row1['table2']['person'], 'Thomas')
+        self.assertEqual(row2['person'], 'Thomas')
+
+        row1 = Table1.getByPrimary(1)
+        row2 = Table2.getByPrimary(1)
+        self.assertEqual(row1['table2']['person'], 'Thomas')
+        self.assertEqual(row2['person'], 'Thomas')
+
+
 
 if __name__ == '__main__':
     unittest.main()

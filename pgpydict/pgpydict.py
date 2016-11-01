@@ -2,6 +2,8 @@ from psycopg2.extras import DictCursor
 
 __all__ = ['PgPyTable', 'PgPyDict']
 
+class NoEntryError(Exception): pass
+
 def column_value_pairs(d, join_str=', '):
     """
     Create a string of SQL that will instruct a Psycopg2 DictCursor to
@@ -116,27 +118,36 @@ class PgPyTable(object):
             t = PgPyTable('some_table', curs, ('id', 'group_id'))
             row = t.getByPrimary({'id':8, 'group_id':12})
         """
-        try:
+        if primary and not self.pks:
+            raise ValueError('No primary keys specified, use getWhere')
+        else:
             if type(primary) != dict:
                 primary = {self.pks[0]:primary,}
-            return self._initPgPyDict(self.getWhere(primary))
-        except IndexError:
-            raise ValueError('No primary keys specified, use getWhere')
+            return self.getWhere(primary)
 
 
     def getWhere(self, where):
+        """
+        Get a PgPyDict from the DB that matches the provided dictionary when
+        it's column's match.
+        """
         self._execute('SELECT * FROM {} WHERE {}'.format(
-                self.table,
-                column_value_pairs(where, join_str=' AND ')
-                ),
+                self.table, column_value_pairs(where, join_str=' AND ')),
             where)
-        return self.curs.fetchone()
+        d = self.curs.fetchone()
+        if not d:
+            raise NoEntryError()
+        return self._initPgPyDict(d)
 
 
     def _appendReferences(self, d):
         for ref_column in self.ref_info:
             table, pk, key_name = self.ref_info[ref_column]
-            d[key_name] = table.getWhere({pk:d[ref_column],})
+            try:
+                d[key_name] = table.getWhere({pk:d[ref_column],})
+            except NoEntryError:
+                # Row lookup failed, the sub-dict does not exist
+                d[key_name] = None
         return d
 
 
