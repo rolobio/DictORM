@@ -12,7 +12,7 @@ class PgPyTable(object):
         self.table = table
         self.curs = psycopg2_cursor
         self.pks = primary_keys
-        self.references_by_ref_column = {}
+        self.ref_info = {}
 
     def _execute(self, *a, **kw):
         return self.curs.execute(*a, **kw)
@@ -22,7 +22,7 @@ class PgPyTable(object):
         # Create the PgPyDict before appending references because dictcursor
         # will not allow columns to be added.
         d = PgPyDict(d, self.table, self.curs, self.pks,
-                self.references_by_ref_column)
+                self.ref_info)
         d = self._appendReferences(d)
         return d
 
@@ -75,8 +75,8 @@ class PgPyTable(object):
 
 
     def _appendReferences(self, d):
-        for ref_column in self.references_by_ref_column:
-            table, pk, key_name = self.references_by_ref_column[ref_column]
+        for ref_column in self.ref_info:
+            table, pk, key_name = self.ref_info[ref_column]
             d[key_name] = table.getWhere({pk:d[ref_column],})
         return d
 
@@ -86,7 +86,7 @@ class PgPyTable(object):
         When getting this table's row, get another table's row which is
         referenced by the provided parameters.
         """
-        self.references_by_ref_column[ref_column] = (pgpytable, primary_key, key_name)
+        self.ref_info[ref_column] = (pgpytable, primary_key, key_name)
 
 
 
@@ -100,18 +100,18 @@ class PgPyDict(dict):
         self._table = table
         self._curs = curs
         self._pks = primary_keys
-        self._references_by_ref_column = references
-        self._references_by_primary = {}
-        for ref_column in self._references_by_ref_column:
-            i,j,k = self._references_by_ref_column[ref_column]
-            self._references_by_primary[k] = ref_column
+        self._ref_info = references
+        self._primary_to_ref = {}
+        for ref_column in self._ref_info:
+            i,j,k = self._ref_info[ref_column]
+            self._primary_to_ref[k] = ref_column
         super().__init__(d)
 
 
     def flush(self):
-        if self._references_by_ref_column:
+        if self._ref_info:
             # Do not send custom columns to the database
-            kvp = key_value_pairs(dict([(k,v) for k,v in self.items() if k not in self._references_by_primary]))
+            kvp = key_value_pairs(dict([(k,v) for k,v in self.items() if k not in self._primary_to_ref]))
         else:
             kvp = key_value_pairs(self)
         self._curs.execute('UPDATE {} SET {} WHERE id=%(id)s'.format(
@@ -124,34 +124,34 @@ class PgPyDict(dict):
         """
         if key in self._pks:
             return
-        elif key in self._references_by_primary:
+        elif key in self._primary_to_ref:
             if type(val) == PgPyDict:
                 # Use the Dict object to set it's matching primary key
-                pgpytable, primary_key, key_name = self._references_by_ref_column[self._references_by_primary[key]]
-                super().__setitem__(self._references_by_primary[key], val[primary_key])
+                pgpytable, primary_key, key_name = self._ref_info[self._primary_to_ref[key]]
+                super().__setitem__(self._primary_to_ref[key], val[primary_key])
             else:
-                super().__setitem__(self._references_by_primary[key], val)
-        elif key in self._references_by_ref_column:
+                super().__setitem__(self._primary_to_ref[key], val)
+        elif key in self._ref_info:
             # Set the matching dict to None, it will be looked-up if it is ever
             # requested using __getitem__
-            pgpytable, primary_key, key_name = self._references_by_ref_column[key]
+            pgpytable, primary_key, key_name = self._ref_info[key]
             super().__setitem__(key_name, None)
         super().__setitem__(key, val)
         self.flush()
 
 
     def __getitem__(self, key):
-        if key in self._references_by_primary and not super().__getitem__(key):
+        if key in self._primary_to_ref and not super().__getitem__(key):
             # The primary key has not yet been set, get it from the referenced
             # object.
-            ref = self._references_by_primary[key]
-            pgpytable, primary_key, key_name = self._references_by_ref_column[ref]
+            ref = self._primary_to_ref[key]
+            pgpytable, primary_key, key_name = self._ref_info[ref]
             if super().__getitem__(ref):
                 super().__setitem__(
                         key,
                         pgpytable.getByPrimary(super().__getitem__(ref)))
-        elif key in self._references_by_ref_column and not super().__getitem__(key):
-            pgpytable, primary_key, key_name = self._references_by_ref_column[key]
+        elif key in self._ref_info and not super().__getitem__(key):
+            pgpytable, primary_key, key_name = self._ref_info[key]
             if super().get(key_name):
                 # Object has already been set, use its primary key
                 super().__setitem__(
