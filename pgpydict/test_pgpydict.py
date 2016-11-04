@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-from pprint import pprint, pformat
 from pgpydict import *
 from psycopg2 import OperationalError
 from psycopg2.extras import DictCursor
@@ -42,7 +41,7 @@ class TestPgPyTable(unittest.TestCase):
 
 
     def test_init(self):
-        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1 = PgPyTable('table1', self.curs)
         row = Table1({'foo':'bar',})
         row_copy = Table1.getByPrimary(1)
         self.assertEqual(row, {'id':1, 'foo':'bar'})
@@ -51,26 +50,26 @@ class TestPgPyTable(unittest.TestCase):
 
 
     def test_multiple_pks(self):
-        Table2 = PgPyTable('table2', self.curs, ('id', 'group_id'))
+        Table2 = PgPyTable('table2', self.curs)
         row1 = Table2({'group_id':3, 'foo':'bar',})
         row2 = Table2({'group_id':3, 'foo':'bar',})
         self.assertRaises(psycopg2.IntegrityError, Table2, row2)
 
 
     def test_getByPrimary_with_multiple_pks(self):
-        Table2 = PgPyTable('table2', self.curs, ('id', 'group_id'))
+        Table2 = PgPyTable('table2', self.curs)
         a = Table2({'group_id':3, 'foo':'bar',})
         b = Table2.getByPrimary({'id':1, 'group_id':3})
         self.assertEqual(a, b)
 
 
     def test_empty(self):
-        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1 = PgPyTable('table1', self.curs)
         Table1({})
 
 
     def test_no_pks(self):
-        Table3 = PgPyTable('table3', self.curs, ())
+        Table3 = PgPyTable('table3', self.curs)
         row = Table3({})
         self.assertEqual(row, {'id':None, 'foo':None})
         row['id'] = 12
@@ -103,7 +102,7 @@ class TestPgPyDict(unittest.TestCase):
 
 
     def test___setitem__(self):
-        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1 = PgPyTable('table1', self.curs)
         Table1({'foo':'bar',})
         row = Table1.getByPrimary(1)
         self.assertEqual(row, {'id':1, 'foo':'bar'})
@@ -117,7 +116,7 @@ class TestPgPyDict(unittest.TestCase):
         A PgPyDict should not delete an item, instead it should set it to None
         so that value will be reflected in the database.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1 = PgPyTable('table1', self.curs)
         Table1({'foo':'bar',})
         row = Table1.getByPrimary(1)
         del row['foo']
@@ -128,7 +127,7 @@ class TestPgPyDict(unittest.TestCase):
         """
         Update should change all values except primary keys.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1 = PgPyTable('table1', self.curs)
         Table1({'foo':'bar',})
         row = Table1.getByPrimary(1)
         new_row = {'id':2, 'foo':'baz'}
@@ -142,7 +141,7 @@ class TestPgPyDict(unittest.TestCase):
         """
         Can insert an empty dict.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1 = PgPyTable('table1', self.curs)
         row = Table1()
         self.assertEqual(row['id'], 1)
 
@@ -151,7 +150,7 @@ class TestPgPyDict(unittest.TestCase):
         """
         Test that the PgPyDict functions as a normal dict.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
+        Table1 = PgPyTable('table1', self.curs)
         row = Table1({'foo':'bar',})
         self.assertEqual(len(row), 2)
         self.assertEqual(sorted(iter(row)), sorted(['id', 'foo']))
@@ -163,7 +162,7 @@ class TestPgPyDict(unittest.TestCase):
 
 
     def test_multiple_primarys(self):
-        Table2 = PgPyTable('table2', self.curs, ('id', 'group_id'))
+        Table2 = PgPyTable('table2', self.curs)
         row = Table2({'id':4, 'group_id':2, 'person':'Dave'})
         row['person'] = 'Austin'
         row = Table2.getByPrimary({'id':4, 'group_id':2})
@@ -181,8 +180,8 @@ class TestPgPyDict(unittest.TestCase):
         """
         curs1 = self.curs
         curs2 = self.conn.cursor(cursor_factory=DictCursor)
-        Table1a = PgPyTable('table1', curs1, ('id',))
-        Table1b = PgPyTable('table1', curs2, ('id',))
+        Table1a = PgPyTable('table1', curs1)
+        Table1b = PgPyTable('table1', curs2)
         row1a = Table1a({'foo':'bar',})
         row2a = Table1b({'foo':'baz',})
         self.conn.commit()
@@ -216,9 +215,8 @@ class TestSubPgPyDict(unittest.TestCase):
         """
         A sub-pgpydict can be specified when a reference column is defined.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
-        Table2 = PgPyTable('table2', self.curs, ('id',))
-        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
         row3 = Table2({'person':'Bob',})
         row2 = Table2({'person':'Dave',})
         row1 = Table1({'foo':'bar',})
@@ -252,9 +250,8 @@ class TestSubPgPyDict(unittest.TestCase):
         """
         A sub-pgpydict can be specified when a reference column is defined.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
-        Table2 = PgPyTable('table2', self.curs, ('id',))
-        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
         row3 = Table2({'person':'Bob',})
         row2 = Table2({'person':'Dave',})
         row1 = Table1({'foo':'bar',})
@@ -288,9 +285,8 @@ class TestSubPgPyDict(unittest.TestCase):
         """
         A sub-pgpydict can be specified when a reference column is defined.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
-        Table2 = PgPyTable('table2', self.curs, ('id',))
-        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
         row2a = Table2({'person':'Dave',})
         row2b = Table2({'person':'Bob',})
         row1a = Table1({'foo':'bar',})
@@ -348,9 +344,8 @@ class TestSubPgPyDict(unittest.TestCase):
 
 
     def test_sub_dict_update(self):
-        Table1 = PgPyTable('table1', self.curs, ('id',))
-        Table2 = PgPyTable('table2', self.curs, ('id',))
-        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
         row2a = Table2({'person':'Dave',})
         row2b = Table2({'person':'Bob',})
         row1a = Table1({'foo':'bar',})
@@ -390,9 +385,8 @@ class TestSubPgPyDict(unittest.TestCase):
 
 
     def test_sub_dict_modification(self):
-        Table1 = PgPyTable('table1', self.curs, ('id',))
-        Table2 = PgPyTable('table2', self.curs, ('id',))
-        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
         row2 = Table2({'person':'Alice',})
         row1 = Table1({'foo':'bar',})
         row1['table2'] = row2
@@ -414,16 +408,18 @@ class TestSubPgPyDict(unittest.TestCase):
         """
         A sub-dict can be created when creating a pgpydict.
         """
-        Table1 = PgPyTable('table1', self.curs, ('id',))
-        Table2 = PgPyTable('table2', self.curs, ('id',))
-        Table1.addReference(Table2, 'id', 'table2_id', 'table2')
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
         row2_dict = {'person':'Alice'}
         row1 = Table1({'foo':'bar', 'table2':row2_dict})
         row2 = row1['table2']
         # an id as been added by the init
         row2_dict['id'] = row2['id']
-        print(row1)
         self.assertEqual(row2, row2_dict)
+        self.assertEqual(row2, Table2.getByPrimary(1))
+        self.conn.commit()
+        self.assertEqual(row2, row2_dict)
+        self.assertEqual(row2, Table2.getByPrimary(1))
 
 
 

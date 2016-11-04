@@ -49,7 +49,7 @@ class PgPyTable(object):
         Python:
             >>> conn = psycopg2.connect(**db_config)
             >>> curs = conn.cursor(cursor_factory=DictCursor)
-            >>> MyTable = PgPyTable('my_table', curs, ('id',))
+            >>> MyTable = PgPyTable('my_table', curs)
             >>> MyTable
             PgPyTable(my_table, ('id',))
 
@@ -64,12 +64,53 @@ class PgPyTable(object):
             True
     """
 
-    def __init__(self, table, psycopg2_cursor, primary_keys):
+    def __init__(self, table, psycopg2_cursor, primary_keys=None, auto_reference=True):
         self.table = table
         self.curs = psycopg2_cursor
-        self.pks = primary_keys
         self.ref_info = {}
         self.primary_to_ref = {}
+        self.pks = primary_keys or self._get_primary_keys()
+        if auto_reference:
+            for reference in self._get_references():
+                table_name, pk, key_name = reference
+                table = PgPyTable(table_name, self.curs, auto_reference=auto_reference)
+                self.addReference(table, pk, key_name,  table_name)
+
+
+    def _get_primary_keys(self):
+        """
+        Get a list of Primary Keys set for this table in the DB.
+        """
+        self._execute('''SELECT a.attname AS data_type
+        FROM   pg_index i
+        JOIN   pg_attribute a ON a.attrelid = i.indrelid
+                             AND a.attnum = ANY(i.indkey)
+                             WHERE  i.indrelid = '%s'::regclass
+                             AND    i.indisprimary;''' % self.table)
+        return [i[0] for i in self.curs.fetchall()]
+
+
+    def _get_references(self):
+        """
+        Get a list of references for this table in the DB.
+
+        Example:
+            [('foreign_table', 'foreign_column_name', 'this_tables_column_name'),]
+        """
+        self._execute(
+            '''SELECT
+                ccu.table_name,
+                ccu.column_name,
+                kcu.column_name
+            FROM
+                information_schema.table_constraints AS tc
+                JOIN information_schema.key_column_usage AS kcu
+                  ON tc.constraint_name = kcu.constraint_name
+                JOIN information_schema.constraint_column_usage AS ccu
+                  ON ccu.constraint_name = tc.constraint_name
+            WHERE constraint_type = 'FOREIGN KEY' AND tc.table_name='{}';'''.format(
+                self.table))
+        return self.curs.fetchall()
 
 
     def __repr__(self):
