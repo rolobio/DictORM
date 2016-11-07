@@ -4,6 +4,14 @@ __all__ = ['PgPyTable', 'PgPyDict']
 
 class NoEntryError(Exception): pass
 
+operator_kinds = {
+        tuple:' IN ',
+        str:'=',
+        int:'=',
+        type(None):'=',
+        }
+
+
 def column_value_pairs(d, join_str=', '):
     """
     Create a string of SQL that will instruct a Psycopg2 DictCursor to
@@ -16,7 +24,10 @@ def column_value_pairs(d, join_str=', '):
 
         id=%(id)s, person=%(person)s
     """
-    return join_str.join([str(k)+'=%('+k+')s' for k in d.keys()])
+    return join_str.join([
+            str(k) + operator_kinds[type(d[k])] + '%('+k+')s'
+            for k in d.keys()
+        ])
 
 
 def insert_column_value_pairs(d):
@@ -59,7 +70,7 @@ class PgPyTable(object):
             >>> row2 = MyTable({'foo':'baz',})
             {'id':2, 'foo':'baz'}
 
-            >>> row2_copy = MyTable.getByPrimary(2)
+            >>> row2_copy = MyTable.getWhere(2)
             >>> row2 == row2__copy
             True
     """
@@ -155,41 +166,32 @@ class PgPyTable(object):
             # Handle an empty call
             self._execute('INSERT INTO {} DEFAULT VALUES RETURNING *'.format(
                 self.table))
-        return self._initPgPyDict(self.curs.fetchone())
-
-
-    def getByPrimary(self, primary):
-        """
-        Get a row from the table that matches the primary keys specified
-        during this instance's creation.
-
-        Single Primary Key:
-            t = PgPyTable('some_table', curs, ('id',))
-            row = t.getByPrimary(42)
-
-        Multiple Primary Keys:
-            t = PgPyTable('some_table', curs, ('id', 'group_id'))
-            row = t.getByPrimary({'id':8, 'group_id':12})
-        """
-        if primary and not self.pks:
-            raise ValueError('No primary keys specified, use getWhere')
-        elif type(primary) != dict:
-            primary = {self.pks[0]:primary,}
-        return self.getWhere(primary)
-
-
-    def getWhere(self, where):
-        """
-        Get a PgPyDict from the DB that matches the provided dictionary when
-        it's column's match.
-        """
-        self._execute('SELECT * FROM {} WHERE {}'.format(
-                self.table, column_value_pairs(where, join_str=' AND ')),
-            where)
         d = self.curs.fetchone()
-        if not d:
-            raise NoEntryError()
         return self._initPgPyDict(d)
+
+    __call__.__doc__ += dict.__doc__
+
+
+    def getWhere(self, id_or_where):
+        """
+        Get a PgPyDict or list of PgPyDict's from the DB that matches the
+        provided dictionary when the column's match.
+        """
+        if type(id_or_where) in (tuple, list, int):
+            try:
+                id_or_where = {self.pks[0]:id_or_where,}
+            except IndexError:
+                raise ValueError('No primary keys specified, use getWhere')
+        self._execute('SELECT * FROM {} WHERE {}'.format(
+                self.table, column_value_pairs(id_or_where, join_str=' AND ')),
+            id_or_where)
+        if self.curs.rowcount == 1 or self.curs.rowcount == 0:
+            d = self.curs.fetchone()
+            if not d:
+                raise NoEntryError()
+            return self._initPgPyDict(d)
+        else:
+            return [self._initPgPyDict(d) for d in self.curs.fetchall()]
 
 
     def _appendReferences(self, d):
@@ -278,7 +280,7 @@ class PgPyDict(dict):
             if super().__getitem__(ref):
                 super().__setitem__(
                         key,
-                        pgpytable.getByPrimary(super().__getitem__(ref)))
+                        pgpytable.getWhere(super().__getitem__(ref)))
         elif key in self._ref_info and not super().__getitem__(key):
             pgpytable, primary_key, key_name = self._ref_info[key]
             if super().get(key_name):

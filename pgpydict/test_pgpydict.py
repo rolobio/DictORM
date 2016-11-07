@@ -43,7 +43,7 @@ class TestPgPyTable(unittest.TestCase):
     def test_init(self):
         Table1 = PgPyTable('table1', self.curs)
         row = Table1({'foo':'bar',})
-        row_copy = Table1.getByPrimary(1)
+        row_copy = Table1.getWhere(1)
         self.assertEqual(row, {'id':1, 'foo':'bar'})
         self.assertEqual(row, row_copy)
         self.assertRaises(psycopg2.IntegrityError, Table1, row)
@@ -56,10 +56,10 @@ class TestPgPyTable(unittest.TestCase):
         self.assertRaises(psycopg2.IntegrityError, Table2, row2)
 
 
-    def test_getByPrimary_with_multiple_pks(self):
+    def test_getWhere_with_multiple_pks(self):
         Table2 = PgPyTable('table2', self.curs)
         a = Table2({'group_id':3, 'foo':'bar',})
-        b = Table2.getByPrimary({'id':1, 'group_id':3})
+        b = Table2.getWhere({'id':1, 'group_id':3})
         self.assertEqual(a, b)
 
 
@@ -77,7 +77,7 @@ class TestPgPyTable(unittest.TestCase):
         self.assertEqual(row, {'id':12, 'foo':'asdf'})
         self.conn.commit()
         self.assertEqual(row, {'id':12, 'foo':'asdf'})
-        self.assertRaises(ValueError, Table3.getByPrimary, 12)
+        self.assertRaises(ValueError, Table3.getWhere, 12)
 
 
 
@@ -104,10 +104,10 @@ class TestPgPyDict(unittest.TestCase):
     def test___setitem__(self):
         Table1 = PgPyTable('table1', self.curs)
         Table1({'foo':'bar',})
-        row = Table1.getByPrimary(1)
+        row = Table1.getWhere(1)
         self.assertEqual(row, {'id':1, 'foo':'bar'})
         row['foo'] = 'baz'
-        row = Table1.getByPrimary(1)
+        row = Table1.getWhere(1)
         self.assertEqual(row, {'id':1, 'foo':'baz'})
 
 
@@ -118,7 +118,7 @@ class TestPgPyDict(unittest.TestCase):
         """
         Table1 = PgPyTable('table1', self.curs)
         Table1({'foo':'bar',})
-        row = Table1.getByPrimary(1)
+        row = Table1.getWhere(1)
         del row['foo']
         self.assertEqual(row['foo'], None)
 
@@ -129,7 +129,7 @@ class TestPgPyDict(unittest.TestCase):
         """
         Table1 = PgPyTable('table1', self.curs)
         Table1({'foo':'bar',})
-        row = Table1.getByPrimary(1)
+        row = Table1.getWhere(1)
         new_row = {'id':2, 'foo':'baz'}
         row.update(new_row)
         self.assertEqual(row['foo'], 'baz')
@@ -165,11 +165,11 @@ class TestPgPyDict(unittest.TestCase):
         Table2 = PgPyTable('table2', self.curs)
         row = Table2({'id':4, 'group_id':2, 'person':'Dave'})
         row['person'] = 'Austin'
-        row = Table2.getByPrimary({'id':4, 'group_id':2})
+        row = Table2.getWhere({'id':4, 'group_id':2})
         self.assertEqual(row['person'], 'Austin')
         row.update({'group_id':5, 'person':'Thomas'})
         self.assertEqual(row['group_id'], 2)
-        row = Table2.getByPrimary({'id':4, 'group_id':2})
+        row = Table2.getWhere({'id':4, 'group_id':2})
         self.assertEqual(row['person'], 'Thomas')
 
 
@@ -185,8 +185,8 @@ class TestPgPyDict(unittest.TestCase):
         row1a = Table1a({'foo':'bar',})
         row2a = Table1b({'foo':'baz',})
         self.conn.commit()
-        row1b = Table1a.getByPrimary(1)
-        row2b = Table1a.getByPrimary(2)
+        row1b = Table1a.getWhere(1)
+        row2b = Table1a.getWhere(2)
         self.assertEqual(row1a, row1b)
         self.assertEqual(row2a, row2b)
 
@@ -398,8 +398,8 @@ class TestSubPgPyDict(unittest.TestCase):
         self.assertEqual(row1['table2']['person'], 'Thomas')
         self.assertEqual(row2['person'], 'Thomas')
 
-        row1 = Table1.getByPrimary(1)
-        row2 = Table2.getByPrimary(1)
+        row1 = Table1.getWhere(1)
+        row2 = Table2.getWhere(1)
         self.assertEqual(row1['table2']['person'], 'Thomas')
         self.assertEqual(row2['person'], 'Thomas')
 
@@ -416,10 +416,67 @@ class TestSubPgPyDict(unittest.TestCase):
         # an id as been added by the init
         row2_dict['id'] = row2['id']
         self.assertEqual(row2, row2_dict)
-        self.assertEqual(row2, Table2.getByPrimary(1))
+        self.assertEqual(row2, Table2.getWhere(1))
         self.conn.commit()
         self.assertEqual(row2, row2_dict)
-        self.assertEqual(row2, Table2.getByPrimary(1))
+        self.assertEqual(row2, Table2.getWhere(1))
+
+
+class TestPgPyTableList(unittest.TestCase):
+
+
+    def setUp(self):
+        self.conn = psycopg2.connect(**test_db_login)
+        self.curs = self.conn.cursor(cursor_factory=DictCursor)
+        self.tearDown()
+        self.curs.execute('''CREATE TABLE table3 (
+                id SERIAL,
+                group_id INTEGER,
+                foo TEXT,
+                PRIMARY KEY(id, group_id)
+                )''')
+        self.curs.execute('CREATE TABLE table2 (id SERIAL PRIMARY KEY, person TEXT)')
+        self.curs.execute('CREATE TABLE table1 (id SERIAL PRIMARY KEY, foo TEXT, table2_id INTEGER REFERENCES table2(id) )')
+        self.conn.commit()
+
+
+    def tearDown(self):
+        self.curs.execute('''DROP SCHEMA public CASCADE;
+                CREATE SCHEMA public;
+                GRANT ALL ON SCHEMA public TO postgres;
+                GRANT ALL ON SCHEMA public TO public;''')
+        self.conn.commit()
+
+
+    def test_list(self):
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
+        foo = Table1({'foo':'foo', 'table2':{'person':'Dave'}})
+        bar = Table1({'foo':'bar', 'table2':{'person':'Bob'}})
+        baz = Table1({'foo':'baz', 'table2':{'person':'Alice'}})
+        entries = Table1.getWhere((1,2,3))
+        self.assertEqual([foo, bar, baz], entries)
+
+
+    def test_getWhere_list(self):
+        Table1 = PgPyTable('table1', self.curs)
+        Table2 = PgPyTable('table2', self.curs)
+        foo1 = Table1({'foo':'foo', 'table2':{'person':'Dave'}})
+        foo2 = Table1({'foo':'foo', 'table2':{'person':'Bob'}})
+        foo3 = Table1({'foo':'foo', 'table2':{'person':'Alice'}})
+        entries = Table1.getWhere({'foo':'foo'})
+
+
+    def test_getWhere_list_multiple_pks(self):
+        Table3 = PgPyTable('table3', self.curs)
+        for i in range(3):
+            for j in range(3):
+                Table3({'group_id':i, 'foo':j})
+        group0 = Table3.getWhere({'group_id':0})
+        self.assertEqual(group0,
+                [{'id': 1, 'group_id': 0, 'foo': '0'},
+                    {'id': 2, 'group_id': 0, 'foo': '1'},
+                    {'id': 3, 'group_id': 0, 'foo': '2'}])
 
 
 
