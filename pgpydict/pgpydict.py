@@ -4,12 +4,10 @@ __all__ = ['PgPyTable', 'PgPyDict']
 
 class NoEntryError(Exception): pass
 
-operator_kinds = {
-        tuple:' IN ',
-        str:'=',
-        int:'=',
-        type(None):'=',
-        }
+def operator_kinds(o):
+    if o in (tuple, list):
+        return ' IN '
+    return '='
 
 
 def column_value_pairs(d, join_str=', '):
@@ -25,7 +23,7 @@ def column_value_pairs(d, join_str=', '):
         id=%(id)s, person=%(person)s
     """
     return join_str.join([
-            str(k) + operator_kinds[type(d[k])] + '%('+k+')s'
+            str(k) + operator_kinds(type(d[k])) + '%('+k+')s'
             for k in d.keys()
         ])
 
@@ -75,7 +73,8 @@ class PgPyTable(object):
             True
     """
 
-    def __init__(self, table, psycopg2_cursor, primary_keys=None, auto_reference=True):
+    def __init__(self, table, psycopg2_cursor, primary_keys=None,
+            auto_reference=True, _original_table=None):
         self.table = table
         self.curs = psycopg2_cursor
         self.ref_info = {}
@@ -83,8 +82,13 @@ class PgPyTable(object):
         self.pks = primary_keys or self._get_primary_keys()
         if auto_reference:
             for reference in self._get_references():
+                if _original_table == self.table:
+                    continue
                 table_name, pk, key_name = reference
-                table = PgPyTable(table_name, self.curs, auto_reference=auto_reference)
+                table = PgPyTable(table_name, self.curs,
+                        # Pass the original table down the line so we don't have
+                        # a resursion problem.
+                        _original_table=_original_table or self.table)
                 self.addReference(table, pk, key_name,  table_name)
 
 

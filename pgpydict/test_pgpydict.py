@@ -480,5 +480,31 @@ class TestPgPyTableList(unittest.TestCase):
 
 
 
+class TestPgPyTableRecursive(unittest.TestCase):
+
+
+    def setUp(self):
+        self.conn = psycopg2.connect(**test_db_login)
+        self.curs = self.conn.cursor(cursor_factory=DictCursor)
+        self.tearDown()
+        self.curs.execute('''CREATE TABLE table2 (id SERIAL PRIMARY KEY, person TEXT);
+        CREATE TABLE table1 (id SERIAL PRIMARY KEY, foo TEXT, table2_id INTEGER REFERENCES table2(id) );
+        ALTER TABLE table2 ADD COLUMN table1_id INTEGER;
+        ALTER TABLE table2 ADD CONSTRAINT table1_id_fk FOREIGN KEY (table1_id) REFERENCES table1(id);
+        ''')
+        self.conn.commit()
+
+
+    def tearDown(self):
+        self.curs.execute('''DROP SCHEMA public CASCADE;
+                CREATE SCHEMA public;
+                GRANT ALL ON SCHEMA public TO postgres;
+                GRANT ALL ON SCHEMA public TO public;''')
+        self.conn.commit()
+
+    def test_recursive(self):
+        Table1 = PgPyTable('table1', self.curs)
+
+
 if __name__ == '__main__':
     unittest.main()
