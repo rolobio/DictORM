@@ -38,7 +38,8 @@ class TestPgPyTable(unittest.TestCase):
                 GRANT ALL ON SCHEMA public TO public;''')
         self.conn.commit()
 
-    def test(self):
+
+    def test_flush(self):
         Person = self.db['person']
         self.assertEqual(0, len(Person))
 
@@ -48,6 +49,15 @@ class TestPgPyTable(unittest.TestCase):
         bob.flush()
         self.assertEqual({'name':'Bob', 'id':1},
                 bob)
+
+
+    def test_getWhere(self):
+        Person = self.db['person']
+        self.assertEqual(0, len(Person))
+
+        bob = Person(name='Bob')
+        bob.flush()
+        self.assertEqual(Person.getWhere(1), bob)
 
 
 

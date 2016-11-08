@@ -46,9 +46,6 @@ def insert_column_value_pairs(d):
             )
 
 
-global UPDATES; UPDATES = []
-
-
 class DictDB(dict):
 
     def __init__(self, cursor):
@@ -79,6 +76,21 @@ class PgPyTable(object):
         self.table = table
         self.db = db
         self.execute = db.curs.execute
+        self.pks = []
+        self._refresh_primary_keys()
+
+
+    def _refresh_primary_keys(self):
+        """
+        Get a list of Primary Keys set for this table in the DB.
+        """
+        self.execute('''SELECT a.attname AS data_type
+        FROM   pg_index i
+        JOIN   pg_attribute a ON a.attrelid = i.indrelid
+                             AND a.attnum = ANY(i.indkey)
+                             WHERE  i.indrelid = '%s'::regclass
+                             AND    i.indisprimary;''' % self.table)
+        self.pks = [i[0] for i in self.db.curs.fetchall()]
 
 
     def __repr__(self):
@@ -92,6 +104,22 @@ class PgPyTable(object):
 
     def __call__(self, *a, **kw):
         return PgPyDict(self, *a, **kw)
+
+
+    def getWhere(self, row_id):
+        if type(row_id) == int:
+            d = {self.pks[0]:row_id,}
+            self.execute('SELECT * FROM {} WHERE {}'.format(
+                    self.table,
+                    column_value_pairs(d, ' AND ')
+                ),
+                d
+            )
+        if self.db.curs.rowcount == 0:
+            return None
+        elif self.db.curs.rowcount == 1:
+            return PgPyDict(self, self.db.curs.fetchone())
+        return [PgPyDict(self, d) for d in self.db.curs.fetchall()]
 
 
 
