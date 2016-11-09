@@ -13,8 +13,7 @@ test_db_login = {
         'port':'5432',
         }
 
-
-class TestPgPyTable(unittest.TestCase):
+class Test(unittest.TestCase):
 
 
     def setUp(self):
@@ -25,6 +24,15 @@ class TestPgPyTable(unittest.TestCase):
         CREATE TABLE person (
             id SERIAL PRIMARY KEY,
             name TEXT
+        );
+        CREATE TABLE department (
+            id SERIAL PRIMARY KEY,
+            name TEXT
+        );
+        CREATE TABLE person_department (
+            person_id INTEGER REFERENCES person(id),
+            department_id INTEGER REFERENCES department(id),
+            PRIMARY KEY (person_id, department_id)
         );
         ''')
         self.conn.commit()
@@ -39,7 +47,7 @@ class TestPgPyTable(unittest.TestCase):
         self.conn.commit()
 
 
-    def test_flush(self):
+    def test_getWhere(self):
         Person = self.db['person']
         self.assertEqual(0, len(Person))
 
@@ -49,15 +57,45 @@ class TestPgPyTable(unittest.TestCase):
         bob.flush()
         self.assertEqual({'name':'Bob', 'id':1},
                 bob)
+        self.assertEqual(Person.getWhere(1), bob)
+
+        # A second flush does not fail
+        bob.flush()
+        self.assertEqual({'name':'Bob', 'id':1},
+                bob)
+        self.assertEqual(Person.getWhere(1), bob)
+
+        bob['name'] = 'Jon'
+        bob.flush()
+        self.assertEqual(bob,
+                {'name':'Jon', 'id':1})
+        self.assertEqual(Person.getWhere(1), bob)
 
 
-    def test_getWhere(self):
+    def test_getWhere_multiple_pks(self):
         Person = self.db['person']
         self.assertEqual(0, len(Person))
-
         bob = Person(name='Bob')
         bob.flush()
-        self.assertEqual(Person.getWhere(1), bob)
+
+        Department = self.db['department']
+        self.assertEqual(0, len(Department))
+        sales = Department(name='Sales')
+        sales.flush()
+
+        PersonDepartment = self.db['person_department']
+        bob_sales = PersonDepartment(person_id=bob['id'], department_id=sales['id'])
+        bob_sales.flush()
+        self.assertEqual(bob_sales['person_id'], bob['id'])
+        self.assertEqual(bob_sales['department_id'], sales['id'])
+        # Searching person_department with two key/value pairs returns the new
+        # row.
+        self.assertEqual(
+                PersonDepartment.getWhere({'person_id':1, 'department_id':1}),
+                bob_sales)
+
+
+    def test_sub_dict(self):
 
 
 
