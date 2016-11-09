@@ -121,24 +121,22 @@ class Test(unittest.TestCase):
         Person = self.db['person']
         self.assertEqual(0, len(Person))
         bob = Person(name='Bob')
+        self.assertEqual(bob, {'name':'Bob'})
         bob.flush()
-        self.assertEqual(bob,
-                {'name':'Bob', 'id':1})
-        self.assertEqual(bob.remove_pks(),
-                {'name':'Bob'})
+        self.assertEqual(bob, {'name':'Bob', 'id':1})
+        self.assertEqual(bob.remove_pks(), {'name':'Bob'})
 
         aly = Person(name='Aly')
+        self.assertEqual(aly, {'name':'Aly'})
         aly.flush()
-        self.assertEqual(aly,
-                {'name':'Aly', 'id':2})
+        self.assertEqual(aly, {'name':'Aly', 'id':2})
+        self.assertEqual(aly.remove_pks(), {'name':'Aly'})
 
         bob.update(aly.remove_pks())
         bob.flush()
         aly.flush()
-        self.assertEqual(bob,
-                {'name':'Aly', 'id':1})
-        self.assertEqual(aly,
-                {'name':'Aly', 'id':2})
+        self.assertEqual(bob, {'name':'Aly', 'id':1})
+        self.assertEqual(aly, {'name':'Aly', 'id':2})
 
 
 
