@@ -198,6 +198,10 @@ class PgPyDict(dict):
 
 
     def remove_refs(self):
+        """
+        Return a dictionary without the key/value(s) added by a reference.  They
+        should never be sent in the query to the Database.
+        """
         return dict([
             (k,v) for k,v in self.items()
                 if k not in self._table.key_name_to_ref
@@ -208,9 +212,12 @@ class PgPyDict(dict):
         if key in self._table.refs:
             key_name, pgpytable, their_column = self._table.refs[key]
             if len(pgpytable.pks) > 1:
-                self[key_name] = pgpytable.get_where(zip(self._table.pks, value))
+                super().__setitem__(key_name, pgpytable.get_where(zip(self._table.pks, value)))
             else:
-                self[key_name] = pgpytable.get_where({self._table.pks[0]:value})
+                super().__setitem__(key_name, pgpytable.get_where({self._table.pks[0]:value}))
+        elif key in self._table.key_name_to_ref:
+            super().__setitem__(self._table.key_name_to_ref[key],
+                    value[self._table.pks[0]])
         super().__setitem__(key, value)
 
 

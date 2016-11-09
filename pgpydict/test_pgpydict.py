@@ -150,17 +150,19 @@ class Test(unittest.TestCase):
 
         bob['manager_id'] = aly['id']
         bob.flush()
-
         self.assertEqual(bob['manager_id'], aly['id'])
         self.assertEqual(bob['manager'], aly)
 
         steve = Person(name='Steve')
         steve.flush()
-
         bob['manager_id'] = steve['id']
-
         self.assertEqual(bob['manager_id'], steve['id'])
         self.assertEqual(bob['manager'], steve)
+
+        bob['manager'] = aly
+        bob.flush()
+        self.assertEqual(bob['manager_id'], aly['id'])
+        self.assertEqual(bob['manager'], aly)
 
 
 
