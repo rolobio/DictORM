@@ -103,6 +103,18 @@ class Test(unittest.TestCase):
 
         bob_copy = Person.getWhere(1)
         bob_copy.flush()
+        self.assertEqual(bob, bob_copy)
+
+
+    def test_dict_inits(self):
+        Person = self.db['person']
+        Person({'name':'Bob'})
+        Person(name='Alice')
+        Person([('name','Steve'),])
+
+        PgPyDict(Person, {'name':'Bob'})
+        PgPyDict(Person, name='Alice')
+        PgPyDict(Person, [('name','Steve'),])
 
 
 
