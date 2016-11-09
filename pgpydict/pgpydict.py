@@ -15,12 +15,17 @@ def column_value_pairs(d, join_str=', '):
     Create a string of SQL that will instruct a Psycopg2 DictCursor to
     interpolate the dictionary's keys into a SELECT or UPDATE SQL query.
 
-    Example:
-        d = {'id':10, 'person':'Dave'}
-
-        becomes
-
+    Example 1:
+        >>> column_value_pairs({'id':10, 'person':'Dave'})
         id=%(id)s, person=%(person)s
+
+    Example 2:
+        >>> column_value_pairs(('id', 'person'))
+        id=%(id)s, person=%(person)s
+
+    Example 3:
+        >>> column_value_pairs({'id':(10,11,13), 'group':'foo'}, ' AND ')
+        id IN %(id)s AND group=%(foo)s
     """
     if type(d) == dict:
         return join_str.join([
