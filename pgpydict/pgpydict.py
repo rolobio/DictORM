@@ -93,11 +93,11 @@ class PgPyTable(object):
         Get a list of Primary Keys set for this table in the DB.
         """
         self.curs.execute('''SELECT a.attname AS data_type
-                FROM   pg_index i
-                JOIN   pg_attribute a ON a.attrelid = i.indrelid
+                FROM pg_index i
+                JOIN pg_attribute a ON a.attrelid = i.indrelid
                 AND a.attnum = ANY(i.indkey)
-                WHERE  i.indrelid = '%s'::regclass
-                AND    i.indisprimary;''' % self.name)
+                WHERE i.indrelid = '%s'::regclass
+                AND i.indisprimary;''' % self.name)
         self.pks = [i[0] for i in self.curs.fetchall()]
 
 
@@ -127,7 +127,7 @@ class PgPyTable(object):
         return l
 
 
-    def getWhere(self, wheres):
+    def get_where(self, wheres):
         if type(wheres) == int:
             wheres = {self.pks[0]:wheres,}
         self.curs.execute('SELECT * FROM {} WHERE {}'.format(
@@ -183,9 +183,9 @@ class PgPyDict(dict):
 
     def remove_pks(self):
         """
-        Return a dictionary without the primary keys that are associated with it
-        in the Database.  This should be used when doing an update of another
-        PgPyDict.
+        Return a dictionary without the primary keys that are associated with
+        this PgPyDict in the Database.  This should be used when doing an update
+        of another PgPyDict.
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
 

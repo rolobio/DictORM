@@ -47,7 +47,7 @@ class Test(unittest.TestCase):
         self.conn.commit()
 
 
-    def test_getWhere(self):
+    def test_get_where(self):
         Person = self.db['person']
         self.assertEqual(0, len(Person))
 
@@ -57,22 +57,22 @@ class Test(unittest.TestCase):
         bob.flush()
         self.assertEqual({'name':'Bob', 'id':1},
                 bob)
-        self.assertEqual(Person.getWhere(1), bob)
+        self.assertEqual(Person.get_where(1), bob)
 
         # A second flush does not fail
         bob.flush()
         self.assertEqual({'name':'Bob', 'id':1},
                 bob)
-        self.assertEqual(Person.getWhere(1), bob)
+        self.assertEqual(Person.get_where(1), bob)
 
         bob['name'] = 'Jon'
         bob.flush()
         self.assertEqual(bob,
                 {'name':'Jon', 'id':1})
-        self.assertEqual(Person.getWhere(1), bob)
+        self.assertEqual(Person.get_where(1), bob)
 
 
-    def test_getWhere_multiple_pks(self):
+    def test_get_where_multiple_pks(self):
         Person = self.db['person']
         self.assertEqual(0, len(Person))
         bob = Person(name='Bob')
@@ -91,7 +91,7 @@ class Test(unittest.TestCase):
         # Searching person_department with two key/value pairs returns the new
         # row.
         self.assertEqual(
-                PersonDepartment.getWhere({'person_id':1, 'department_id':1}),
+                PersonDepartment.get_where({'person_id':1, 'department_id':1}),
                 bob_sales)
 
 
@@ -101,7 +101,7 @@ class Test(unittest.TestCase):
         bob = Person(name='Bob')
         bob.flush()
 
-        bob_copy = Person.getWhere(1)
+        bob_copy = Person.get_where(1)
         bob_copy.flush()
         self.assertEqual(bob, bob_copy)
 
