@@ -149,6 +149,12 @@ class PgPyDict(dict):
 
 
     def flush(self):
+        """
+        Insert this dictionary into it's table if its no yet in the Database,
+        or Update it's row if it is already in the database.
+
+        All column/values will bet inserted/set by this method.
+        """
         if not self._in_db:
             self._curs.execute('INSERT INTO {} {} RETURNING *'.format(
                     self._table.name,
@@ -168,6 +174,15 @@ class PgPyDict(dict):
         d = self._curs.fetchone()
         super().__init__(d)
         return self
+
+
+    def remove_pks(self):
+        """
+        Return a dictionary without the primary keys that are associated with it
+        in the Database.  This should be used when doing an update of another
+        PgPyDict.
+        """
+        return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
 
 
 

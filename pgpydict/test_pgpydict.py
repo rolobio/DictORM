@@ -117,6 +117,30 @@ class Test(unittest.TestCase):
         PgPyDict(Person, [('name','Steve'),])
 
 
+    def test_remove_pks(self):
+        Person = self.db['person']
+        self.assertEqual(0, len(Person))
+        bob = Person(name='Bob')
+        bob.flush()
+        self.assertEqual(bob,
+                {'name':'Bob', 'id':1})
+        self.assertEqual(bob.remove_pks(),
+                {'name':'Bob'})
+
+        aly = Person(name='Aly')
+        aly.flush()
+        self.assertEqual(aly,
+                {'name':'Aly', 'id':2})
+
+        bob.update(aly.remove_pks())
+        bob.flush()
+        aly.flush()
+        self.assertEqual(bob,
+                {'name':'Aly', 'id':1})
+        self.assertEqual(aly,
+                {'name':'Aly', 'id':2})
+
+
 
 if __name__ == '__main__':
     unittest.main()
