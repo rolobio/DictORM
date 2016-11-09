@@ -85,6 +85,8 @@ class PgPyTable(object):
         self.db = db
         self.curs = db.curs
         self.pks = []
+        self.refs = {}
+        self.key_name_to_ref = {}
         self._refresh_primary_keys()
 
 
@@ -102,7 +104,7 @@ class PgPyTable(object):
 
 
     def __repr__(self):
-        return 'PgPyTable({})'.format(self.name)
+        return 'PgPyTable({}, {})'.format(self.name, self.pks)
 
 
     def __len__(self):
@@ -127,6 +129,10 @@ class PgPyTable(object):
         return l
 
 
+    def _pk_value_pairs(self):
+        return column_value_pairs(self.pks)
+
+
     def get_where(self, wheres):
         if type(wheres) == int:
             wheres = {self.pks[0]:wheres,}
@@ -139,8 +145,9 @@ class PgPyTable(object):
         return self._return_results()
 
 
-    def _pk_value_pairs(self):
-        return column_value_pairs(self.pks)
+    def set_reference(self, my_column, key_name, pgpytable, their_column):
+        self.refs[my_column] = (key_name, pgpytable, their_column)
+        self.key_name_to_ref[key_name] = my_column
 
 
 
@@ -163,15 +170,15 @@ class PgPyDict(dict):
         if not self._in_db:
             self._curs.execute('INSERT INTO {} {} RETURNING *'.format(
                     self._table.name,
-                    insert_column_value_pairs(self)
+                    insert_column_value_pairs(self.remove_refs())
                 ),
-                self
+                self.remove_refs()
             )
             self._in_db = True
         else:
             self._curs.execute('UPDATE {} SET {} WHERE {} RETURNING *'.format(
                     self._table.name,
-                    column_value_pairs(self),
+                    column_value_pairs(self.remove_refs()),
                     self._table._pk_value_pairs(),
                 ),
                 self
@@ -189,5 +196,21 @@ class PgPyDict(dict):
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
 
+
+    def remove_refs(self):
+        return dict([
+            (k,v) for k,v in self.items()
+                if k not in self._table.key_name_to_ref
+            ])
+
+
+    def __setitem__(self, key, value):
+        if key in self._table.refs:
+            key_name, pgpytable, their_column = self._table.refs[key]
+            if len(pgpytable.pks) > 1:
+                self[key_name] = pgpytable.get_where(zip(self._table.pks, value))
+            else:
+                self[key_name] = pgpytable.get_where({self._table.pks[0]:value})
+        super().__setitem__(key, value)
 
 

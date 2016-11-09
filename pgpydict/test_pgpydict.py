@@ -23,7 +23,8 @@ class Test(unittest.TestCase):
         self.curs.execute('''
         CREATE TABLE person (
             id SERIAL PRIMARY KEY,
-            name TEXT
+            name TEXT,
+            manager_id INTEGER REFERENCES person(id)
         );
         CREATE TABLE department (
             id SERIAL PRIMARY KEY,
@@ -52,23 +53,22 @@ class Test(unittest.TestCase):
         self.assertEqual(0, len(Person))
 
         bob = Person(name='Bob')
-        self.assertEqual({'name':'Bob',},
-                bob)
+        self.assertEqual({'name':'Bob'}, bob)
         bob.flush()
-        self.assertEqual({'name':'Bob', 'id':1},
+        self.assertEqual({'name':'Bob', 'id':1, 'manager_id':None},
                 bob)
         self.assertEqual(Person.get_where(1), bob)
 
         # A second flush does not fail
         bob.flush()
-        self.assertEqual({'name':'Bob', 'id':1},
+        self.assertEqual({'name':'Bob', 'id':1, 'manager_id':None},
                 bob)
         self.assertEqual(Person.get_where(1), bob)
 
         bob['name'] = 'Jon'
         bob.flush()
         self.assertEqual(bob,
-                {'name':'Jon', 'id':1})
+                {'name':'Jon', 'id':1, 'manager_id':None})
         self.assertEqual(Person.get_where(1), bob)
 
 
@@ -123,20 +123,44 @@ class Test(unittest.TestCase):
         bob = Person(name='Bob')
         self.assertEqual(bob, {'name':'Bob'})
         bob.flush()
-        self.assertEqual(bob, {'name':'Bob', 'id':1})
-        self.assertEqual(bob.remove_pks(), {'name':'Bob'})
+        self.assertEqual(bob, {'name':'Bob', 'id':1, 'manager_id':None})
+        self.assertEqual(bob.remove_pks(), {'name':'Bob', 'manager_id':None})
 
         aly = Person(name='Aly')
         self.assertEqual(aly, {'name':'Aly'})
         aly.flush()
-        self.assertEqual(aly, {'name':'Aly', 'id':2})
-        self.assertEqual(aly.remove_pks(), {'name':'Aly'})
+        self.assertEqual(aly, {'name':'Aly', 'id':2, 'manager_id':None})
+        self.assertEqual(aly.remove_pks(), {'name':'Aly', 'manager_id':None})
 
         bob.update(aly.remove_pks())
         bob.flush()
         aly.flush()
-        self.assertEqual(bob, {'name':'Aly', 'id':1})
-        self.assertEqual(aly, {'name':'Aly', 'id':2})
+        self.assertEqual(bob, {'name':'Aly', 'id':1, 'manager_id':None})
+        self.assertEqual(aly, {'name':'Aly', 'id':2, 'manager_id':None})
+
+
+    def test_add_reference(self):
+        Person = self.db['person']
+        Person.set_reference('manager_id', 'manager', Person, 'id')
+
+        bob = Person(name='Bob')
+        bob.flush()
+        aly = Person(name='Aly')
+        aly.flush()
+
+        bob['manager_id'] = aly['id']
+        bob.flush()
+
+        self.assertEqual(bob['manager_id'], aly['id'])
+        self.assertEqual(bob['manager'], aly)
+
+        steve = Person(name='Steve')
+        steve.flush()
+
+        bob['manager_id'] = steve['id']
+
+        self.assertEqual(bob['manager_id'], steve['id'])
+        self.assertEqual(bob['manager'], steve)
 
 
 
