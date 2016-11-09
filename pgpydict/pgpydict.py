@@ -113,8 +113,13 @@ class PgPyTable(object):
         if self.curs.rowcount == 0:
             return None
         elif self.curs.rowcount == 1:
-            return PgPyDict(self, self.curs.fetchone())
-        return [PgPyDict(self, d) for d in self.curs.fetchall()]
+            d = PgPyDict(self, self.curs.fetchone())
+            d._in_db = True
+            return d
+        l = [PgPyDict(self, d) for d in self.curs.fetchall()]
+        for i in l:
+            i._in_db = True
+        return l
 
 
     def getWhere(self, wheres):

@@ -95,7 +95,14 @@ class Test(unittest.TestCase):
                 bob_sales)
 
 
-    def test_sub_dict(self):
+    def test_already_in_db(self):
+        Person = self.db['person']
+        self.assertEqual(0, len(Person))
+        bob = Person(name='Bob')
+        bob.flush()
+
+        bob_copy = Person.getWhere(1)
+        bob_copy.flush()
 
 
 
