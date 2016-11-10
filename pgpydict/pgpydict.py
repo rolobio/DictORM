@@ -88,6 +88,7 @@ class PgPyTable(object):
         self.refs = {}
         self.key_name_to_ref = {}
         self._refresh_primary_keys()
+        self.sort_by = None
 
 
     def _refresh_primary_keys(self):
@@ -113,17 +114,18 @@ class PgPyTable(object):
 
 
     def __call__(self, *a, **kw):
-        return PgPyDict(self, *a, **kw)
+        d = PgPyDict(self, *a, **kw)
+        return self._add_references(d)
 
 
-    def _return_results(self):
-        if self.curs.rowcount == 0:
+    def _return_results(self, is_list=False):
+        if not is_list and self.curs.rowcount == 0:
             return None
-        elif self.curs.rowcount == 1:
+        elif not is_list and self.curs.rowcount == 1:
             d = PgPyDict(self, self.curs.fetchone())
             d._in_db = True
-            return d
-        l = [PgPyDict(self, d) for d in self.curs.fetchall()]
+            return self._add_references(d)
+        l = [self._add_references(PgPyDict(self, d)) for d in self.curs.fetchall()]
         for i in l:
             i._in_db = True
         return l
@@ -133,21 +135,33 @@ class PgPyTable(object):
         return column_value_pairs(self.pks)
 
 
-    def get_where(self, wheres):
+    def get_where(self, wheres=None, is_list=False):
         if type(wheres) == int:
             wheres = {self.pks[0]:wheres,}
-        self.curs.execute('SELECT * FROM {} WHERE {}'.format(
+        elif wheres == None:
+            self.curs.execute('SELECT * FROM {}'.format(self.name))
+            return self._return_results()
+
+        self.curs.execute('SELECT * FROM {} WHERE {} ORDER BY {}'.format(
                 self.name,
-                column_value_pairs(wheres, ' AND ')
+                column_value_pairs(wheres, ' AND '),
+                self.sort_by or self.pks[0],
             ),
-            wheres
+            wheres,
         )
-        return self._return_results()
+        return self._return_results(is_list=is_list)
 
 
-    def set_reference(self, my_column, key_name, pgpytable, their_column):
-        self.refs[my_column] = (key_name, pgpytable, their_column)
+    def set_reference(self, my_column, key_name, pgpytable, their_column, is_list=False):
+        self.refs[my_column] = (key_name, pgpytable, their_column, is_list)
         self.key_name_to_ref[key_name] = my_column
+
+
+    def _add_references(self, d):
+        for my_column in self.refs:
+            key_name, pgpytable, their_column, is_list = self.refs[my_column]
+            d[key_name] = None
+        return d
 
 
 
@@ -210,14 +224,22 @@ class PgPyDict(dict):
 
     def __setitem__(self, key, value):
         if key in self._table.refs:
-            key_name, pgpytable, their_column = self._table.refs[key]
+            key_name, pgpytable, their_column, is_list = self._table.refs[key]
             if len(pgpytable.pks) > 1:
                 super().__setitem__(key_name, pgpytable.get_where(zip(self._table.pks, value)))
             else:
                 super().__setitem__(key_name, pgpytable.get_where({self._table.pks[0]:value}))
-        elif key in self._table.key_name_to_ref:
+        elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
             super().__setitem__(self._table.key_name_to_ref[key],
                     value[self._table.pks[0]])
         super().__setitem__(key, value)
+
+
+    def __getitem__(self, key):
+        if key in self._table.key_name_to_ref:
+            key_name, pgpytable, their_column, is_list = self._table.refs[self._table.key_name_to_ref[key]]
+            super().__setitem__(key, pgpytable.get_where({their_column:self[self._table.key_name_to_ref[key]]}, is_list=is_list))
+        return super().__getitem__(key)
+
 
 

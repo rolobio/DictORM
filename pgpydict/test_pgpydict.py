@@ -145,6 +145,8 @@ class Test(unittest.TestCase):
 
         bob = Person(name='Bob')
         bob.flush()
+        self.assertEqual(bob,
+                {'name':'Bob', 'id':1, 'manager_id':None, 'manager':None})
         aly = Person(name='Aly')
         aly.flush()
 
@@ -163,6 +165,46 @@ class Test(unittest.TestCase):
         bob.flush()
         self.assertEqual(bob['manager_id'], aly['id'])
         self.assertEqual(bob['manager'], aly)
+
+
+    def test_add_onetomany(self):
+        Person = self.db['person']
+        Department = self.db['department']
+        PD = self.db['person_department']
+        PD.sort_by = 'person_id'
+        PD.set_reference('department_id', 'department', Department, 'id')
+        PD.set_reference('person_id', 'person', Person, 'id')
+        Person.set_reference('id', 'person_departments', PD, 'person_id', is_list=True)
+
+        bob = Person(name='Bob')
+        bob.flush()
+        self.assertEqual(bob,
+                {'name':'Bob', 'id':1, 'manager_id':None, 'person_departments':None})
+
+        sales = Department(name='Sales')
+        sales.flush()
+        bob_pd_sales = PD(department_id=sales['id'], person_id=bob['id'])
+        bob_pd_sales.flush()
+        bob.flush()
+        self.assertEqual(bob['person_departments'], [bob_pd_sales,])
+
+        hr = Department(name='HR')
+        hr.flush()
+        bob_pd_hr = PD(department_id=hr['id'], person_id=bob['id'])
+        bob_pd_hr.flush()
+        bob.flush()
+        self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
+
+        aly = Person(name='Aly')
+        aly.flush()
+        bob.flush()
+        self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
+
+        aly_pd_sales = PD(department_id=sales['id'], person_id=aly['id'])
+        aly_pd_sales.flush()
+        aly.flush()
+        self.assertEqual(aly['person_departments'], [aly_pd_sales,])
+        self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
 
 
 
