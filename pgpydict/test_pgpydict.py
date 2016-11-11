@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+from pprint import pprint
 from pgpydict import *
 from psycopg2 import OperationalError
 from psycopg2.extras import DictCursor
@@ -14,6 +15,9 @@ test_db_login = {
         }
 
 class Test(unittest.TestCase):
+
+    def assertDictContains(self, d1, d2):
+        assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
 
 
     def setUp(self):
@@ -35,6 +39,13 @@ class Test(unittest.TestCase):
             department_id INTEGER REFERENCES department(id),
             PRIMARY KEY (person_id, department_id)
         );
+        CREATE TABLE car (
+            id SERIAL PRIMARY KEY,
+            license_plate TEXT,
+            name TEXT,
+            person_id INTEGER REFERENCES person(id)
+        );
+        ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
         ''')
         self.conn.commit()
         self.db = DictDB(self.curs)
@@ -55,20 +66,20 @@ class Test(unittest.TestCase):
         bob = Person(name='Bob')
         self.assertEqual({'name':'Bob'}, bob)
         bob.flush()
-        self.assertEqual({'name':'Bob', 'id':1, 'manager_id':None},
-                bob)
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
         self.assertEqual(Person.get_where(1), bob)
 
         # A second flush does not fail
         bob.flush()
-        self.assertEqual({'name':'Bob', 'id':1, 'manager_id':None},
-                bob)
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
         self.assertEqual(Person.get_where(1), bob)
 
         bob['name'] = 'Jon'
         bob.flush()
-        self.assertEqual(bob,
-                {'name':'Jon', 'id':1, 'manager_id':None})
+        self.assertDictContains(bob, {'name':'Jon', 'id':1})
+        self.assertEqual(Person.get_where(1), bob)
+
+        self.conn.commit()
         self.assertEqual(Person.get_where(1), bob)
 
 
@@ -116,6 +127,12 @@ class Test(unittest.TestCase):
         PgPyDict(Person, name='Alice')
         PgPyDict(Person, [('name','Steve'),])
 
+        # A fake column will fail when going into the database
+        p = Person(fake_column='foo')
+        self.assertRaises(psycopg2.ProgrammingError, p.flush)
+        self.conn.rollback()
+
+
 
     def test_remove_pks(self):
         Person = self.db['person']
@@ -123,30 +140,29 @@ class Test(unittest.TestCase):
         bob = Person(name='Bob')
         self.assertEqual(bob, {'name':'Bob'})
         bob.flush()
-        self.assertEqual(bob, {'name':'Bob', 'id':1, 'manager_id':None})
-        self.assertEqual(bob.remove_pks(), {'name':'Bob', 'manager_id':None})
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
+        self.assertDictContains(bob.remove_pks(), {'name':'Bob'})
 
         aly = Person(name='Aly')
         self.assertEqual(aly, {'name':'Aly'})
         aly.flush()
-        self.assertEqual(aly, {'name':'Aly', 'id':2, 'manager_id':None})
-        self.assertEqual(aly.remove_pks(), {'name':'Aly', 'manager_id':None})
+        self.assertDictContains(aly, {'name':'Aly', 'id':2})
+        self.assertDictContains(aly.remove_pks(), {'name':'Aly'})
 
         bob.update(aly.remove_pks())
         bob.flush()
         aly.flush()
-        self.assertEqual(bob, {'name':'Aly', 'id':1, 'manager_id':None})
-        self.assertEqual(aly, {'name':'Aly', 'id':2, 'manager_id':None})
+        self.assertDictContains(bob, {'name':'Aly', 'id':1})
+        self.assertDictContains(aly, {'name':'Aly', 'id':2})
 
 
-    def test_add_reference(self):
+    def test_set_reference(self):
         Person = self.db['person']
         Person.set_reference('manager_id', 'manager', Person, 'id')
 
         bob = Person(name='Bob')
         bob.flush()
-        self.assertEqual(bob,
-                {'name':'Bob', 'id':1, 'manager_id':None, 'manager':None})
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
         aly = Person(name='Aly')
         aly.flush()
 
@@ -167,7 +183,17 @@ class Test(unittest.TestCase):
         self.assertEqual(bob['manager'], aly)
 
 
-    def test_add_onetomany(self):
+    def test_onetomany(self):
+        """
+        Linking to person.id from person_department.person_id allows you to have
+        multiple person_department records.
+
+         person              person_department          department
+        =======================================================================
+        id <-------+-+----> person_id department_id -> id
+                    \ \---> person_id department_id -> id
+                     \----> person_id department_id -> id
+        """
         Person = self.db['person']
         Department = self.db['department']
         PD = self.db['person_department']
@@ -178,8 +204,7 @@ class Test(unittest.TestCase):
 
         bob = Person(name='Bob')
         bob.flush()
-        self.assertEqual(bob,
-                {'name':'Bob', 'id':1, 'manager_id':None, 'person_departments':None})
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
 
         sales = Department(name='Sales')
         sales.flush()
@@ -205,6 +230,24 @@ class Test(unittest.TestCase):
         aly.flush()
         self.assertEqual(aly['person_departments'], [aly_pd_sales,])
         self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
+
+
+    def test_onetoone(self):
+        Person = self.db['person']
+        Car = self.db['car']
+        Person.set_reference('car_id', 'car', Car, 'id')
+        Car.set_reference('person_id', 'person', Person, 'id')
+
+        will = Person(name='Will')
+        will.flush()
+        stratus = Car(name='Dodge Stratus', license_plate='123ABC')
+        stratus.flush()
+        stratus['person_id'], will['car_id'] = will['id'], stratus['id']
+        stratus.flush()
+        will.flush()
+
+        self.assertEqual(will['car'].remove_refs(), stratus.remove_refs())
+        self.assertEqual(stratus['person'].remove_refs(), will.remove_refs())
 
 
 
