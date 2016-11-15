@@ -1,8 +1,9 @@
 from psycopg2.extras import DictCursor
 
-__all__ = ['DictDB', 'PgPyTable', 'PgPyDict']
+__all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey']
 
 class NoEntryError(Exception): pass
+class NoPrimaryKey(Exception): pass
 
 def operator_kinds(o):
     if o in (tuple, list):
@@ -95,7 +96,7 @@ class PgPyTable(object):
         """
         Get a list of Primary Keys set for this table in the DB.
         """
-        self.curs.execute('''SELECT a.attname AS data_type
+        self.curs.execute('''SELECT a.attname
                 FROM pg_index i
                 JOIN pg_attribute a ON a.attrelid = i.indrelid
                 AND a.attnum = ANY(i.indkey)
@@ -119,8 +120,8 @@ class PgPyTable(object):
 
 
     def _return_results(self, is_list=False):
-        if not is_list and self.curs.rowcount == 0:
-            return None
+        if self.curs.rowcount == 0:
+            raise NoEntryError('No entry found')
         elif not is_list and self.curs.rowcount == 1:
             d = PgPyDict(self, self.curs.fetchone())
             d._in_db = True
@@ -137,6 +138,8 @@ class PgPyTable(object):
 
     def get_where(self, wheres=None, is_list=False):
         if type(wheres) == int:
+            if not self.pks:
+                raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
             wheres = {self.pks[0]:wheres,}
         elif wheres == None:
             self.curs.execute('SELECT * FROM {}'.format(self.name))
@@ -190,6 +193,9 @@ class PgPyDict(dict):
             )
             self._in_db = True
         else:
+            if not self._table.pks:
+                raise NoPrimaryKey('Cannot update to {}, no primary keys defined.'.format(
+                    self._table))
             self._curs.execute('UPDATE {} SET {} WHERE {} RETURNING *'.format(
                     self._table.name,
                     column_value_pairs(self.remove_refs()),
@@ -223,6 +229,10 @@ class PgPyDict(dict):
 
 
     def __setitem__(self, key, value):
+        """
+        If the key being modified has a referenced pair, change that key's value
+        to match the new row.
+        """
         if key in self._table.refs:
             key_name, pgpytable, their_column, is_list = self._table.refs[key]
             if len(pgpytable.pks) > 1:
@@ -236,10 +246,21 @@ class PgPyDict(dict):
 
 
     def __getitem__(self, key):
+        """
+
+        """
         if key in self._table.key_name_to_ref:
             key_name, pgpytable, their_column, is_list = self._table.refs[self._table.key_name_to_ref[key]]
-            super().__setitem__(key, pgpytable.get_where({their_column:self[self._table.key_name_to_ref[key]]}, is_list=is_list))
+            super().__setitem__(key,
+                    pgpytable.get_where(
+                        {their_column:self[self._table.key_name_to_ref[key]]},
+                        is_list=is_list)
+                    )
         return super().__getitem__(key)
+
+
+    __setitem__.__doc__ += dict.__setitem__.__doc__
+    __getitem__.__doc__ += dict.__getitem__.__doc__
 
 
 

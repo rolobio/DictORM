@@ -46,6 +46,7 @@ class Test(unittest.TestCase):
             person_id INTEGER REFERENCES person(id)
         );
         ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
+        CREATE TABLE no_pk (foo TEXT);
         ''')
         self.conn.commit()
         self.db = DictDB(self.curs)
@@ -188,11 +189,11 @@ class Test(unittest.TestCase):
         Linking to person.id from person_department.person_id allows you to have
         multiple person_department records.
 
-         person              person_department          department
-        =======================================================================
-        id <-------+-+----> person_id department_id -> id
-                    \ \---> person_id department_id -> id
-                     \----> person_id department_id -> id
+        person              ║ person_department            ║ department
+        ════════════════════╬══════════════════════════════╬════════════════════
+        id --------+-+----> ║ person_id   department_id -> ║ id
+                    \ \---> ║ person_id   department_id -> ║ id
+                     \----> ║ person_id   department_id -> ║ id
         """
         Person = self.db['person']
         Department = self.db['department']
@@ -233,6 +234,12 @@ class Test(unittest.TestCase):
 
 
     def test_onetoone(self):
+        """
+        person              ║ car
+        ════════════════════╬═══════════════════════════════════════════════════
+        id     <----------- ║ person_id
+        car_id -----------> ║ id
+        """
         Person = self.db['person']
         Car = self.db['car']
         Person.set_reference('car_id', 'car', Car, 'id')
@@ -248,6 +255,24 @@ class Test(unittest.TestCase):
 
         self.assertEqual(will['car'].remove_refs(), stratus.remove_refs())
         self.assertEqual(stratus['person'].remove_refs(), will.remove_refs())
+
+
+    def test_errors(self):
+        """
+        Getting a bad primary key raises NoEntryError.
+
+        A table with no primary key(s) can be gotten, but not updated.
+        """
+        Person = self.db['person']
+        self.assertRaises(NoEntryError, Person.get_where, 1)
+
+        NoPk = self.db['no_pk']
+        foo = NoPk(foo='bar')
+        foo.flush()
+        self.assertEqual(foo, {'foo':'bar'})
+        self.assertEqual(NoPk.get_where(), {'foo':'bar'})
+        foo['foo'] = 'baz'
+        self.assertRaises(NoPrimaryKey, foo.flush)
 
 
 
