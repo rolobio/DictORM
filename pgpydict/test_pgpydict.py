@@ -83,6 +83,22 @@ class Test(unittest.TestCase):
         self.conn.commit()
         self.assertEqual(Person.get_where(1), bob)
 
+        # Items are inserted in the order they are flushed
+        alice = Person(name='Alice')
+        dave = Person(name='Dave')
+        dave.flush()
+        alice.flush()
+
+        # get_where with no parameters returns the entire table
+        self.assertEqual(Person.get_where(), [bob, dave, alice])
+
+        # A delete sql command can be executed on a PgPyDict
+        dave.delete()
+        self.assertEqual(Person.get_where(), [bob, alice])
+        self.conn.commit()
+        self.assertEqual(Person.get_where(), [bob, alice])
+
+
 
     def test_get_where_multiple_pks(self):
         Person = self.db['person']

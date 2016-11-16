@@ -208,6 +208,17 @@ class PgPyDict(dict):
         return self
 
 
+    def delete(self):
+        """
+        Delete this row from it's table in the database.
+        """
+        self._curs.execute('DELETE FROM {} WHERE {}'.format(
+                self._table.name,
+                self._table._pk_value_pairs()),
+            self
+            )
+
+
     def remove_pks(self):
         """
         Return a dictionary without the primary keys that are associated with
