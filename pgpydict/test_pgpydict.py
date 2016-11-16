@@ -98,6 +98,12 @@ class Test(unittest.TestCase):
         self.conn.commit()
         self.assertEqual(Person.get_where(), [bob, alice])
 
+        # Database row survives an object deletion
+        del bob
+        del alice
+        self.conn.commit()
+        self.assertEqual(len(Person.get_where()), 2)
+
 
 
     def test_get_where_multiple_pks(self):
@@ -122,6 +128,7 @@ class Test(unittest.TestCase):
                 PersonDepartment.get_where({'person_id':1, 'department_id':1}),
                 bob_sales)
 
+        # Test deletion with multiple Primary Keys
         bob_sales.delete()
         self.assertRaises(NoEntryError, PersonDepartment.get_where)
 
