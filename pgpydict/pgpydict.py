@@ -133,7 +133,7 @@ class PgPyTable(object):
 
 
     def _pk_value_pairs(self):
-        return column_value_pairs(self.pks)
+        return column_value_pairs(self.pks, ' AND ')
 
 
     def get_where(self, wheres=None, is_list=False):

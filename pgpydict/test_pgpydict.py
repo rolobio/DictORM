@@ -122,6 +122,9 @@ class Test(unittest.TestCase):
                 PersonDepartment.get_where({'person_id':1, 'department_id':1}),
                 bob_sales)
 
+        bob_sales.delete()
+        self.assertRaises(NoEntryError, PersonDepartment.get_where)
+
 
     def test_already_in_db(self):
         Person = self.db['person']
