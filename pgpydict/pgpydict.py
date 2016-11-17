@@ -109,12 +109,6 @@ class PgPyTable(object):
         return 'PgPyTable({}, {})'.format(self.name, self.pks)
 
 
-    def __len__(self):
-        self.curs.execute('SELECT COUNT(*) as "count" FROM {table}'.format(
-            table=self.name))
-        return self.curs.fetchone()['count']
-
-
     def __call__(self, *a, **kw):
         d = PgPyDict(self, *a, **kw)
         return self._add_references(d)
@@ -166,6 +160,12 @@ class PgPyTable(object):
             key_name, pgpytable, their_column, is_list = self.refs[my_column]
             d[key_name] = None
         return d
+
+
+    def count(self):
+        self.curs.execute('SELECT COUNT(*) as "count" FROM {table}'.format(
+            table=self.name))
+        return self.curs.fetchone()['count']
 
 
 

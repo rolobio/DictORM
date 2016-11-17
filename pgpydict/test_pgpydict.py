@@ -62,7 +62,7 @@ class Test(unittest.TestCase):
 
     def test_get_where(self):
         Person = self.db['person']
-        self.assertEqual(0, len(Person))
+        self.assertEqual(0, Person.count())
 
         bob = Person(name='Bob')
         self.assertEqual({'name':'Bob'}, bob)
@@ -108,12 +108,12 @@ class Test(unittest.TestCase):
 
     def test_get_where_multiple_pks(self):
         Person = self.db['person']
-        self.assertEqual(0, len(Person))
+        self.assertEqual(0, Person.count())
         bob = Person(name='Bob')
         bob.flush()
 
         Department = self.db['department']
-        self.assertEqual(0, len(Department))
+        self.assertEqual(0, Department.count())
         sales = Department(name='Sales')
         sales.flush()
 
@@ -135,7 +135,7 @@ class Test(unittest.TestCase):
 
     def test_already_in_db(self):
         Person = self.db['person']
-        self.assertEqual(0, len(Person))
+        self.assertEqual(0, Person.count())
         bob = Person(name='Bob')
         bob.flush()
 
@@ -163,7 +163,7 @@ class Test(unittest.TestCase):
 
     def test_remove_pks(self):
         Person = self.db['person']
-        self.assertEqual(0, len(Person))
+        self.assertEqual(0, Person.count())
         bob = Person(name='Bob')
         self.assertEqual(bob, {'name':'Bob'})
         bob.flush()
