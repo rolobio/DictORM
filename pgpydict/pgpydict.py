@@ -123,17 +123,17 @@ class PgPyTable(object):
         if self.curs.rowcount == 0:
             raise NoEntryError('No entry found')
         elif not is_list and self.curs.rowcount == 1:
-            d = PgPyDict(self, self.curs.fetchone())
+            d = self(self.curs.fetchone())
             d._in_db = True
-            return self._add_references(d)
-        l = [self._add_references(PgPyDict(self, d)) for d in self.curs.fetchall()]
+            return d
+        l = [self(d) for d in self.curs.fetchall()]
         for i in l:
             i._in_db = True
         return l
 
 
-    def _pk_value_pairs(self):
-        return column_value_pairs(self.pks, ' AND ')
+    def _pk_value_pairs(self, join_str=' AND '):
+        return column_value_pairs(self.pks, join_str)
 
 
     def get_where(self, wheres=None, is_list=False):
