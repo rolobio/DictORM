@@ -197,10 +197,10 @@ class PgPyDict(dict):
             if not self._table.pks:
                 raise NoPrimaryKey('Cannot update to {}, no primary keys defined.'.format(
                     self._table))
-            self._curs.execute('UPDATE {table} SET {cvp} WHERE {wheres} RETURNING *'.format(
+            self._curs.execute('UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *'.format(
                     table=self._table.name,
                     cvp=column_value_pairs(self.remove_refs()),
-                    wheres=self._table._pk_value_pairs(),
+                    pvp=self._table._pk_value_pairs(),
                 ),
                 self
             )
