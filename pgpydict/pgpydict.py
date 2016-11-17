@@ -1,6 +1,11 @@
+"""
+Access a Psycopg2 database as if it were a Python Dictionary.
+"""
 from psycopg2.extras import DictCursor
 
-__all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey']
+__all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
+    '__version__']
+__version__ = '0.1'
 
 class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
@@ -177,7 +182,7 @@ class PgPyDict(dict):
         self._table = pgpytable
         self._in_db = False
         self._curs = pgpytable.db.curs
-        super().__init__(*a, **kw)
+        super(PgPyDict, self).__init__(*a, **kw)
 
 
     def flush(self):
@@ -207,7 +212,7 @@ class PgPyDict(dict):
                 self
             )
         d = self._curs.fetchone()
-        super().__init__(d)
+        super(PgPyDict, self).__init__(d)
         return self
 
 
@@ -251,14 +256,14 @@ class PgPyDict(dict):
             key_name, pgpytable, their_column, is_list = self._table.refs[key]
             if len(pgpytable.pks) > 1:
                 d = pgpytable.get_where(zip(self._table.pks, value))
-                super().__setitem__(key_name, d)
+                super(PgPyDict, self).__setitem__(key_name, d)
             else:
                 d = pgpytable.get_where(**{self._table.pks[0]:value})
-                super().__setitem__(key_name, d)
+                super(PgPyDict, self).__setitem__(key_name, d)
         elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
-            super().__setitem__(self._table.key_name_to_ref[key],
+            super(PgPyDict, self).__setitem__(self._table.key_name_to_ref[key],
                     value[self._table.pks[0]])
-        super().__setitem__(key, value)
+        super(PgPyDict, self).__setitem__(key, value)
 
 
     def __getitem__(self, key):
@@ -267,12 +272,12 @@ class PgPyDict(dict):
         """
         if key in self._table.key_name_to_ref:
             key_name, pgpytable, their_column, is_list = self._table.refs[self._table.key_name_to_ref[key]]
-            super().__setitem__(key,
+            super(PgPyDict, self).__setitem__(key,
                     pgpytable.get_where(
                         is_list=is_list,
                         **{their_column:self[self._table.key_name_to_ref[key]]})
                     )
-        return super().__getitem__(key)
+        return super(PgPyDict, self).__getitem__(key)
 
 
     __setitem__.__doc__ += dict.__setitem__.__doc__
