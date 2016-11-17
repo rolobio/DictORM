@@ -184,6 +184,12 @@ class Test(unittest.TestCase):
 
 
     def test_set_reference(self):
+        """
+        person
+        ════════════════════
+        id <----------\
+        manager_id ---/
+        """
         Person = self.db['person']
         Person.set_reference('manager_id', 'manager', Person, 'id')
 
@@ -217,9 +223,9 @@ class Test(unittest.TestCase):
 
         person              ║ person_department            ║ department
         ════════════════════╬══════════════════════════════╬════════════════════
-        id --------+-+----> ║ person_id   department_id -> ║ id
-                    \ \---> ║ person_id   department_id -> ║ id
-                     \----> ║ person_id   department_id -> ║ id
+        id <-------+-+----- ║ person_id   department_id -> ║ id
+                    \ \---- ║ person_id   department_id -> ║ id
+                     \----- ║ person_id   department_id -> ║ id
         """
         Person = self.db['person']
         Department = self.db['department']
