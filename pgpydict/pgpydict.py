@@ -110,7 +110,8 @@ class PgPyTable(object):
 
 
     def __len__(self):
-        self.curs.execute('SELECT COUNT(*) as "count" FROM {}'.format(self.name))
+        self.curs.execute('SELECT COUNT(*) as "count" FROM {table}'.format(
+            table=self.name))
         return self.curs.fetchone()['count']
 
 
@@ -145,10 +146,10 @@ class PgPyTable(object):
             self.curs.execute('SELECT * FROM {}'.format(self.name))
             return self._return_results()
 
-        self.curs.execute('SELECT * FROM {} WHERE {} ORDER BY {}'.format(
-                self.name,
-                column_value_pairs(wheres, ' AND '),
-                self.sort_by or self.pks[0],
+        self.curs.execute('SELECT * FROM {table} WHERE {wheres} ORDER BY {pks}'.format(
+                table=self.name,
+                wheres=column_value_pairs(wheres, ' AND '),
+                pks=self.sort_by or self.pks[0],
             ),
             wheres,
         )
@@ -185,9 +186,9 @@ class PgPyDict(dict):
         All column/values will bet inserted/set by this method.
         """
         if not self._in_db:
-            self._curs.execute('INSERT INTO {} {} RETURNING *'.format(
-                    self._table.name,
-                    insert_column_value_pairs(self.remove_refs())
+            self._curs.execute('INSERT INTO {table} {cvp} RETURNING *'.format(
+                    table=self._table.name,
+                    cvp=insert_column_value_pairs(self.remove_refs())
                 ),
                 self.remove_refs()
             )
@@ -196,10 +197,10 @@ class PgPyDict(dict):
             if not self._table.pks:
                 raise NoPrimaryKey('Cannot update to {}, no primary keys defined.'.format(
                     self._table))
-            self._curs.execute('UPDATE {} SET {} WHERE {} RETURNING *'.format(
-                    self._table.name,
-                    column_value_pairs(self.remove_refs()),
-                    self._table._pk_value_pairs(),
+            self._curs.execute('UPDATE {table} SET {cvp} WHERE {wheres} RETURNING *'.format(
+                    table=self._table.name,
+                    cvp=column_value_pairs(self.remove_refs()),
+                    wheres=self._table._pk_value_pairs(),
                 ),
                 self
             )
@@ -212,9 +213,9 @@ class PgPyDict(dict):
         """
         Delete this row from it's table in the database.
         """
-        self._curs.execute('DELETE FROM {} WHERE {}'.format(
-                self._table.name,
-                self._table._pk_value_pairs()),
+        self._curs.execute('DELETE FROM {table} WHERE {pvp}'.format(
+                table=self._table.name,
+                pvp=self._table._pk_value_pairs()),
             self
             )
 
