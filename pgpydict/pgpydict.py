@@ -165,9 +165,9 @@ class PgPyTable(object):
 
 
     def count(self):
-        self.curs.execute('SELECT COUNT(*) as "count" FROM {table}'.format(
+        self.curs.execute('SELECT COUNT(*) FROM {table}'.format(
             table=self.name))
-        return self.curs.fetchone()['count']
+        return self.curs.fetchone()[0]
 
 
 
@@ -250,9 +250,11 @@ class PgPyDict(dict):
         if key in self._table.refs:
             key_name, pgpytable, their_column, is_list = self._table.refs[key]
             if len(pgpytable.pks) > 1:
-                super().__setitem__(key_name, pgpytable.get_where(zip(self._table.pks, value)))
+                d = pgpytable.get_where(zip(self._table.pks, value))
+                super().__setitem__(key_name, d)
             else:
-                super().__setitem__(key_name, pgpytable.get_where(**{self._table.pks[0]:value}))
+                d = pgpytable.get_where(**{self._table.pks[0]:value})
+                super().__setitem__(key_name, d)
         elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
             super().__setitem__(self._table.key_name_to_ref[key],
                     value[self._table.pks[0]])
