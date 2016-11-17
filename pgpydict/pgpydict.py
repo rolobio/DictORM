@@ -131,21 +131,23 @@ class PgPyTable(object):
         return column_value_pairs(self.pks, join_str)
 
 
-    def get_where(self, wheres=None, is_list=False):
-        if type(wheres) == int:
+    def get_where(self, is_list=False, *a, **kw):
+        if a and type(a) in (list, tuple):
             if not self.pks:
                 raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
-            wheres = {self.pks[0]:wheres,}
-        elif wheres == None:
+            wheres = dict(zip(self.pks, a))
+        elif a and type(a) == dict:
+            kw = a
+        elif not a and not kw:
             self.curs.execute('SELECT * FROM {}'.format(self.name))
             return self._return_results()
 
         self.curs.execute('SELECT * FROM {table} WHERE {wheres} ORDER BY {pks}'.format(
                 table=self.name,
-                wheres=column_value_pairs(wheres, ' AND '),
+                wheres=column_value_pairs(kw, ' AND '),
                 pks=self.sort_by or self.pks[0],
             ),
-            wheres,
+            kw,
         )
         return self._return_results(is_list=is_list)
 
@@ -250,7 +252,7 @@ class PgPyDict(dict):
             if len(pgpytable.pks) > 1:
                 super().__setitem__(key_name, pgpytable.get_where(zip(self._table.pks, value)))
             else:
-                super().__setitem__(key_name, pgpytable.get_where({self._table.pks[0]:value}))
+                super().__setitem__(key_name, pgpytable.get_where(**{self._table.pks[0]:value}))
         elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
             super().__setitem__(self._table.key_name_to_ref[key],
                     value[self._table.pks[0]])
@@ -265,8 +267,8 @@ class PgPyDict(dict):
             key_name, pgpytable, their_column, is_list = self._table.refs[self._table.key_name_to_ref[key]]
             super().__setitem__(key,
                     pgpytable.get_where(
-                        {their_column:self[self._table.key_name_to_ref[key]]},
-                        is_list=is_list)
+                        is_list=is_list,
+                        **{their_column:self[self._table.key_name_to_ref[key]]})
                     )
         return super().__getitem__(key)
 

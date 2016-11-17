@@ -125,7 +125,7 @@ class Test(unittest.TestCase):
         # Searching person_department with two key/value pairs returns the new
         # row.
         self.assertEqual(
-                PersonDepartment.get_where({'person_id':1, 'department_id':1}),
+                PersonDepartment.get_where(person_id=1, department_id=1),
                 bob_sales)
 
         # Test deletion with multiple Primary Keys
