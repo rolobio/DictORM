@@ -146,13 +146,13 @@ class Test(unittest.TestCase):
 
     def test_dict_inits(self):
         Person = self.db['person']
-        Person({'name':'Bob'})
-        Person(name='Alice')
-        Person([('name','Steve'),])
+        Person({'name':'Bob'}).flush()
+        Person(name='Alice').flush()
+        Person([('name','Steve'),]).flush()
 
-        PgPyDict(Person, {'name':'Bob'})
-        PgPyDict(Person, name='Alice')
-        PgPyDict(Person, [('name','Steve'),])
+        PgPyDict(Person, {'name':'Bob'}).flush()
+        PgPyDict(Person, name='Alice').flush()
+        PgPyDict(Person, [('name','Steve'),]).flush()
 
         # A fake column will fail when going into the database
         p = Person(fake_column='foo')
