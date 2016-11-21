@@ -115,7 +115,10 @@ Dave
 >>> dave.flush()
 # Commit any changes
 >>> conn.commit()
+```
 
+Get a row from the database as a PgPyDict
+```python
 # Get a row from the database, you may specify which columns must contain what
 # value.
 >>> bob = Person.get_where(id=1)
@@ -137,4 +140,48 @@ Dave
 # Bob is a copy of steve, except for bob's primary key
 >>> bob
 {'name':'Steve', 'id':1}
+```
+
+Set a one-to-one reference to another table
+```python
+# person              | car
+# --------------------+-------
+# car_id -----------> | id
+>>> Car = db['car']
+>>> Person.set_reference('car_id', 'car', Car, 'id')
+# Give Steve a car
+>>> steve = Person.get_where(1)
+>>> steve['car_id'] = car['id']
+>>> steve.flush()
+>>> steve['car'] == car
+True
+```
+
+Set a one-to-many reference to another table using an intermediary table
+```python
+# person              | person_department            | department
+# --------------------+------------------------------+-------------------
+# id <-------+-+----- | person_id   department_id -> | id
+#             \ \---- | person_id   department_id -> | id
+#              \----- | person_id   department_id -> | id
+>>> Department = db['department']
+>>> PD = db['person_department']
+>>> PD.set_reference('department_id', 'department', Department, 'id')
+
+# Define one-to-many reference for person
+>>> Person.set_reference('id', 'person_departments', PD, 'person_id', is_list=True)
+
+# Create HR and Sales departments
+>>> hr = Department(name='HR')
+>>> hr.flush()
+>>> sales = Department(name='Sales')
+>>> sales.flush()
+
+# Add PD rows for Steve for both departments
+>>> PD(person_id=steve['id'], department_id=hr['id'])
+>>> PD(person_id=steve['id'], department_id=sales['id'])
+
+>>> steve['person_departments']
+[{'department': {'name':'HR', 'id':1}, 'department_id': 1, 'person_id': 1},
+ {'department': {'name':'Sales', 'id':2}, 'department_id': 2, 'person_id': 1}]
 ```
