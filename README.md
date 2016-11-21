@@ -6,7 +6,7 @@
 Many database tables are constructed similar to a Python Dictionary.  Why not
 use it as such?
 
-## Basic Usage
+## Installation
 Install pgpydict using pip:
 ```bash
 pip install pgpydict
@@ -18,24 +18,30 @@ pip install -r requirements.txt
 python setup.py install
 ```
 
+## Basic Usage
 Connect to the database using psycopg2:
 ```python
 >>> import psycopg2, psycopg2.extras
 
 >>> conn = psycopg2.connect(**db_login)
+# Must use a DictCursor!
 >>> curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
->>> db = DictDB(cursor)
-```
 
-Get a PgPyTable from your Dictionary DB:
-```python
+# DictDB queries the database for all tables and allows them to be gotten
+# as if DictDB was a dictionary.
+>>> db = DictDB(curs)
+
+# Get a PgPyTable object for table 'person'
 >>> person = db['person']
+# PgPyDict relies on primary keys to successfully Update a row in the 'person'
+# table.  The primary keys found are listed when the person object is printed.
 >>> person
-PgPyTable(dave, [id,])
-```
+PgPyTable(dave, ['id',])
 
-Insert and Update a PgPyDict object:
-```python
+# You can define your own primary keys
+person.pks = ['id',]
+
+# Insert and Update a PgPyDict object:
 >>> dave = person(name='Dave')
 >>> dave
 {'name':'Dave', 'id':1}
