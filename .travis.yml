@@ -8,6 +8,6 @@ install:
 before_script:
     - psql -c 'create database pgpydict;' -U postgres
 script:
-    - "green -v ."
+    - "green -v --run-coverage ."
 services:
     - postgresql
