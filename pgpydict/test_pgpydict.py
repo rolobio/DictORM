@@ -1,7 +1,6 @@
 #! /usr/bin/env python
-from pgpydict import *
+from pgpydict import DictDB, PgPyTable, PgPyDict, NoEntryError, NoPrimaryKey
 from pprint import pprint
-from psycopg2 import OperationalError
 from psycopg2.extras import DictCursor
 import os
 import psycopg2
@@ -23,6 +22,7 @@ else:
             'host':'localhost',
             'port':'5432',
             }
+
 
 class Test(unittest.TestCase):
 

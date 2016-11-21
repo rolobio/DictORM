@@ -1,7 +1,6 @@
 """
 Access a Psycopg2 database as if it were a Python Dictionary.
 """
-from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
     '__version__']
@@ -140,7 +139,7 @@ class PgPyTable(object):
         if a and type(a) in (list, tuple):
             if not self.pks:
                 raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
-            wheres = dict(zip(self.pks, a))
+            kw = dict(zip(self.pks, a))
         elif a and type(a) == dict:
             kw = a
         elif not a and not kw:
