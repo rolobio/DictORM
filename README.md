@@ -117,7 +117,7 @@ Dave
 >>> conn.commit()
 ```
 
-Get a row from the database as a PgPyDict
+### Get a row from the database as a PgPyDict
 ```python
 # Get a row from the database, you may specify which columns must contain what
 # value.
@@ -127,7 +127,10 @@ Get a row from the database as a PgPyDict
 >>> bob = Person.get_where(1)
 >>> bob
 {'name':'Bob', 'id':1}
+```
 
+### Update a PgPyDict without overwriting Primary Keys
+```python
 # A PgPyDict behaves like a Python dictionary and can be updated/set.  Update
 # bob dict with steve dict, but don't overwrite bob's primary keys.
 >>> steve = Person(name='Steve')
@@ -142,7 +145,7 @@ Get a row from the database as a PgPyDict
 {'name':'Steve', 'id':1}
 ```
 
-Set a one-to-one reference to another table
+### Set a one-to-one reference to another table
 ```python
 # person              | car
 # --------------------+-------
@@ -157,7 +160,7 @@ Set a one-to-one reference to another table
 True
 ```
 
-Set a one-to-many reference to another table using an intermediary table
+### Set a one-to-many reference to another table using an intermediary table
 ```python
 # person              | person_department            | department
 # --------------------+------------------------------+-------------------
