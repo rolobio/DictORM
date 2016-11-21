@@ -18,6 +18,53 @@ pip install -r requirements.txt
 python setup.py install
 ```
 
+## Quick feature example
+```python
+>>> db = DictDB(psycopg2_DictCursor)
+>>> person = db['person']
+# Define Will's initial column values
+>>> will = person(name='Will')
+# Insert Will
+>>> will.flush()
+>>> will
+{'name':'Will', 'id':1}
+# Change Will however you want
+>>> will['name'] = 'Steve'
+>>> will
+{'name':'Steve', 'id':1}
+# Send the changes to the database
+>>> will.flush()
+```
+
+## Another quick feature example (the cool stuff)
+```python
+# Define a relationship to another table, access that one-to-one relationship
+# as if it were a sub-dictionary.
+>>> car = db['car']
+>>> person.set_reference('car_id', 'car', car, 'id')
+# 'car_id' : the column that person contains that references the 'car' table
+# 'car'    : the key of the sub-dictionary you are defining
+# car      : the PgPyTable object that you are referencing
+# 'id'     : the primary key that 'car_id' references
+
+>>> wills_car = car(name='Dodge Stratus', plate='123ABC')
+>>> wills_car.flush()
+>>> wills_car
+{'id':1, 'name':'Dodge Stratus', 'plate':'123ABC'}
+
+>>> will['car_id'] = wills_car['id']
+# Update the database row, update the will object with is new car
+>>> will.flush()
+>>> will
+{'name':'Will', 'id':1, 'car_id':1, 'car':{'id':1, 'name':'Dodge Stratus', 'plate':'123ABC'}}
+>>> will['car'] == wills_car
+True
+
+# I did not show 'car_id' in the first Will examples, this was to avoid
+# confusion.  You must define 'car_id' in the database before it can be
+# accessed by PgPyDict.
+```
+
 ## Basic Usage
 Connect to the database using psycopg2 and DictCursor:
 ```python
