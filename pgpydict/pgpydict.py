@@ -93,7 +93,7 @@ class PgPyTable(object):
         self.refs = {}
         self.key_name_to_ref = {}
         self._refresh_primary_keys()
-        self.sort_by = None
+        self.order_by = None
 
 
     def _refresh_primary_keys(self):
@@ -146,10 +146,10 @@ class PgPyTable(object):
             self.curs.execute('SELECT * FROM {}'.format(self.name))
             return self._return_results()
 
-        self.curs.execute('SELECT * FROM {table} WHERE {wheres} ORDER BY {pks}'.format(
+        self.curs.execute('SELECT * FROM {table} WHERE {wheres} ORDER BY {order_by}'.format(
                 table=self.name,
                 wheres=column_value_pairs(kw, ' AND '),
-                pks=self.sort_by or self.pks[0],
+                order_by=self.order_by or self.pks[0],
             ),
             kw,
         )
