@@ -21,6 +21,7 @@ python setup.py install
 ## Quick feature example
 ```python
 >>> db = DictDB(psycopg2_DictCursor)
+# Get the PgPyTable object that was automatically found by DictDB
 >>> person = db['person']
 # Define Will's initial column values
 >>> will = person(name='Will')
