@@ -20,11 +20,12 @@ python setup.py install
 
 ## Quick feature example
 ```python
+# Create a dictionary that contains all tables in the database
 >>> db = DictDB(psycopg2_DictCursor)
 # Get the PgPyTable object that was automatically found by DictDB
->>> person = db['person']
+>>> Person = db['person']
 # Define Will's initial column values
->>> will = person(name='Will')
+>>> will = Person(name='Will')
 # Insert Will
 >>> will.flush()
 >>> will
@@ -41,20 +42,20 @@ python setup.py install
 ```python
 # Define a relationship to another table, access that one-to-one relationship
 # as if it were a sub-dictionary.
->>> car = db['car']
->>> person.set_reference('car_id', 'car', car, 'id')
-# 'car_id' : the column that person contains that references the 'car' table
+>>> Car = db['car']
+>>> Person.set_reference('car_id', 'car', Car, 'id')
+# 'car_id' : the column that Person contains that references the 'car' table
 # 'car'    : the key of the sub-dictionary you are defining
-# car      : the PgPyTable object that you are referencing
+# Car      : the PgPyTable object that you are referencing
 # 'id'     : the primary key that 'car_id' references
 
->>> wills_car = car(name='Dodge Stratus', plate='123ABC')
+>>> wills_car = Car(name='Dodge Stratus', plate='123ABC')
 >>> wills_car.flush()
 >>> wills_car
 {'id':1, 'name':'Dodge Stratus', 'plate':'123ABC'}
 
 >>> will['car_id'] = wills_car['id']
-# Update the database row, update the will object with is new car
+# Update the database row, update the will object with his new car
 >>> will.flush()
 >>> will
 {'name':'Will', 'id':1, 'car_id':1, 'car':{'id':1, 'name':'Dodge Stratus', 'plate':'123ABC'}}
@@ -84,19 +85,19 @@ Finally, use PgPyDict:
 
 # Get a PgPyTable object for table 'person'
 # person table built using: (id SERIAL PRIMARY KEY, name TEXT)
->>> person = db['person']
+>>> Person = db['person']
 
 # PgPyDict relies on primary keys to successfully Update a row in the 'person'
-# table.  The primary keys found are listed when the person object is printed.
->>> person
+# table.  The primary keys found are listed when the Person object is printed.
+>>> Person
 PgPyTable(dave, ['id',])
 
 # You can define your own primary keys
-person.pks = ['id',]
+Person.pks = ['id',]
 
-# Insert into "person" table by calling "person" object as if it were a
+# Insert into "person" table by calling "Person" object as if it were a
 # dictionary.
->>> dave = person(name='Dave')
+>>> dave = Person(name='Dave')
 # Insert dave into the database
 >>> dave.flush()
 >>> dave
@@ -117,16 +118,16 @@ Dave
 
 # Get a row from the database, you may specify which columns must contain what
 # value.
->>> bob = person.get_where(id=1)
+>>> bob = Person.get_where(id=1)
 # Or, if the table has ONLY ONE primary key, you may forgo specifying a column
 # name. PyPyTable.get_where assumes you are accessing the single primary key.
->>> bob = person.get_where(1)
+>>> bob = Person.get_where(1)
 >>> bob
 {'name':'Bob', 'id':1}
 
 # A PgPyDict behaves like a Python dictionary and can be updated/set.  Update
 # bob dict with steve dict, but don't overwrite bob's primary keys.
->>> steve = person(name='Steve')
+>>> steve = Person(name='Steve')
 >>> steve
 {'name':'Steve', 'id':2}
 >>> steve.remove_pks()
