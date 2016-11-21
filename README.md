@@ -19,14 +19,17 @@ python setup.py install
 ```
 
 ## Basic Usage
-Connect to the database using psycopg2:
+Connect to the database using psycopg2 and DictCursor:
 ```python
 >>> import psycopg2, psycopg2.extras
 
 >>> conn = psycopg2.connect(**db_login)
 # Must use a DictCursor!
 >>> curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+```
 
+Finally, use PgPyDict:
+```python
 # DictDB queries the database for all tables and allows them to be gotten
 # as if DictDB was a dictionary.
 >>> db = DictDB(curs)
