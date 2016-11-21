@@ -6,7 +6,7 @@ python:
 install:
     "pip install -r requirements.txt"
 before_script:
-    - psql -c 'create database pgpydict;' -U pgpydict
+    - psql -c 'create database pgpydict;' -U postgres
 script:
     - "green -v ."
 services:

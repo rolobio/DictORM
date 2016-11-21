@@ -1,18 +1,28 @@
 #! /usr/bin/env python
-from pprint import pprint
 from pgpydict import *
+from pprint import pprint
 from psycopg2 import OperationalError
 from psycopg2.extras import DictCursor
+import os
 import psycopg2
 import unittest
 
-test_db_login = {
-        'database':'pgpydict',
-        'user':'pgpydict',
-        'password':'pgpydict',
-        'host':'localhost',
-        'port':'5432',
-        }
+if 'CI' in os.environ.keys():
+    test_db_login = {
+            'database':'pgpydict',
+            'user':'postgres',
+            'password':'',
+            'host':'localhost',
+            'port':'5432',
+            }
+else:
+    test_db_login = {
+            'database':'pgpydict',
+            'user':'pgpydict',
+            'password':'pgpydict',
+            'host':'localhost',
+            'port':'5432',
+            }
 
 class Test(unittest.TestCase):
 
