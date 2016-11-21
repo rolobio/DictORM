@@ -60,6 +60,10 @@ class Test(unittest.TestCase):
         self.conn.commit()
 
 
+    def test_DictDB(self):
+        self.db.refresh_tables()
+
+
     def test_get_where(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
