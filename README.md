@@ -127,6 +127,9 @@ Dave
 >>> bob = Person.get_where(1)
 >>> bob
 {'name':'Bob', 'id':1}
+# Get all rows in a table
+>>> Person.get_where()
+[{'name':'Bob', 'id':1},]
 ```
 
 ### Update a PgPyDict without overwriting Primary Keys
