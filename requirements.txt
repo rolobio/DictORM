@@ -1,2 +1,3 @@
+coverage
 green
 psycopg2
