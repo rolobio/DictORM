@@ -1,1 +1,4 @@
-from pgpydict.pgpydict import *
+try:
+    from pgpydict.pgpydict import *
+except ImportError:
+    from .pgpydict import *

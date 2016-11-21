@@ -200,7 +200,6 @@ class Test(unittest.TestCase):
     def test_set_reference(self):
         """
         person
-        ════════════════════
         id <----------\
         manager_id ---/
         """
@@ -235,11 +234,11 @@ class Test(unittest.TestCase):
         Linking to person.id from person_department.person_id allows you to have
         multiple person_department records.
 
-        person              ║ person_department            ║ department
-        ════════════════════╬══════════════════════════════╬════════════════════
-        id <-------+-+----- ║ person_id   department_id -> ║ id
-                    \ \---- ║ person_id   department_id -> ║ id
-                     \----- ║ person_id   department_id -> ║ id
+        person              | person_department            | department
+        --------------------+------------------------------+-------------------
+        id <-------+-+----- | person_id   department_id -> | id
+                    \ \---- | person_id   department_id -> | id
+                     \----- | person_id   department_id -> | id
         """
         Person = self.db['person']
         Department = self.db['department']
@@ -281,10 +280,10 @@ class Test(unittest.TestCase):
 
     def test_onetoone(self):
         """
-        person              ║ car
-        ════════════════════╬═══════════════════════════════════════════════════
-        id     <----------- ║ person_id
-        car_id -----------> ║ id
+        person              | car
+        --------------------+--------------------------------------------------
+        id     <----------- | person_id
+        car_id -----------> | id
         """
         Person = self.db['person']
         Car = self.db['car']
