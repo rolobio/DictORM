@@ -32,7 +32,9 @@ Connect to the database using psycopg2:
 >>> db = DictDB(curs)
 
 # Get a PgPyTable object for table 'person'
+# person table built using: (id SERIAL PRIMARY KEY, name TEXT)
 >>> person = db['person']
+
 # PgPyDict relies on primary keys to successfully Update a row in the 'person'
 # table.  The primary keys found are listed when the person object is printed.
 >>> person
@@ -41,14 +43,14 @@ PgPyTable(dave, ['id',])
 # You can define your own primary keys
 person.pks = ['id',]
 
-# Insert and Update a PgPyDict object:
+# Insert into "person" table by calling "person" object as if it were a
+# dictionary.
 >>> dave = person(name='Dave')
 >>> dave
 {'name':'Dave', 'id':1}
 
 >>> dave['name']
 Dave
-
 >>> dave['id']
 1
 
@@ -61,4 +63,17 @@ Dave
 >>> bob = person.get_where(id=1)
 >>> bob
 {'name':'Bob', 'id':1}
+
+# A PgPyDict behaves exactly like a Python dictionary and can be updated/set
+>>> steve = person(name='Steve')
+>>> steve
+{'name':'Steve', 'id':2}
+# Update bob using steve's keys and values.  You get a dictionary
+# without primary keys to avoid overwritting another row.
+>>> steve.remove_pks()
+{'name':'Steve'} # id is missing because its the primary key
+>>> bob.update(steve.remove_pks())
+>>> bob.flush()
+>>> bob
+{'name':'Steve', 'id':1}
 ```
