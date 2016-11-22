@@ -112,6 +112,12 @@ class Test(unittest.TestCase):
         self.conn.commit()
         self.assertEqual(Person.get_where(), [bob, alice])
 
+        # get_where accepts a tuple of ids, and returns those rows
+        self.assertEqual(Person.get_where(id=(1,3)),
+                [bob, alice])
+        self.assertEqual(Person.get_where(id=(1,3), many=True),
+                [bob, alice])
+
         # Database row survives an object deletion
         del bob
         del alice
