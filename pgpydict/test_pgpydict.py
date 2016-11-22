@@ -95,7 +95,7 @@ class Test(unittest.TestCase):
         self.assertEqual(Person.get_where(1), bob)
 
         self.conn.commit()
-        self.assertEqual(Person.get_where(1), bob)
+        self.assertEqual(Person.get_where({'id':1}), bob)
 
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')

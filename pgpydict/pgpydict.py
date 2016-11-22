@@ -38,7 +38,7 @@ def column_value_pairs(d, join_str=', '):
                 for k in d.keys()
             ])
     else:
-        return join_str.join([i+'=%('+i+')s' for i in d])
+        return join_str.join([str(i)+'=%('+str(i)+')s' for i in d])
 
 
 def insert_column_value_pairs(d):
@@ -52,7 +52,7 @@ def insert_column_value_pairs(d):
     """
     return '({}) VALUES ({})'.format(
             ', '.join(sorted(d)),
-            ', '.join(['%('+k+')s' for k in sorted(d)]),
+            ', '.join(['%('+str(i)+')s' for i in sorted(d)]),
             )
 
 
@@ -134,12 +134,14 @@ class PgPyTable(object):
 
     def get_where(self, *a, **kw):
         many = kw.pop('many', None)
-        if a and type(a) in (list, tuple):
+        if a and len(a) == 1 and type(a[0]) == dict:
+            # A single dictionary has been passed as an argument, use it as
+            # the keyword arguments.
+            kw = a[0]
+        elif a:
             if not self.pks:
                 raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
             kw = dict(zip(self.pks, a))
-        elif a and type(a) == dict:
-            kw = a
         elif not a and not kw:
             self.curs.execute('SELECT * FROM {}'.format(self.name))
             return self._return_results()
