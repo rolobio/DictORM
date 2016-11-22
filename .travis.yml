@@ -9,7 +9,8 @@ install:
 before_script:
     - psql -c 'create database pgpydict;' -U postgres
 script:
-    - "green -vv --run-coverage ."
+    - "green -vv ."
+    - "coverage report --rcfile=.coveragerc"
     - "python setup.py install"
     - "python -c 'from pgpydict import *'"
 services:
