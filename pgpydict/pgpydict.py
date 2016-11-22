@@ -47,15 +47,12 @@ def insert_column_value_pairs(d):
     interpolate the dictionary's keys into a INSERT SQL query.
 
     Example:
-        d = {'id':10, 'person':'Dave'}
-
-        becomes
-
+        >>> insert_column_value_pairs({'id':10, 'person':'Dave'})
         (id, person) VALUES (%(id)s, %(person)s)
     """
     return '({}) VALUES ({})'.format(
-            ', '.join(d),
-            ', '.join(['%('+k+')s' for k in d]),
+            ', '.join(sorted(d)),
+            ', '.join(['%('+k+')s' for k in sorted(d)]),
             )
 
 
