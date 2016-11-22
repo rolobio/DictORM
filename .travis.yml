@@ -3,14 +3,19 @@ python:
     - "2.7"
     - "3.4"
     - "3.5"
-
 install:
     "pip install -r requirements.txt"
 before_script:
     - psql -c 'create database pgpydict;' -U postgres
 script:
+    # Run tests verbosely
     - "green -vv --run-coverage ."
+    # Test installation
     - "python setup.py install"
+    #  Verify that pgpydict can be imported
     - "python -c 'from pgpydict import *'"
 services:
     - postgresql
+after_success:
+    # Submit coverage report to coveralls
+    coveralls
