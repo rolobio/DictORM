@@ -118,10 +118,10 @@ class PgPyTable(object):
         return self._add_references(d)
 
 
-    def _return_results(self, is_list=False):
+    def _return_results(self, many=False):
         if self.curs.rowcount == 0:
             raise NoEntryError('No entry found')
-        elif not is_list and self.curs.rowcount == 1:
+        elif not many and self.curs.rowcount == 1:
             d = self(self.curs.fetchone())
             d._in_db = True
             return d
@@ -135,7 +135,7 @@ class PgPyTable(object):
         return column_value_pairs(self.pks, join_str)
 
 
-    def get_where(self, is_list=False, *a, **kw):
+    def get_where(self, many=False, *a, **kw):
         if a and type(a) in (list, tuple):
             if not self.pks:
                 raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
@@ -153,17 +153,17 @@ class PgPyTable(object):
             ),
             kw,
         )
-        return self._return_results(is_list=is_list)
+        return self._return_results(many=many)
 
 
-    def set_reference(self, my_column, key_name, pgpytable, their_column, is_list=False):
-        self.refs[my_column] = (key_name, pgpytable, their_column, is_list)
+    def set_reference(self, my_column, key_name, pgpytable, their_column, many=False):
+        self.refs[my_column] = (key_name, pgpytable, their_column, many)
         self.key_name_to_ref[key_name] = my_column
 
 
     def _add_references(self, d):
         for my_column in self.refs:
-            key_name, pgpytable, their_column, is_list = self.refs[my_column]
+            key_name, pgpytable, their_column, many = self.refs[my_column]
             d[key_name] = None
         return d
 
@@ -252,7 +252,7 @@ class PgPyDict(dict):
         to match the new row.
         """
         if key in self._table.refs:
-            key_name, pgpytable, their_column, is_list = self._table.refs[key]
+            key_name, pgpytable, their_column, many = self._table.refs[key]
             if len(pgpytable.pks) > 1:
                 d = pgpytable.get_where(zip(self._table.pks, value))
                 super(PgPyDict, self).__setitem__(key_name, d)
@@ -270,10 +270,10 @@ class PgPyDict(dict):
 
         """
         if key in self._table.key_name_to_ref:
-            key_name, pgpytable, their_column, is_list = self._table.refs[self._table.key_name_to_ref[key]]
+            key_name, pgpytable, their_column, many = self._table.refs[self._table.key_name_to_ref[key]]
             super(PgPyDict, self).__setitem__(key,
                     pgpytable.get_where(
-                        is_list=is_list,
+                        many=many,
                         **{their_column:self[self._table.key_name_to_ref[key]]})
                     )
         return super(PgPyDict, self).__getitem__(key)

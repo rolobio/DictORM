@@ -246,7 +246,7 @@ class Test(unittest.TestCase):
         PD.sort_by = 'person_id'
         PD.set_reference('department_id', 'department', Department, 'id')
         PD.set_reference('person_id', 'person', Person, 'id')
-        Person.set_reference('id', 'person_departments', PD, 'person_id', is_list=True)
+        Person.set_reference('id', 'person_departments', PD, 'person_id', many=True)
 
         bob = Person(name='Bob')
         bob.flush()
