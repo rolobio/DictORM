@@ -2,6 +2,7 @@
 ## Use Postgresql as if it were a Python Dictionary
 
 [![Build Status](https://travis-ci.org/rolobio/pgpydict.svg?branch=master)](https://travis-ci.org/rolobio/pgpydict)
+[![Coverage Status](https://coveralls.io/repos/github/rolobio/pgpydict/badge.svg?branch=master)](https://coveralls.io/github/rolobio/pgpydict?branch=master)
 
 Many database tables are constructed similar to a Python Dictionary.  Why not
 use it as such?
@@ -18,7 +19,7 @@ pip install -r requirements.txt
 python setup.py install
 ```
 
-## Quick feature example
+## Quick & Simple Example!
 ```python
 # Create a dictionary that contains all tables in the database
 >>> db = DictDB(psycopg2_DictCursor)
@@ -38,7 +39,7 @@ python setup.py install
 >>> will.flush()
 ```
 
-## Another quick feature example (the cool stuff)
+## Another quick example (the cool stuff)
 ```python
 # Define a relationship to another table, access that one-to-one relationship
 # as if it were a sub-dictionary.
@@ -68,6 +69,19 @@ True
 ```
 
 ## Basic Usage
+Create your tables with at least one primary key:
+```sql
+CREATE TABLE person (
+    id SERIAL PRIMARY KEY,
+    name TEXT,
+    car_id INTEGER REFERNCES car(id)
+);
+CREATE TABLE car (
+    id SERIAL PRIMARY KEY,
+    license TEXT
+);
+```
+
 Connect to the database using psycopg2 and DictCursor:
 ```python
 >>> import psycopg2, psycopg2.extras
@@ -161,6 +175,19 @@ Dave
 >>> steve.flush()
 >>> steve['car'] == car
 True
+```
+
+Add in more tables
+```sql
+CREATE TABLE department (
+    id SERIAL PRIMARY KEY,
+    name
+);
+CREATE TABLE perons_department (
+    person_id INTEGER REFERENCES person(id),
+    department_id INTEGER REFERENCES department(id),
+    PRIMARY KEY (person_id, department)
+);
 ```
 
 ### Set a one-to-many reference to another table using an intermediary table
