@@ -132,7 +132,7 @@ class PgPyTable(object):
         return column_value_pairs(self.pks, join_str)
 
 
-    def get_where(self, many=False, *a, **kw):
+    def get_where(self, *a, many=False, **kw):
         if a and type(a) in (list, tuple):
             if not self.pks:
                 raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))

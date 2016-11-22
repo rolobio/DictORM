@@ -103,6 +103,11 @@ class Test(unittest.TestCase):
         dave.flush()
         alice.flush()
 
+        # get_where with a single integer argument should produce a single
+        # PgPyDict row that matches that row's id
+        self.assertEqual(Person.get_where(1), bob)
+        self.assertEqual(self.curs.rowcount, 1)
+
         # get_where with no parameters returns the entire table
         self.assertEqual(Person.get_where(), [bob, dave, alice])
 
