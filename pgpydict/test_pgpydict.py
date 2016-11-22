@@ -329,6 +329,7 @@ class Test(unittest.TestCase):
         self.assertEqual(NoPk.get_where(), {'foo':'bar'})
         foo['foo'] = 'baz'
         self.assertRaises(NoPrimaryKey, foo.flush)
+        self.assertRaises(NoPrimaryKey, NoPk.get_where, 1)
 
 
 

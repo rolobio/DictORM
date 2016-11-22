@@ -253,12 +253,9 @@ class PgPyDict(dict):
         """
         if key in self._table.refs:
             key_name, pgpytable, their_column, many = self._table.refs[key]
-            if len(pgpytable.pks) > 1:
-                d = pgpytable.get_where(zip(self._table.pks, value))
-                super(PgPyDict, self).__setitem__(key_name, d)
-            else:
-                d = pgpytable.get_where(**{self._table.pks[0]:value})
-                super(PgPyDict, self).__setitem__(key_name, d)
+            # TODO What if there are multiple primary keys?
+            d = pgpytable.get_where({self._table.pks[0]:value})
+            super(PgPyDict, self).__setitem__(key_name, d)
         elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
             super(PgPyDict, self).__setitem__(self._table.key_name_to_ref[key],
                     value[self._table.pks[0]])
