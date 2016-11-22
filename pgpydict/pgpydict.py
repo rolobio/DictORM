@@ -1,9 +1,10 @@
 """
 Access a Psycopg2 database as if it were a Python Dictionary.
 """
+from copy import copy
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
-    '__version__']
+    '__version__', 'column_value_pairs']
 __version__ = '0.1'
 
 class NoEntryError(Exception): pass
@@ -15,10 +16,13 @@ def operator_kinds(o):
     return '='
 
 
-def column_value_pairs(d, join_str=', '):
+def column_value_pairs(d, join_str=', ', prefix=''):
     """
     Create a string of SQL that will instruct a Psycopg2 DictCursor to
     interpolate the dictionary's keys into a SELECT or UPDATE SQL query.
+
+    If old is True, prefix all values with old_ .  This is used to change
+    primary key values.
 
     Example 1:
         >>> column_value_pairs({'id':10, 'person':'Dave'})
@@ -29,16 +33,20 @@ def column_value_pairs(d, join_str=', '):
         id=%(id)s, person=%(person)s
 
     Example 3:
-        >>> column_value_pairs({'id':(10,11,13), 'group':'foo'}, ' AND ')
-        id IN %(id)s AND group=%(foo)s
+        >>> column_value_pairs({'id':(10,11,13), 'group':'group'}, ' AND ')
+        group=%(group)s AND id IN %(id)s
+
+    Example 4:
+        >>> column_value_pairs( {'id':12, 'person':'Dave'}, prefix='old_')
+        id=%(old_id)s, person=%(old_person)s
     """
     if type(d) == dict:
         return join_str.join([
-                str(k) + operator_kinds(type(d[k])) + '%('+k+')s'
-                for k in d.keys()
+                str(k) + operator_kinds(type(d[k])) + '%('+prefix+k+')s'
+                for k in sorted(d.keys())
             ])
     else:
-        return join_str.join([str(i)+'=%('+str(i)+')s' for i in d])
+        return join_str.join([str(i)+'=%('+prefix+str(i)+')s' for i in d])
 
 
 def insert_column_value_pairs(d):
@@ -128,8 +136,8 @@ class PgPyTable(object):
         return l
 
 
-    def _pk_value_pairs(self, join_str=' AND '):
-        return column_value_pairs(self.pks, join_str)
+    def _pk_value_pairs(self, join_str=' AND ', prefix=''):
+        return column_value_pairs(self.pks, join_str, prefix)
 
 
     def get_where(self, *a, **kw):
@@ -182,6 +190,7 @@ class PgPyDict(dict):
         self._in_db = False
         self._curs = pgpytable.db.curs
         super(PgPyDict, self).__init__(*a, **kw)
+        self._old = self.remove_refs()
 
 
     def flush(self):
@@ -203,15 +212,18 @@ class PgPyDict(dict):
             if not self._table.pks:
                 raise NoPrimaryKey('Cannot update to {}, no primary keys defined.'.format(
                     self._table))
+            combined = copy(self.remove_refs())
+            combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
             self._curs.execute('UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *'.format(
                     table=self._table.name,
                     cvp=column_value_pairs(self.remove_refs()),
-                    pvp=self._table._pk_value_pairs(),
+                    pvp=self._table._pk_value_pairs(prefix='old_'),
                 ),
-                self
+                combined
             )
         d = self._curs.fetchone()
         super(PgPyDict, self).__init__(d)
+        self._old = self.remove_refs()
         return self
 
 
@@ -254,7 +266,7 @@ class PgPyDict(dict):
         if key in self._table.refs:
             key_name, pgpytable, their_column, many = self._table.refs[key]
             # TODO What if there are multiple primary keys?
-            d = pgpytable.get_where({self._table.pks[0]:value})
+            d = pgpytable.get_where(value)
             super(PgPyDict, self).__setitem__(key_name, d)
         elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
             super(PgPyDict, self).__setitem__(self._table.key_name_to_ref[key],

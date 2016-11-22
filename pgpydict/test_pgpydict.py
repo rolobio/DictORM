@@ -1,5 +1,6 @@
 #! /usr/bin/env python
-from pgpydict import DictDB, PgPyTable, PgPyDict, NoEntryError, NoPrimaryKey
+from pgpydict import (DictDB, PgPyTable, PgPyDict, NoEntryError, NoPrimaryKey,
+    column_value_pairs)
 from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
@@ -288,6 +289,22 @@ class Test(unittest.TestCase):
         self.assertEqual(aly['person_departments'], [aly_pd_sales,])
         self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
 
+        # Move bob's hr to aly
+        bob_pd_hr['person_id'] = aly['id']
+        aly_pd_hr = bob_pd_hr.flush()
+        self.assertEqual([i.remove_refs() for i in aly['person_departments']], [aly_pd_sales.remove_refs(), aly_pd_hr.remove_refs()])
+        self.assertEqual([i.remove_refs() for i in bob['person_departments']], [bob_pd_sales.remove_refs()])
+
+
+    def test_changing_pks(self):
+        Person = self.db['person']
+        bob = Person(name='Bob')
+        bob.flush()
+        self.assertEqual(bob['id'], 1)
+        bob['id'] = 2
+        bob.flush()
+        self.assertEqual(bob['id'], 2)
+
 
     def test_onetoone(self):
         """
@@ -330,6 +347,17 @@ class Test(unittest.TestCase):
         foo['foo'] = 'baz'
         self.assertRaises(NoPrimaryKey, foo.flush)
         self.assertRaises(NoPrimaryKey, NoPk.get_where, 1)
+
+
+    def test_column_value_pairs(self):
+        self.assertEqual(column_value_pairs({'id':10, 'person':'Dave'}),
+                'id=%(id)s, person=%(person)s')
+        self.assertEqual(column_value_pairs(('id', 'person')),
+                'id=%(id)s, person=%(person)s')
+        self.assertEqual(column_value_pairs({'id':(10,11,13), 'group':'foo'}, ' AND '),
+                'group=%(group)s AND id IN %(id)s')
+        self.assertEqual(column_value_pairs({'id':12, 'person':'Dave'}, prefix='old_'),
+                'id=%(old_id)s, person=%(old_person)s')
 
 
 
