@@ -130,6 +130,11 @@ class Test(unittest.TestCase):
         self.conn.commit()
         self.assertEqual(len(Person.get_where()), 2)
 
+        bob, alice = Person.get_where()
+        bob.delete()
+        alice.delete()
+        self.assertRaises(NoEntryError, Person.get_where)
+
 
 
     def test_get_where_multiple_pks(self):
