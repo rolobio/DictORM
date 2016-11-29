@@ -382,6 +382,14 @@ class Test(unittest.TestCase):
         curs2.execute('SELECT * FROM person')
         self.assertEqual(next(persons), aly)
 
+        # Using pgpydict's cursor will intefere
+        persons = Person.get_where()
+        self.assertEqual(next(persons), bob)
+        self.db.curs.execute('SELECT * FROM person')
+        self.assertEqual(next(persons), bob)
+        self.assertEqual(next(persons), aly)
+        self.assertRaises(StopIteration, next, persons)
+
 
 
 if __name__ == '__main__':
