@@ -33,7 +33,8 @@ class Test(unittest.TestCase):
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
-        self.curs = self.conn.cursor(cursor_factory=DictCursor)
+        self.db = DictDB(self.conn)
+        self.curs = self.db.curs
         self.tearDown()
         self.curs.execute('''
         CREATE TABLE person (
@@ -60,7 +61,7 @@ class Test(unittest.TestCase):
         CREATE TABLE no_pk (foo TEXT);
         ''')
         self.conn.commit()
-        self.db = DictDB(self.curs)
+        self.db.refresh_tables()
 
 
     def tearDown(self):
@@ -361,6 +362,25 @@ class Test(unittest.TestCase):
                 'group=%(group)s AND id IN %(id)s')
         self.assertEqual(column_value_pairs({'id':12, 'person':'Dave'}, prefix='old_'),
                 'id=%(old_id)s, person=%(old_person)s')
+
+
+    def test_second_cursor(self):
+        """
+        PgPyDict's cursor should not interfere with another cursor.
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob')
+        bob.flush()
+        aly = Person(name='Aly')
+        aly.flush()
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
+
+        curs2 = self.conn.cursor(cursor_factory=DictCursor)
+        persons = Person.get_where()
+        self.assertEqual(next(persons), bob)
+
+        curs2.execute('SELECT * FROM person')
+        self.assertEqual(next(persons), aly)
 
 
 

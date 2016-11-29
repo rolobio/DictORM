@@ -2,6 +2,7 @@
 Access a Psycopg2 database as if it were a Python Dictionary.
 """
 from copy import copy
+from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
     '__version__', 'column_value_pairs']
@@ -67,8 +68,9 @@ def insert_column_value_pairs(d):
 
 class DictDB(dict):
 
-    def __init__(self, cursor):
-        self.curs = cursor
+    def __init__(self, psycopg2_conn):
+        self.conn = psycopg2_conn
+        self.curs = self.conn.cursor(cursor_factory=DictCursor)
         self.refresh_tables()
         super(DictDB, self).__init__()
 
