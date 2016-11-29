@@ -9,6 +9,7 @@ __version__ = '0.1'
 
 class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
+class UnexpectedRows(Exception): pass
 
 def operator_kinds(o):
     if o in (tuple, list):
@@ -124,16 +125,14 @@ class PgPyTable(object):
 
 
     def _return_results(self, many=False):
-        if self.curs.rowcount == 0:
-            raise NoEntryError('No entry found')
-        elif not many and self.curs.rowcount == 1:
-            d = self(self.curs.fetchone())
+        while True:
+            d = self.curs.fetchone()
+            if not d:
+                break
+            # Convert returned dictionary to a PgPyDict
+            d = self(d)
             d._in_db = True
-            return d
-        l = [self(d) for d in self.curs.fetchall()]
-        for i in l:
-            i._in_db = True
-        return l
+            yield d
 
 
     def _pk_value_pairs(self, join_str=' AND ', prefix=''):
@@ -162,6 +161,13 @@ class PgPyTable(object):
             kw,
         )
         return self._return_results(many=many)
+
+
+    def get_one(self, *a, **kw):
+        l = list(self.get_where(*a, **kw))
+        if len(l) > 1:
+            raise UnexpectedRows('More than one row selected.')
+        return l[0]
 
 
     def set_reference(self, my_column, key_name, pgpytable, their_column, many=False):
@@ -266,7 +272,11 @@ class PgPyDict(dict):
         if key in self._table.refs:
             key_name, pgpytable, their_column, many = self._table.refs[key]
             # TODO What if there are multiple primary keys?
-            d = pgpytable.get_where(value)
+            if many:
+                d = list(pgpytable.get_where(value))
+            else:
+                d = pgpytable.get_one(value)
+
             super(PgPyDict, self).__setitem__(key_name, d)
         elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
             super(PgPyDict, self).__setitem__(self._table.key_name_to_ref[key],
@@ -280,11 +290,16 @@ class PgPyDict(dict):
         """
         if key in self._table.key_name_to_ref:
             key_name, pgpytable, their_column, many = self._table.refs[self._table.key_name_to_ref[key]]
-            super(PgPyDict, self).__setitem__(key,
-                    pgpytable.get_where(
-                        many=many,
-                        **{their_column:self[self._table.key_name_to_ref[key]]})
-                    )
+            if many:
+                super(PgPyDict, self).__setitem__(key,
+                        pgpytable.get_where(
+                            **{their_column:self[self._table.key_name_to_ref[key]]})
+                        )
+            else:
+                super(PgPyDict, self).__setitem__(key,
+                        pgpytable.get_one(
+                            **{their_column:self[self._table.key_name_to_ref[key]]})
+                        )
         return super(PgPyDict, self).__getitem__(key)
 
 

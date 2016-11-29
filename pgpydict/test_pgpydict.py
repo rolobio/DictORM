@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from pgpydict import (DictDB, PgPyTable, PgPyDict, NoEntryError, NoPrimaryKey,
+from pgpydict import (DictDB, PgPyTable, PgPyDict, NoPrimaryKey,
     column_value_pairs)
 from pprint import pprint
 from psycopg2.extras import DictCursor
@@ -83,20 +83,20 @@ class Test(unittest.TestCase):
         self.assertEqual({'name':'Bob'}, bob)
         bob.flush()
         self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertEqual(Person.get_where(1), bob)
+        self.assertEqual(list(Person.get_where(1)), [bob,])
 
         # A second flush does not fail
         bob.flush()
         self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertEqual(Person.get_where(1), bob)
+        self.assertEqual(list(Person.get_where(1)), [bob,])
 
         bob['name'] = 'Jon'
         bob.flush()
         self.assertDictContains(bob, {'name':'Jon', 'id':1})
-        self.assertEqual(Person.get_where(1), bob)
+        self.assertEqual(list(Person.get_where(1)), [bob,])
 
         self.conn.commit()
-        self.assertEqual(Person.get_where({'id':1}), bob)
+        self.assertEqual(list(Person.get_where({'id':1})), [bob,])
 
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')
@@ -106,34 +106,34 @@ class Test(unittest.TestCase):
 
         # get_where with a single integer argument should produce a single
         # PgPyDict row that matches that row's id
-        self.assertEqual(Person.get_where(1), bob)
+        self.assertEqual(list(Person.get_where(1)), [bob,])
         self.assertEqual(self.curs.rowcount, 1)
 
         # get_where with no parameters returns the entire table
-        self.assertEqual(Person.get_where(), [bob, dave, alice])
+        self.assertEqual(list(Person.get_where()), [bob, dave, alice])
 
         # A delete sql command can be executed on a PgPyDict
         dave.delete()
-        self.assertEqual(Person.get_where(), [bob, alice])
+        self.assertEqual(list(Person.get_where()), [bob, alice])
         self.conn.commit()
-        self.assertEqual(Person.get_where(), [bob, alice])
+        self.assertEqual(list(Person.get_where()), [bob, alice])
 
         # get_where accepts a tuple of ids, and returns those rows
-        self.assertEqual(Person.get_where(id=(1,3)),
+        self.assertEqual(list(Person.get_where(id=(1,3))),
                 [bob, alice])
-        self.assertEqual(Person.get_where(id=(1,3), many=True),
+        self.assertEqual(list(Person.get_where(id=(1,3), many=True)),
                 [bob, alice])
 
         # Database row survives an object deletion
         del bob
         del alice
         self.conn.commit()
-        self.assertEqual(len(Person.get_where()), 2)
+        self.assertEqual(len(list(Person.get_where())), 2)
 
         bob, alice = Person.get_where()
         bob.delete()
         alice.delete()
-        self.assertRaises(NoEntryError, Person.get_where)
+        self.assertEqual(len(list(Person.get_where())), 0)
 
 
 
@@ -156,12 +156,12 @@ class Test(unittest.TestCase):
         # Searching person_department with two key/value pairs returns the new
         # row.
         self.assertEqual(
-                PersonDepartment.get_where(person_id=1, department_id=1),
-                bob_sales)
+                list(PersonDepartment.get_where(person_id=1, department_id=1)),
+                [bob_sales,])
 
         # Test deletion with multiple Primary Keys
         bob_sales.delete()
-        self.assertRaises(NoEntryError, PersonDepartment.get_where)
+        self.assertEqual(len(list(PersonDepartment.get_where())), 0)
 
 
     def test_already_in_db(self):
@@ -170,7 +170,7 @@ class Test(unittest.TestCase):
         bob = Person(name='Bob')
         bob.flush()
 
-        bob_copy = Person.get_where(1)
+        bob_copy = Person.get_one(1)
         bob_copy.flush()
         self.assertEqual(bob, bob_copy)
 
@@ -232,18 +232,18 @@ class Test(unittest.TestCase):
         bob['manager_id'] = aly['id']
         bob.flush()
         self.assertEqual(bob['manager_id'], aly['id'])
-        self.assertEqual(bob['manager'], aly)
+        self.assertEqual(bob['manager'].remove_refs(), aly.remove_refs())
 
         steve = Person(name='Steve')
         steve.flush()
         bob['manager_id'] = steve['id']
         self.assertEqual(bob['manager_id'], steve['id'])
-        self.assertEqual(bob['manager'], steve)
+        self.assertEqual(bob['manager'].remove_refs(), steve.remove_refs())
 
         bob['manager'] = aly
         bob.flush()
         self.assertEqual(bob['manager_id'], aly['id'])
-        self.assertEqual(bob['manager'], aly)
+        self.assertEqual(bob['manager'].remove_refs(), aly.remove_refs())
 
 
     def test_onetomany(self):
@@ -274,25 +274,25 @@ class Test(unittest.TestCase):
         bob_pd_sales = PD(department_id=sales['id'], person_id=bob['id'])
         bob_pd_sales.flush()
         bob.flush()
-        self.assertEqual(bob['person_departments'], [bob_pd_sales,])
+        self.assertEqual(list(bob['person_departments']), [bob_pd_sales,])
 
         hr = Department(name='HR')
         hr.flush()
         bob_pd_hr = PD(department_id=hr['id'], person_id=bob['id'])
         bob_pd_hr.flush()
         bob.flush()
-        self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
+        self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
         aly = Person(name='Aly')
         aly.flush()
         bob.flush()
-        self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
+        self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
         aly_pd_sales = PD(department_id=sales['id'], person_id=aly['id'])
         aly_pd_sales.flush()
         aly.flush()
-        self.assertEqual(aly['person_departments'], [aly_pd_sales,])
-        self.assertEqual(bob['person_departments'], [bob_pd_sales, bob_pd_hr])
+        self.assertEqual(list(aly['person_departments']), [aly_pd_sales,])
+        self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
         # Move bob's hr to aly
         bob_pd_hr['person_id'] = aly['id']
@@ -337,18 +337,16 @@ class Test(unittest.TestCase):
 
     def test_errors(self):
         """
-        Getting a bad primary key raises NoEntryError.
-
         A table with no primary key(s) can be gotten, but not updated.
         """
         Person = self.db['person']
-        self.assertRaises(NoEntryError, Person.get_where, 1)
 
         NoPk = self.db['no_pk']
         foo = NoPk(foo='bar')
         foo.flush()
+        self.conn.commit()
         self.assertEqual(foo, {'foo':'bar'})
-        self.assertEqual(NoPk.get_where(), {'foo':'bar'})
+        self.assertEqual(list(NoPk.get_where()), [{'foo':'bar'},])
         foo['foo'] = 'baz'
         self.assertRaises(NoPrimaryKey, foo.flush)
         self.assertRaises(NoPrimaryKey, NoPk.get_where, 1)
