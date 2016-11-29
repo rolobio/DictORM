@@ -5,7 +5,7 @@ from copy import copy
 from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
-    '__version__', 'column_value_pairs']
+    'UnexpectedRows', '__version__', 'column_value_pairs']
 __version__ = '0.1'
 
 class NoEntryError(Exception): pass
@@ -273,13 +273,7 @@ class PgPyDict(dict):
         """
         if key in self._table.refs:
             key_name, pgpytable, their_column, many = self._table.refs[key]
-            # TODO What if there are multiple primary keys?
-            if many:
-                d = list(pgpytable.get_where(value))
-            else:
-                d = pgpytable.get_one(value)
-
-            super(PgPyDict, self).__setitem__(key_name, d)
+            super(PgPyDict, self).__setitem__(key_name, pgpytable.get_one(value))
         elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
             super(PgPyDict, self).__setitem__(self._table.key_name_to_ref[key],
                     value[self._table.pks[0]])

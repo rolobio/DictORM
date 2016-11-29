@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from pgpydict import (DictDB, PgPyTable, PgPyDict, NoPrimaryKey,
+from pgpydict import (DictDB, PgPyTable, PgPyDict, UnexpectedRows, NoPrimaryKey,
     column_value_pairs)
 from pprint import pprint
 from psycopg2.extras import DictCursor
@@ -341,6 +341,10 @@ class Test(unittest.TestCase):
         A table with no primary key(s) can be gotten, but not updated.
         """
         Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
+
+        self.assertRaises(UnexpectedRows, Person.get_one)
 
         NoPk = self.db['no_pk']
         foo = NoPk(foo='bar')
