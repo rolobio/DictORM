@@ -303,6 +303,13 @@ class Test(unittest.TestCase):
 
 
     def test_onetomany(self):
+        """
+        person              | car
+        --------------------+--------------------------------------------------
+        id     <----+-+---- | person_id
+                     \ \--- | person_id
+                      \---- | person_id
+        """
         Person = self.db['person']
 
         Car = self.db['car']
@@ -314,7 +321,6 @@ class Test(unittest.TestCase):
         ford = Car(name='Ford', person_id=bob['id']).flush()
 
         self.assertEqual(list(bob['cars']), [toyota, honda, ford])
-
 
 
     def test_changing_pks(self):
