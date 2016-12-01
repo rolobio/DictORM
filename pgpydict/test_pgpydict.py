@@ -247,7 +247,7 @@ class Test(unittest.TestCase):
         self.assertEqual(bob['manager'].remove_refs(), aly.remove_refs())
 
 
-    def test_onetomany(self):
+    def test_manytomany(self):
         """
         Linking to person.id from person_department.person_id allows you to have
         multiple person_department records.
@@ -300,6 +300,21 @@ class Test(unittest.TestCase):
         aly_pd_hr = bob_pd_hr.flush()
         self.assertEqual([i.remove_refs() for i in aly['person_departments']], [aly_pd_sales.remove_refs(), aly_pd_hr.remove_refs()])
         self.assertEqual([i.remove_refs() for i in bob['person_departments']], [bob_pd_sales.remove_refs()])
+
+
+    def test_onetomany(self):
+        Person = self.db['person']
+
+        Car = self.db['car']
+        Person.set_reference('id', 'cars', Car, 'person_id', many=True)
+
+        bob = Person(name='Bob').flush()
+        toyota = Car(name='Toyota', person_id=bob['id']).flush()
+        honda = Car(name='Honda', person_id=bob['id']).flush()
+        ford = Car(name='Ford', person_id=bob['id']).flush()
+
+        self.assertEqual(list(bob['cars']), [toyota, honda, ford])
+
 
 
     def test_changing_pks(self):
