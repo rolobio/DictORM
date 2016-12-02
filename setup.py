@@ -18,7 +18,7 @@ config = {
         'psycopg2',
         ],
     'classifiers':[
-        "Development Status :: 5 - Production/Stable",
+        "Development Status :: 4 - Beta",
         "Topic :: Utilities",
         ],
     'test_suite':'pgpydict.test_pgpydict',

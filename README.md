@@ -46,8 +46,7 @@ python setup.py install
 >>> Car = db['car']
 >>> Person['car'] = Person['car_id'] == Car['id']
 # 'car'            : the key of the sub-dictionary you are defining
-# Person['car_id'] : the column that Person contains that references the 'car'
-#                    table.
+# Person['car_id'] : the key that Person contains that references the 'car' table.
 # Car['id']        : the key of Car that references Person['car_id']
 
 >>> wills_car = Car(name='Dodge Stratus', plate='123ABC')

@@ -153,20 +153,20 @@ class Test(unittest.TestCase):
         sales = Department(name='Sales')
         sales.flush()
 
-        PersonDepartment = self.db['person_department']
-        bob_sales = PersonDepartment(person_id=bob['id'], department_id=sales['id'])
+        PD = self.db['person_department']
+        bob_sales = PD(person_id=bob['id'], department_id=sales['id'])
         bob_sales.flush()
         self.assertEqual(bob_sales['person_id'], bob['id'])
         self.assertEqual(bob_sales['department_id'], sales['id'])
         # Searching person_department with two key/value pairs returns the new
         # row.
         self.assertEqual(
-                list(PersonDepartment.get_where(person_id=1, department_id=1)),
+                list(PD.get_where(person_id=1, department_id=1)),
                 [bob_sales,])
 
         # Test deletion with multiple Primary Keys
         bob_sales.delete()
-        self.assertEqual(len(list(PersonDepartment.get_where())), 0)
+        self.assertEqual(len(list(PD.get_where())), 0)
 
 
     def test_already_in_db(self):
