@@ -59,12 +59,16 @@ class Test(unittest.TestCase):
         );
         ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
         CREATE TABLE no_pk (foo TEXT);
+        CREATE TABLE station (
+            person_id INTEGER
+        );
         ''')
         self.conn.commit()
         self.db.refresh_tables()
 
 
     def tearDown(self):
+        self.conn.rollback()
         self.curs.execute('''DROP SCHEMA public CASCADE;
                 CREATE SCHEMA public;
                 GRANT ALL ON SCHEMA public TO postgres;
@@ -215,14 +219,14 @@ class Test(unittest.TestCase):
         self.assertDictContains(aly, {'name':'Aly', 'id':2})
 
 
-    def test_set_reference(self):
+    def test_self_reference(self):
         """
         person
         id <----------\
         manager_id ---/
         """
         Person = self.db['person']
-        Person.set_reference('manager_id', 'manager', Person, 'id')
+        Person['manager'] = Person['manager_id'] == Person['id']
 
         bob = Person(name='Bob')
         bob.flush()
@@ -262,9 +266,9 @@ class Test(unittest.TestCase):
         Department = self.db['department']
         PD = self.db['person_department']
         PD.sort_by = 'person_id'
-        PD.set_reference('department_id', 'department', Department, 'id')
-        PD.set_reference('person_id', 'person', Person, 'id')
-        Person.set_reference('id', 'person_departments', PD, 'person_id', many=True)
+        PD['department'] = PD['department_id'] == Department['id']
+        PD['person'] = PD['person_id'] == Person['id']
+        Person['person_departments'] = Person['id'] > PD['person_id']
 
         bob = Person(name='Bob')
         bob.flush()
@@ -313,7 +317,7 @@ class Test(unittest.TestCase):
         Person = self.db['person']
 
         Car = self.db['car']
-        Person.set_reference('id', 'cars', Car, 'person_id', many=True)
+        Person['cars'] = Person['id'] > Car['person_id']
 
         bob = Person(name='Bob').flush()
         toyota = Car(name='Toyota', person_id=bob['id']).flush()
@@ -321,6 +325,34 @@ class Test(unittest.TestCase):
         ford = Car(name='Ford', person_id=bob['id']).flush()
 
         self.assertEqual(list(bob['cars']), [toyota, honda, ford])
+
+
+    def test_onetomany_alter_primary_key(self):
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
+
+        Station = self.db['station']
+        Station.order_by = 'person_id'
+        Station['person'] = Station['person_id'] == Person['id']
+        Person['stations'] = Person['id'] > Station['person_id']
+
+        desk1 = Station(person_id=bob['id']).flush()
+        desk2 = Station(person_id=bob['id']).flush()
+        desk3 = Station(person_id=bob['id']).flush()
+
+        self.assertEqual(list(bob['stations']), [desk1, desk2, desk3])
+
+        bob.delete()
+        self.conn.commit()
+
+        self.assertEqual(desk1['person_id'], 1)
+        self.assertEqual(desk2['person_id'], 1)
+        self.assertEqual(desk3['person_id'], 1)
+
+        aly['id'] = 1
+        aly.flush()
+        self.assertEqual(list(aly['stations']), [desk1, desk2, desk3])
 
 
     def test_changing_pks(self):
@@ -342,8 +374,8 @@ class Test(unittest.TestCase):
         """
         Person = self.db['person']
         Car = self.db['car']
-        Person.set_reference('car_id', 'car', Car, 'id')
-        Car.set_reference('person_id', 'person', Person, 'id')
+        Person['car'] = Person['car_id'] == Car['id']
+        Car['person'] = Car['person_id'] == Person['id']
 
         will = Person(name='Will')
         will.flush()

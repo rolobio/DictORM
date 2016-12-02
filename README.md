@@ -44,11 +44,11 @@ python setup.py install
 # Define a relationship to another table, access that one-to-one relationship
 # as if it were a sub-dictionary.
 >>> Car = db['car']
->>> Person.set_reference('car_id', 'car', Car, 'id')
-# 'car_id' : the column that Person contains that references the 'car' table
-# 'car'    : the key of the sub-dictionary you are defining
-# Car      : the PgPyTable object that you are referencing
-# 'id'     : the primary key that 'car_id' references
+>>> Person['car'] = Person['car_id'] == Car['id']
+# 'car'            : the key of the sub-dictionary you are defining
+# Person['car_id'] : the column that Person contains that references the 'car'
+#                    table.
+# Car['id']        : the key of Car that references Person['car_id']
 
 >>> wills_car = Car(name='Dodge Stratus', plate='123ABC')
 >>> wills_car.flush()
@@ -168,7 +168,7 @@ Dave
 # --------------------+-------
 # car_id -----------> | id
 >>> Car = db['car']
->>> Person.set_reference('car_id', 'car', Car, 'id')
+>>> Person['car'] = Person['car_id'] == Car['id']
 # Give Steve a car
 >>> steve = Person.get_where(1)
 >>> steve['car_id'] = car['id']
@@ -199,10 +199,12 @@ CREATE TABLE perons_department (
 #              \----- | person_id   department_id -> | id
 >>> Department = db['department']
 >>> PD = db['person_department']
->>> PD.set_reference('department_id', 'department', Department, 'id')
+>>> PD['department'] = PD['department_id'] == Department['id']
 
-# Define one-to-many reference for person
->>> Person.set_reference('id', 'person_departments', PD, 'person_id', is_list=True)
+# Reference many rows using ">".  I would rather use "in", but "__contains__"
+# overwrites any values returned and instead returns a True/False.  So, we use
+# ">" to specify that many rows can be returned.
+>>> Person['person_departments'] = Person['id'] > PD['person_id']
 
 # Create HR and Sales departments
 >>> hr = Department(name='HR')

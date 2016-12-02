@@ -99,7 +99,7 @@ class PgPyTable(object):
         self.curs = db.curs
         self.pks = []
         self.refs = {}
-        self.key_name_to_ref = {}
+        self.ref_name_to_my_column = {}
         self._refresh_primary_keys()
         self.order_by = None
 
@@ -172,15 +172,10 @@ class PgPyTable(object):
         return l[0]
 
 
-    def set_reference(self, my_column, key_name, pgpytable, their_column, many=False):
-        self.refs[my_column] = (key_name, pgpytable, their_column, many)
-        self.key_name_to_ref[key_name] = my_column
-
-
     def _add_references(self, d):
         for my_column in self.refs:
-            key_name, pgpytable, their_column, many = self.refs[my_column]
-            d[key_name] = None
+            ref_name, pgpytable, their_column, many = self.refs[my_column]
+            d[ref_name] = None
         return d
 
 
@@ -188,6 +183,37 @@ class PgPyTable(object):
         self.curs.execute('SELECT COUNT(*) FROM {table}'.format(
             table=self.name))
         return self.curs.fetchone()[0]
+
+
+    def __setitem__(self, ref_name, value):
+        my_column, pgpytable, their_column, many = value
+        self.refs[my_column] = (ref_name, pgpytable, their_column, many)
+        self.ref_name_to_my_column[ref_name] = my_column
+
+
+    def __getitem__(self, key):
+        return Reference(self, key)
+
+
+
+class Reference(object):
+    """
+    This class facilitates creating relationships between PgPyTables by using
+    == and >.
+
+    I would rather use "in" instead of ">", but "__contains__" overwrites what
+    is returned and only returns a True/False value. :(
+    """
+
+    def __init__(self, pgpytable, column):
+        self.pgpytable = pgpytable
+        self.column = column
+
+    def __eq__(self, reference):
+        return (self.column, reference.pgpytable, reference.column, False)
+
+    def __gt__(self, reference):
+        return (self.column, reference.pgpytable, reference.column, True)
 
 
 
@@ -262,7 +288,7 @@ class PgPyDict(dict):
         """
         return dict([
             (k,v) for k,v in self.items()
-                if k not in self._table.key_name_to_ref
+                if k not in self._table.ref_name_to_my_column
             ])
 
 
@@ -272,10 +298,14 @@ class PgPyDict(dict):
         to match the new row.
         """
         if key in self._table.refs:
-            key_name, pgpytable, their_column, many = self._table.refs[key]
-            super(PgPyDict, self).__setitem__(key_name, pgpytable.get_one(value))
-        elif key in self._table.key_name_to_ref and type(value) == PgPyDict:
-            super(PgPyDict, self).__setitem__(self._table.key_name_to_ref[key],
+            ref_name, pgpytable, their_column, many = self._table.refs[key]
+            wheres = {their_column:value}
+            if many:
+                super(PgPyDict, self).__setitem__(ref_name, pgpytable.get_where(wheres))
+            else:
+                super(PgPyDict, self).__setitem__(ref_name, pgpytable.get_one(wheres))
+        elif key in self._table.ref_name_to_my_column and type(value) == PgPyDict:
+            super(PgPyDict, self).__setitem__(self._table.ref_name_to_my_column[key],
                     value[self._table.pks[0]])
         super(PgPyDict, self).__setitem__(key, value)
 
@@ -284,17 +314,18 @@ class PgPyDict(dict):
         """
 
         """
-        if key in self._table.key_name_to_ref:
-            key_name, pgpytable, their_column, many = self._table.refs[self._table.key_name_to_ref[key]]
+        if key in self._table.ref_name_to_my_column:
+            my_column = self._table.ref_name_to_my_column[key]
+            ref_name, pgpytable, their_column, many = self._table.refs[my_column]
             if many:
                 super(PgPyDict, self).__setitem__(key,
                         pgpytable.get_where(
-                            **{their_column:self[self._table.key_name_to_ref[key]]})
+                            **{their_column:self[my_column]})
                         )
             else:
                 super(PgPyDict, self).__setitem__(key,
                         pgpytable.get_one(
-                            **{their_column:self[self._table.key_name_to_ref[key]]})
+                            **{their_column:self[my_column]})
                         )
         return super(PgPyDict, self).__getitem__(key)
 
