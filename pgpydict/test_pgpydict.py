@@ -126,8 +126,6 @@ class Test(unittest.TestCase):
         # get_where accepts a tuple of ids, and returns those rows
         self.assertEqual(list(Person.get_where(id=(1,3))),
                 [bob, alice])
-        self.assertEqual(list(Person.get_where(id=(1,3), many=True)),
-                [bob, alice])
 
         # Database row survives an object deletion
         del bob
@@ -446,6 +444,19 @@ class Test(unittest.TestCase):
         self.assertEqual(next(persons), bob)
         self.assertEqual(next(persons), aly)
         self.assertRaises(StopIteration, next, persons)
+
+
+    def test_order_by(self):
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
+        wil = Person(name='Wil').flush()
+
+        self.assertEqual(list(Person.get_where()), [bob, aly, wil])
+        Person.order_by = 'id asc'
+        self.assertEqual(list(Person.get_where()), [bob, aly, wil])
+        Person.order_by = 'id desc'
+        self.assertEqual(list(Person.get_where()), [wil, aly, bob])
 
 
 

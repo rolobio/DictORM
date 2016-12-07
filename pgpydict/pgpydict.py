@@ -6,7 +6,7 @@ from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
     'UnexpectedRows', '__version__', 'column_value_pairs']
-__version__ = '0.3'
+__version__ = '0.4'
 
 class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
@@ -126,7 +126,7 @@ class PgPyTable(object):
         return self._add_references(d)
 
 
-    def _return_results(self, many=False):
+    def _return_results(self):
         while True:
             d = self.curs.fetchone()
             if not d:
@@ -142,7 +142,13 @@ class PgPyTable(object):
 
 
     def get_where(self, *a, **kw):
-        many = kw.pop('many', None)
+        if self.order_by:
+            order_by = self.order_by
+        elif self.pks:
+            order_by = self.pks[0]
+        else:
+            order_by = None
+
         if a and len(a) == 1 and type(a[0]) == dict:
             # A single dictionary has been passed as an argument, use it as
             # the keyword arguments.
@@ -152,17 +158,21 @@ class PgPyTable(object):
                 raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
             kw = dict(zip(self.pks, a))
         elif not a and not kw:
-            self.curs.execute('SELECT * FROM {}'.format(self.name))
+            # No "wheres" provided, get all rows
+            sql = 'SELECT * FROM {table} '
+            if order_by:
+                sql += 'ORDER BY {order_by}'
+            self.curs.execute(sql.format(table=self.name, order_by=order_by))
             return self._return_results()
 
         self.curs.execute('SELECT * FROM {table} WHERE {wheres} ORDER BY {order_by}'.format(
                 table=self.name,
                 wheres=column_value_pairs(kw, ' AND '),
-                order_by=self.order_by or self.pks[0],
+                order_by=order_by
             ),
             kw,
         )
-        return self._return_results(many=many)
+        return self._return_results()
 
 
     def get_one(self, *a, **kw):
