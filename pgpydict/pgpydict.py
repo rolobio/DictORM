@@ -1,12 +1,13 @@
 """
 Access a Psycopg2 database as if it were a Python Dictionary.
 """
+from json import dumps
 from copy import copy
 from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
     'UnexpectedRows', '__version__', 'column_value_pairs']
-__version__ = '0.4'
+__version__ = '0.5'
 
 class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
@@ -64,6 +65,16 @@ def insert_column_value_pairs(d):
             ', '.join(sorted(d)),
             ', '.join(['%('+str(i)+')s' for i in sorted(d)]),
             )
+
+
+def json_dicts(d):
+    """
+    Convert all dictionaries contained in this object into JSON strings.
+    """
+    for key, value in d.items():
+        if type(value) == dict:
+            d[key] = dumps(value)
+    return d
 
 
 class DictDB(dict):
@@ -245,11 +256,12 @@ class PgPyDict(dict):
         All column/values will bet inserted/set by this method.
         """
         if not self._in_db:
+            d = json_dicts(self.remove_refs())
             self._curs.execute('INSERT INTO {table} {cvp} RETURNING *'.format(
                     table=self._table.name,
                     cvp=insert_column_value_pairs(self.remove_refs())
                 ),
-                self.remove_refs()
+                d
             )
             self._in_db = True
         else:
@@ -258,6 +270,7 @@ class PgPyDict(dict):
                     self._table))
             combined = copy(self.remove_refs())
             combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
+            combined = json_dicts(combined)
             self._curs.execute('UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *'.format(
                     table=self._table.name,
                     cvp=column_value_pairs(self.remove_refs()),

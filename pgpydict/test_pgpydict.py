@@ -62,6 +62,11 @@ class Test(unittest.TestCase):
         CREATE TABLE station (
             person_id INTEGER
         );
+        CREATE TABLE posession (
+            id SERIAL PRIMARY KEY,
+            person_id INTEGER,
+            posession JSONB
+        );
         ''')
         self.conn.commit()
         self.db.refresh_tables()
@@ -457,6 +462,16 @@ class Test(unittest.TestCase):
         self.assertEqual(list(Person.get_where()), [bob, aly, wil])
         Person.order_by = 'id desc'
         self.assertEqual(list(Person.get_where()), [wil, aly, bob])
+
+
+    def test_json(self):
+        Posession = self.db['posession']
+        p = Posession(posession={'foo':'bar', 'baz':1, True:False})
+        p.flush()
+
+        p['posession'] = {'foo':'baz'}
+        p.flush()
+        self.assertEqual(Posession.get_one()['posession'], {'foo':'baz'})
 
 
 
