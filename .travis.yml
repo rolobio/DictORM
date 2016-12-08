@@ -15,7 +15,7 @@ script:
     #  Verify that pgpydict can be imported
     - "python -c 'from pgpydict import *'"
 services:
-    - postgresql
+    - postgresql: "9.4"
 after_success:
     # Submit coverage report to coveralls
     coveralls
