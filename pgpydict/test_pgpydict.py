@@ -463,6 +463,22 @@ class Test(unittest.TestCase):
         Person.order_by = 'id desc'
         self.assertEqual(list(Person.get_where()), [wil, aly, bob])
 
+        NoPk = self.db['no_pk']
+        NoPk(foo='bar').flush()
+        NoPk(foo='baz').flush()
+        self.assertEqual(len(list(NoPk.get_where())), 2)
+        self.assertNotIn('ORDER BY', NoPk.curs.query.decode())
+        NoPk.order_by = 'foo desc'
+        self.assertEqual(len(list(NoPk.get_where())), 2)
+        self.assertIn('ORDER BY foo desc', NoPk.curs.query.decode())
+
+        NoPk.order_by = None
+        self.assertEqual(len(list(NoPk.get_where(foo='bar'))), 1)
+        self.assertNotIn('ORDER BY', NoPk.curs.query.decode())
+        NoPk.order_by = 'foo desc'
+        self.assertEqual(len(list(NoPk.get_where(foo='bar'))), 1)
+        self.assertIn('ORDER BY foo desc', NoPk.curs.query.decode())
+
 
     def test_json(self):
         Posession = self.db['posession']

@@ -153,12 +153,11 @@ class PgPyTable(object):
 
 
     def get_where(self, *a, **kw):
+        order_by = None
         if self.order_by:
             order_by = self.order_by
         elif self.pks:
             order_by = self.pks[0]
-        else:
-            order_by = None
 
         if a and len(a) == 1 and type(a[0]) == dict:
             # A single dictionary has been passed as an argument, use it as
@@ -176,7 +175,10 @@ class PgPyTable(object):
             self.curs.execute(sql.format(table=self.name, order_by=order_by))
             return self._return_results()
 
-        self.curs.execute('SELECT * FROM {table} WHERE {wheres} ORDER BY {order_by}'.format(
+        sql = 'SELECT * FROM {table} WHERE {wheres} '
+        if order_by:
+            sql += 'ORDER BY {order_by}'
+        self.curs.execute(sql.format(
                 table=self.name,
                 wheres=column_value_pairs(kw, ' AND '),
                 order_by=order_by
