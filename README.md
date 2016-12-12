@@ -189,7 +189,7 @@ CREATE TABLE perons_department (
 );
 ```
 
-### Set a one-to-many reference to another table using an intermediary table
+### Set a many-to-many reference to another table using an intermediary table
 ```python
 # person              | person_department            | department
 # --------------------+------------------------------+-------------------
