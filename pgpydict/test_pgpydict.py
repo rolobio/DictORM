@@ -24,6 +24,11 @@ else:
             'port':'5432',
             }
 
+def _remove_refs(o):
+    if type(o) == PgPyDict:
+        return o.remove_refs()
+    return [i.remove_refs() for i in o]
+
 
 class Test(unittest.TestCase):
 
@@ -305,8 +310,8 @@ class Test(unittest.TestCase):
         # Move bob's hr to aly
         bob_pd_hr['person_id'] = aly['id']
         aly_pd_hr = bob_pd_hr.flush()
-        self.assertEqual([i.remove_refs() for i in aly['person_departments']], [aly_pd_sales.remove_refs(), aly_pd_hr.remove_refs()])
-        self.assertEqual([i.remove_refs() for i in bob['person_departments']], [bob_pd_sales.remove_refs()])
+        self.assertEqual(_remove_refs(aly['person_departments']), _remove_refs([aly_pd_sales, aly_pd_hr]))
+        self.assertEqual(_remove_refs(bob['person_departments']), [bob_pd_sales.remove_refs()])
 
 
     def test_onetomany(self):
@@ -489,6 +494,49 @@ class Test(unittest.TestCase):
         p.flush()
         self.assertEqual(Posession.get_one()['posession'], {'foo':'baz'})
 
+
+    def test_multiple_references(self):
+        Person = self.db['person']
+        Person['manager'] = Person['manager_id'] == Person['id']
+        alice = Person(name='Alice').flush()
+
+        dave = Person(name='Dave', manager_id=alice['id']).flush()
+        self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
+        bob = Person(name='Bob', manager_id=alice['id']).flush()
+        self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
+
+        # New reference, no flush required
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        self.assertEqual(_remove_refs(alice['subordinates']),
+                _remove_refs([dave, bob]))
+
+        # Changes survive a commit/flush
+        self.conn.commit()
+        bob.flush()
+        alice.flush()
+        dave.flush()
+        self.assertEqual(_remove_refs(alice['subordinates']),
+                _remove_refs([dave, bob]))
+        self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
+        self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
+
+        PD, Department = self.db['person_department'], self.db['department']
+        PD['department'] = PD['department_id'] == Department['id']
+        Person['person_departments'] = Person['id'] > PD['person_id']
+
+        hr = Department(name='HR').flush()
+        sales = Department(name='Sales').flush()
+        hr_pd = PD(department_id=hr['id'], person_id=dave['id']).flush()
+        sales_pd = PD(department_id=sales['id'], person_id=dave['id']).flush()
+
+        self.assertEqual(_remove_refs(dave['person_departments']),
+                _remove_refs([hr_pd, sales_pd]))
+
+        print(alice._curs.query)
+        _remove_refs(alice['subordinates'])
+        print(alice._curs.query)
+        self.assertEqual(_remove_refs(alice['subordinates']),
+                _remove_refs([dave, bob]))
 
 
 if __name__ == '__main__':
