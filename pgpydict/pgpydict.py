@@ -110,7 +110,7 @@ class PgPyTable(object):
         self.curs = db.curs
         self.pks = []
         self.refs = {}
-        self.ref_name_to_my_column = {}
+        self.refname_to_mycolumn = {}
         self._refresh_primary_keys()
         self.order_by = None
 
@@ -196,8 +196,7 @@ class PgPyTable(object):
 
 
     def _add_references(self, d):
-        for my_column in self.refs:
-            ref_name, pgpytable, their_column, many = self.refs[my_column]
+        for ref_name in self.refs:
             d[ref_name] = None
         return d
 
@@ -210,8 +209,8 @@ class PgPyTable(object):
 
     def __setitem__(self, ref_name, value):
         my_column, pgpytable, their_column, many = value
-        self.refs[my_column] = (ref_name, pgpytable, their_column, many)
-        self.ref_name_to_my_column[ref_name] = my_column
+        self.refs[ref_name] = (my_column, pgpytable, their_column, many)
+        self.refname_to_mycolumn[ref_name] = ref_name
 
 
     def __getitem__(self, key):
@@ -313,49 +312,30 @@ class PgPyDict(dict):
         """
         return dict([
             (k,v) for k,v in self.items()
-                if k not in self._table.ref_name_to_my_column
+                if k not in self._table.refname_to_mycolumn
             ])
-
-
-    def __setitem__(self, key, value):
-        """
-        If the key being modified has a referenced pair, change that key's value
-        to match the new row.
-        """
-        if key in self._table.refs:
-            ref_name, pgpytable, their_column, many = self._table.refs[key]
-            wheres = {their_column:value}
-            if many:
-                super(PgPyDict, self).__setitem__(ref_name, pgpytable.get_where(wheres))
-            else:
-                super(PgPyDict, self).__setitem__(ref_name, pgpytable.get_one(wheres))
-        elif key in self._table.ref_name_to_my_column and type(value) == PgPyDict:
-            super(PgPyDict, self).__setitem__(self._table.ref_name_to_my_column[key],
-                    value[self._table.pks[0]])
-        super(PgPyDict, self).__setitem__(key, value)
 
 
     def __getitem__(self, key):
         """
-
+        Get the provided "key" from the dictionary.  If the key refers to a
+        referenced row, get that row first.
         """
-        if key in self._table.ref_name_to_my_column:
-            my_column = self._table.ref_name_to_my_column[key]
-            ref_name, pgpytable, their_column, many = self._table.refs[my_column]
+        if key in self._table.refs:
+            my_column, pgpytable, their_column, many = self._table.refs[key]
+            wheres = {their_column:self[my_column]}
             if many:
-                super(PgPyDict, self).__setitem__(key,
-                        pgpytable.get_where(
-                            **{their_column:self[my_column]})
-                        )
+                val = pgpytable.get_where(**wheres)
             else:
-                super(PgPyDict, self).__setitem__(key,
-                        pgpytable.get_one(
-                            **{their_column:self[my_column]})
-                        )
+                try:
+                    val = pgpytable.get_one(**wheres)
+                except IndexError:
+                    # No results returned, must not be set
+                    val = None
+            super(PgPyDict, self).__setitem__(key, val)
         return super(PgPyDict, self).__getitem__(key)
 
 
-    __setitem__.__doc__ += dict.__setitem__.__doc__
     __getitem__.__doc__ += dict.__getitem__.__doc__
 
 

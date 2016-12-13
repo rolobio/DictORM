@@ -204,7 +204,6 @@ class Test(unittest.TestCase):
         self.conn.rollback()
 
 
-
     def test_remove_pks(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
@@ -225,38 +224,6 @@ class Test(unittest.TestCase):
         aly.flush()
         self.assertDictContains(bob, {'name':'Aly', 'id':1})
         self.assertDictContains(aly, {'name':'Aly', 'id':2})
-
-
-    def test_self_reference(self):
-        """
-        person
-        id <----------\
-        manager_id ---/
-        """
-        Person = self.db['person']
-        Person['manager'] = Person['manager_id'] == Person['id']
-
-        bob = Person(name='Bob')
-        bob.flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        aly = Person(name='Aly')
-        aly.flush()
-
-        bob['manager_id'] = aly['id']
-        bob.flush()
-        self.assertEqual(bob['manager_id'], aly['id'])
-        self.assertEqual(bob['manager'].remove_refs(), aly.remove_refs())
-
-        steve = Person(name='Steve')
-        steve.flush()
-        bob['manager_id'] = steve['id']
-        self.assertEqual(bob['manager_id'], steve['id'])
-        self.assertEqual(bob['manager'].remove_refs(), steve.remove_refs())
-
-        bob['manager'] = aly
-        bob.flush()
-        self.assertEqual(bob['manager_id'], aly['id'])
-        self.assertEqual(bob['manager'].remove_refs(), aly.remove_refs())
 
 
     def test_manytomany(self):
@@ -496,11 +463,27 @@ class Test(unittest.TestCase):
 
 
     def test_multiple_references(self):
+        """
+        person
+        ------------------
+        id <----------\
+        manager_id ---/
+
+
+        person               | person
+        ---------------------+---------------
+        id  <--+-+---------- | manager_id
+                \ \--------- | manager_id
+                 \---------- | manager_id
+        """
         Person = self.db['person']
         Person['manager'] = Person['manager_id'] == Person['id']
         alice = Person(name='Alice').flush()
+        self.assertEqual(None, alice['manager'])
 
         dave = Person(name='Dave', manager_id=alice['id']).flush()
+        self.assertDictContains(dave, {'name':'Dave', 'manager_id':1, 'manager':None})
+        dave['manager_id'] = alice['id']
         self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
         bob = Person(name='Bob', manager_id=alice['id']).flush()
         self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
@@ -529,14 +512,13 @@ class Test(unittest.TestCase):
         hr_pd = PD(department_id=hr['id'], person_id=dave['id']).flush()
         sales_pd = PD(department_id=sales['id'], person_id=dave['id']).flush()
 
+        # All references are available on demand
         self.assertEqual(_remove_refs(dave['person_departments']),
                 _remove_refs([hr_pd, sales_pd]))
-
-        print(alice._curs.query)
-        _remove_refs(alice['subordinates'])
-        print(alice._curs.query)
         self.assertEqual(_remove_refs(alice['subordinates']),
                 _remove_refs([dave, bob]))
+        self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
+        self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
 
 
 if __name__ == '__main__':
