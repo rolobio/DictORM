@@ -35,9 +35,6 @@ class Test(unittest.TestCase):
     def assertDictContains(self, d1, d2):
         assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
 
-    def assertType(self, o, i):
-        assert type(o) == i, '{} was of type {} not {}'.format(o, type(o), i)
-
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
@@ -532,7 +529,7 @@ class Test(unittest.TestCase):
         alice = Person(name='Alice').flush()
         dave = Person(name='Dave', manager_id=alice['id']).flush()
         bob = Person(name='Bob', manager_id=alice['id']).flush()
-        self.assertType(alice['subordinates'], ResultsGenerator)
+        self.assertIsInstance(alice['subordinates'], ResultsGenerator)
         self.assertNotIn(alice._curs.query.decode(), 'SELECT *')
         # get len() without running a larger query
         self.assertEqual(len(alice['subordinates']), 2)
