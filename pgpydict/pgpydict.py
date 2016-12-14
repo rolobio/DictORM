@@ -8,7 +8,7 @@ from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
-__version__ = '0.8'
+__version__ = '0.9'
 
 class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
