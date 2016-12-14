@@ -125,10 +125,7 @@ class ResultsGenerator:
             self.curs.execute(self.query, self.vars)
             self.query = None
 
-        try:
-            d = self.curs.fetchone()
-        except ProgrammingError:
-            raise StopIteration
+        d = self.curs.fetchone()
 
         if not d:
             raise StopIteration
