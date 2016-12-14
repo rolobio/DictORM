@@ -534,10 +534,12 @@ class Test(unittest.TestCase):
         bob = Person(name='Bob', manager_id=alice['id']).flush()
         self.assertType(alice['subordinates'], ResultsGenerator)
         self.assertNotIn(alice._curs.query.decode(), 'SELECT *')
-        list(alice['subordinates'])
+        # get len() without running a larger query
         self.assertEqual(len(alice['subordinates']), 2)
+        # you can still get the same old results even after running a len()
         self.assertEqual(_remove_refs(alice['subordinates']),
                 _remove_refs([dave, bob]))
+        # the generator can be converted to a list
         self.assertEqual(_remove_refs(list(alice['subordinates'])),
                 _remove_refs([dave, bob]))
 
