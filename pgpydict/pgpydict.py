@@ -130,6 +130,9 @@ class ResultsGenerator:
         d._in_db = True
         return d
 
+    # for python 2.7
+    next = __next__
+
 
     def __len__(self):
         query = self.query.replace(
