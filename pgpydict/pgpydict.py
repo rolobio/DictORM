@@ -144,7 +144,7 @@ class ResultsGenerator:
         elif self.pgpytable.pks:
             query = query.replace('ORDER BY '+self.pgpytable.pks[0], '')
         self.curs.execute(query, self.vars)
-        return self.curs.fetchone()['count']
+        return int(self.curs.fetchone()['count'])
 
 
 
