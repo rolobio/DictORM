@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 from pgpydict import (DictDB, PgPyTable, PgPyDict, UnexpectedRows, NoPrimaryKey,
-    column_value_pairs)
+    ResultsGenerator, column_value_pairs)
 from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
@@ -34,6 +34,9 @@ class Test(unittest.TestCase):
 
     def assertDictContains(self, d1, d2):
         assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
+
+    def assertType(self, o, i):
+        assert type(o) == i
 
 
     def setUp(self):
@@ -483,7 +486,6 @@ class Test(unittest.TestCase):
 
         dave = Person(name='Dave', manager_id=alice['id']).flush()
         self.assertDictContains(dave, {'name':'Dave', 'manager_id':1, 'manager':None})
-        dave['manager_id'] = alice['id']
         self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
         bob = Person(name='Bob', manager_id=alice['id']).flush()
         self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
@@ -519,6 +521,25 @@ class Test(unittest.TestCase):
                 _remove_refs([dave, bob]))
         self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
         self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
+
+
+    def test_count(self):
+        """
+        Simple reference counting is supported.
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        alice = Person(name='Alice').flush()
+        dave = Person(name='Dave', manager_id=alice['id']).flush()
+        bob = Person(name='Bob', manager_id=alice['id']).flush()
+        self.assertType(alice['subordinates'], ResultsGenerator)
+        self.assertNotIn(alice._curs.query.decode(), 'SELECT *')
+        list(alice['subordinates'])
+        self.assertEqual(len(alice['subordinates']), 2)
+        self.assertEqual(_remove_refs(alice['subordinates']),
+                _remove_refs([dave, bob]))
+        self.assertEqual(_remove_refs(list(alice['subordinates'])),
+                _remove_refs([dave, bob]))
 
 
 if __name__ == '__main__':

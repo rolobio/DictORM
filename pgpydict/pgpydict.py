@@ -6,7 +6,7 @@ from copy import copy
 from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
-    'UnexpectedRows', '__version__', 'column_value_pairs']
+    'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
 __version__ = '0.7'
 
 class NoEntryError(Exception): pass
@@ -101,6 +101,48 @@ class DictDB(dict):
             self[table['table_name']] = PgPyTable(table['table_name'], self)
 
 
+class ResultsGenerator:
+    """
+    This class replicates a Generator, it mearly adds the ability to
+    get the len() of the generator.  A seperate SQL count is run to get
+    that length.
+    """
+
+    def __init__(self, query, vars, pgpytable):
+        self.query = query
+        self.vars = vars
+        self.pgpytable = pgpytable
+        self.curs = pgpytable.curs
+
+    def __iter__(self): return self
+
+    def __next__(self):
+        if self.query:
+            # Run the query only once
+            self.curs.execute(self.query, self.vars)
+            self.query = None
+
+        d = self.curs.fetchone()
+        if not d:
+            raise StopIteration
+        # Convert returned dictionary to a PgPyDict
+        d = self.pgpytable(d)
+        d._in_db = True
+        return d
+
+
+    def __len__(self):
+        query = self.query.replace(
+            'SELECT *',
+            'SELECT COUNT(*) AS "count"')
+        if self.pgpytable.order_by:
+            query = query.replace('ORDER BY '+self.pgpytable.order_by, '')
+        elif self.pgpytable.pks:
+            query = query.replace('ORDER BY '+self.pgpytable.pks[0], '')
+        self.curs.execute(query, self.vars)
+        return self.curs.fetchone()['count']
+
+
 
 class PgPyTable(object):
 
@@ -137,17 +179,6 @@ class PgPyTable(object):
         return self._add_references(d)
 
 
-    def _return_results(self):
-        while True:
-            d = self.curs.fetchone()
-            if not d:
-                break
-            # Convert returned dictionary to a PgPyDict
-            d = self(d)
-            d._in_db = True
-            yield d
-
-
     def _pk_value_pairs(self, join_str=' AND ', prefix=''):
         return column_value_pairs(self.pks, join_str, prefix)
 
@@ -167,25 +198,20 @@ class PgPyTable(object):
             if not self.pks:
                 raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
             kw = dict(zip(self.pks, a))
-        elif not a and not kw:
-            # No "wheres" provided, get all rows
-            sql = 'SELECT * FROM {table} '
-            if order_by:
-                sql += 'ORDER BY {order_by}'
-            self.curs.execute(sql.format(table=self.name, order_by=order_by))
-            return self._return_results()
 
-        sql = 'SELECT * FROM {table} WHERE {wheres} '
+        # Build out the query using user-provideded data, and data gathered
+        # from the DB.
+        sql = 'SELECT * FROM {table} '
+        if kw:
+            sql += 'WHERE {wheres} '
         if order_by:
             sql += 'ORDER BY {order_by}'
-        self.curs.execute(sql.format(
+        sql = sql.format(
                 table=self.name,
                 wheres=column_value_pairs(kw, ' AND '),
                 order_by=order_by
-            ),
-            kw,
-        )
-        return self._return_results()
+            )
+        return ResultsGenerator(sql, kw, self)
 
 
     def get_one(self, *a, **kw):
