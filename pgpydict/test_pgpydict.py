@@ -36,7 +36,7 @@ class Test(unittest.TestCase):
         assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
 
     def assertType(self, o, i):
-        assert type(o) == i
+        assert type(o) == i, '{} was of type {} not {}'.format(o, type(o), i)
 
 
     def setUp(self):
