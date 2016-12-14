@@ -464,10 +464,9 @@ class Test(unittest.TestCase):
 
     def test_multiple_references(self):
         """
-        person
-        ------------------
-        id <----------\
-        manager_id ---/
+        person               | person
+        ---------------------+---------------
+        id <---------------- | manager_id
 
 
         person               | person
