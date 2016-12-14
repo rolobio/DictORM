@@ -417,7 +417,7 @@ class Test(unittest.TestCase):
         # Using pgpydict's cursor will intefere
         persons = Person.get_where()
         self.assertEqual(next(persons), bob)
-        self.db.curs.execute('SELECT * FROM person')
+        persons.curs.execute('SELECT * FROM person')
         self.assertEqual(next(persons), bob)
         self.assertEqual(next(persons), aly)
         self.assertRaises(StopIteration, next, persons)
@@ -441,15 +441,17 @@ class Test(unittest.TestCase):
         self.assertEqual(len(list(NoPk.get_where())), 2)
         self.assertNotIn('ORDER BY', NoPk.curs.query.decode())
         NoPk.order_by = 'foo desc'
-        self.assertEqual(len(list(NoPk.get_where())), 2)
-        self.assertIn('ORDER BY foo desc', NoPk.curs.query.decode())
+        results = NoPk.get_where()
+        self.assertEqual(len(list(results)), 2)
+        self.assertIn('ORDER BY foo desc', results.curs.query.decode())
 
         NoPk.order_by = None
         self.assertEqual(len(list(NoPk.get_where(foo='bar'))), 1)
         self.assertNotIn('ORDER BY', NoPk.curs.query.decode())
         NoPk.order_by = 'foo desc'
-        self.assertEqual(len(list(NoPk.get_where(foo='bar'))), 1)
-        self.assertIn('ORDER BY foo desc', NoPk.curs.query.decode())
+        results = NoPk.get_where(foo='bar')
+        self.assertEqual(len(list(results)), 1)
+        self.assertIn('ORDER BY foo desc', results.curs.query.decode())
 
 
     def test_json(self):
@@ -518,6 +520,12 @@ class Test(unittest.TestCase):
         self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
         self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
 
+        # You can iterate through subordinates using a for loop
+        for sub in alice['subordinates']:
+            for pd in sub['person_departments']:
+                pd.delete()
+            sub.delete()
+
 
     def test_count(self):
         """
@@ -538,6 +546,20 @@ class Test(unittest.TestCase):
         # the generator can be converted to a list
         self.assertEqual(_remove_refs(list(alice['subordinates'])),
                 _remove_refs([dave, bob]))
+
+
+    def test_empty_reference(self):
+        """
+        Iterating through an empty reference does not break.
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        alice = Person(name='Alice').flush()
+
+        self.assertEqual(len(alice['subordinates']), 0)
+        for sub in alice['subordinates']:
+            raise Exception('There should not be any subordinates')
+
 
 
 if __name__ == '__main__':

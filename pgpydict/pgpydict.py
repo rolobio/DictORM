@@ -1,8 +1,9 @@
 """
 Access a Psycopg2 database as if it were a Python Dictionary.
 """
-from json import dumps
 from copy import copy
+from json import dumps
+from psycopg2 import ProgrammingError
 from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
@@ -112,7 +113,9 @@ class ResultsGenerator:
         self.query = query
         self.vars = vars
         self.pgpytable = pgpytable
-        self.curs = pgpytable.curs
+        # This needs its own generator in case the usual cursor is used to
+        # Update/Delete/Insert, overwriting the results of this query.
+        self.curs = pgpytable.db.conn.cursor(cursor_factory=DictCursor)
 
     def __iter__(self): return self
 
@@ -122,7 +125,11 @@ class ResultsGenerator:
             self.curs.execute(self.query, self.vars)
             self.query = None
 
-        d = self.curs.fetchone()
+        try:
+            d = self.curs.fetchone()
+        except ProgrammingError:
+            raise StopIteration
+
         if not d:
             raise StopIteration
         # Convert returned dictionary to a PgPyDict
