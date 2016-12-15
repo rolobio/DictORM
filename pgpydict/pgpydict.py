@@ -1,9 +1,7 @@
 """
 Access a Psycopg2 database as if it were a Python Dictionary.
 """
-from copy import copy
 from json import dumps
-from psycopg2 import ProgrammingError
 from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
@@ -303,7 +301,7 @@ class PgPyDict(dict):
             if not self._table.pks:
                 raise NoPrimaryKey('Cannot update to {}, no primary keys defined.'.format(
                     self._table))
-            combined = copy(self.remove_refs())
+            combined = self.remove_refs()
             combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
             combined = json_dicts(combined)
             self._curs.execute('UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *'.format(
