@@ -16,6 +16,7 @@ pip install pgpydict
 ## Quick & Simple Example!
 ```python
 # Create a dictionary that contains all tables in the database
+>>> from pgpydict import DictDB, PgPyDict
 >>> db = DictDB(psycopg2_conn)
 # Get the PgPyTable object that was automatically found by DictDB
 >>> Person = db['person']
@@ -134,11 +135,11 @@ Dave
 ```python
 # Get a row from the database, you may specify which columns must contain what
 # value.
->>> bob = Person.get_where(id=1)
+>>> bob = Person.get_one(id=1)
 # Or, if the table has primary key(s), you may forgo specifying a column
-# name. PyPyTable.get_where will pair the arguments you provide with the
+# name. PyPyTable.get_one will pair the arguments you provide with the
 # primary keys in their respective orders:
->>> bob = Person.get_where(1)
+>>> bob = Person.get_one(1)
 >>> bob
 {'name':'Bob', 'id':1}
 # Get all rows in a table
@@ -170,7 +171,7 @@ Dave
 >>> Car = db['car']
 >>> Person['car'] = Person['car_id'] == Car['id']
 # Give Steve a car
->>> steve = Person.get_where(1)
+>>> steve = Person.get_one(1)
 >>> steves_car = Car().flush()
 >>> steve['car_id'] = steves_car['id']
 >>> steve.flush()
@@ -184,7 +185,7 @@ True
 # -------------------+-----------
 # id --------------> | manager_id
 >>> Person['manager'] = Person['id'] == Person['manager_id']
->>> steve = Person.get_where(1)
+>>> steve = Person.get_one(1)
 >>> bob = Person(name='Bob', manager_id=steve['id']).flush()
 >>> aly = Person(name='Aly', manager_id=steve['id']).flush()
 >>> bob['manager'] == steve
@@ -223,6 +224,7 @@ CREATE TABLE persons_department (
 >>> Department = db['department']
 >>> PD = db['person_department']
 >>> PD['department'] = PD['department_id'] == Department['id']
+>>> PD['person'] = PD['person_id'] == Person['id']
 
 # Reference many rows using ">".  I would rather use "in", but "__contains__"
 # overwrites any values returned and instead returns a True/False.  So, we use
@@ -230,10 +232,8 @@ CREATE TABLE persons_department (
 >>> Person['person_departments'] = Person['id'] > PD['person_id']
 
 # Create HR and Sales departments
->>> hr = Department(name='HR')
->>> hr.flush()
->>> sales = Department(name='Sales')
->>> sales.flush()
+>>> hr = Department(name='HR').flush()
+>>> sales = Department(name='Sales').flush()
 
 # Add PD rows for Steve for both departments
 >>> PD(person_id=steve['id'], department_id=hr['id']).flush()
@@ -242,4 +242,13 @@ CREATE TABLE persons_department (
 >>> steve['person_departments']
 [{'department': hr, 'department_id': 1, 'person_id': 1},
  {'department': sales, 'department_id': 2, 'person_id': 1}]
+
+# Get all persons who are in sales:
+>>> PD(person_id=aly['id'], department_id=sales['id']).flush()
+>>> PD(person_id=bob['id'], department_id=sales['id']).flush()
+>>> for pd in PD.get_where(department_id=sales['id']):
+>>>     pd['person']
+steve
+aly
+bob
 ```
