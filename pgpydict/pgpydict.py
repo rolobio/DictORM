@@ -120,9 +120,9 @@ class DictDB(dict):
 class ResultsGenerator:
     """
     This class replicates a Generator, it mearly adds the ability to
-    get the len() of the generator.  This method should only be returned by
-    PgPyTable.get_where and PgPyTable.get_one, the query passesd to this
-    instance will be modified to do that count.
+    get the len() of the generator (the rowcount of the last query run).
+    This method should only be returned by PgPyTable.get_where and
+    PgPyTable.get_one.
 
     Really, just use this class as if it were a generator unless you want
     a count.
@@ -159,15 +159,11 @@ class ResultsGenerator:
 
 
     def __len__(self):
-        query = self.query.replace(
-            'SELECT *',
-            'SELECT COUNT(*) AS "count"')
-        if self.pgpytable.order_by:
-            query = query.replace('ORDER BY '+self.pgpytable.order_by, '')
-        elif self.pgpytable.pks:
-            query = query.replace('ORDER BY '+self.pgpytable.pks[0], '')
-        self.curs.execute(query, self.vars)
-        return int(self.curs.fetchone()['count'])
+        if self.query:
+            # Run the query only once
+            self.curs.execute(self.query, self.vars)
+            self.query = None
+        return self.curs.rowcount
 
 
 

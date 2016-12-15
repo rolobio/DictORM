@@ -560,6 +560,9 @@ class Test(unittest.TestCase):
         for sub in alice['subordinates']:
             raise Exception('There should not be any subordinates')
 
+        Person['manager'] = Person['id'] == Person['manager_id']
+        self.assertEqual(alice['manager'], None)
+
 
 
 if __name__ == '__main__':
