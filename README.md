@@ -13,33 +13,37 @@ Install pgpydict using pip:
 pip install pgpydict
 ```
 
-or run python:
-```bash
-pip install -r requirements.txt
-python setup.py install
-```
-
 ## Quick & Simple Example!
 ```python
 # Create a dictionary that contains all tables in the database
->>> db = DictDB(psycopg2_DictCursor)
+>>> db = DictDB(psycopg2_conn)
 # Get the PgPyTable object that was automatically found by DictDB
 >>> Person = db['person']
+
 # Define Will's initial column values
 >>> will = Person(name='Will')
+>>> will
+{'name':'Will',}
+
 # Insert Will
 >>> will.flush()
 >>> will
 {'name':'Will', 'id':1}
+
 # Change Will however you want
 >>> will['name'] = 'Steve'
 >>> will
 {'name':'Steve', 'id':1}
-# Send the changes to the database
+# Send the changes to the database, all columns will be overwritten to what this
+# "dictionary" now contains.
 >>> will.flush()
+
+PgPyDict will NEVER commit or rollback changes, that is up to you.
+Make sure to commit your changes:
+psycopg2_conn.commit()
 ```
 
-## Another quick example (the cool stuff)
+## References will be represented as a sub-dictionary
 ```python
 # Define a relationship to another table, access that one-to-one relationship
 # as if it were a sub-dictionary.
@@ -67,13 +71,14 @@ True
 # accessed by PgPyDict.
 ```
 
-## Basic Usage
+## Detailed Basic Usage
 Create your tables with at least one primary key:
 ```sql
 CREATE TABLE person (
     id SERIAL PRIMARY KEY,
     name TEXT,
-    car_id INTEGER REFERNCES car(id)
+    car_id INTEGER REFERNCES car(id),
+    manager_id INTEGER REFERNCES person(id)
 );
 CREATE TABLE car (
     id SERIAL PRIMARY KEY,
@@ -86,15 +91,13 @@ Connect to the database using psycopg2 and DictCursor:
 >>> import psycopg2, psycopg2.extras
 
 >>> conn = psycopg2.connect(**db_login)
-# Must use a DictCursor!
->>> curs = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 ```
 
 Finally, use PgPyDict:
 ```python
 # DictDB queries the database for all tables and allows them to be gotten
 # as if DictDB was a dictionary.
->>> db = DictDB(curs)
+>>> db = DictDB(conn)
 
 # Get a PgPyTable object for table 'person'
 # person table built using: (id SERIAL PRIMARY KEY, name TEXT)
@@ -110,9 +113,7 @@ Person.pks = ['id',]
 
 # Insert into "person" table by calling "Person" object as if it were a
 # dictionary.
->>> dave = Person(name='Dave')
-# Insert dave into the database
->>> dave.flush()
+>>> dave = Person(name='Dave').flush()
 >>> dave
 {'name':'Dave', 'id':1}
 
@@ -126,7 +127,7 @@ Dave
 >>> dave['name'] = 'Bob'
 # Send the changes to the database
 >>> dave.flush()
-# Commit any changes
+# Commit any changes is up to you.
 >>> conn.commit()
 ```
 
@@ -135,8 +136,9 @@ Dave
 # Get a row from the database, you may specify which columns must contain what
 # value.
 >>> bob = Person.get_where(id=1)
-# Or, if the table has ONLY ONE primary key, you may forgo specifying a column
-# name. PyPyTable.get_where assumes you are accessing the single primary key.
+# Or, if the table has primary key(s), you may forgo specifying a column
+# name. PyPyTable.get_where will pair the arguments you provide with the
+# primary keys in their respective orders:
 >>> bob = Person.get_where(1)
 >>> bob
 {'name':'Bob', 'id':1}
@@ -149,7 +151,7 @@ Dave
 ```python
 # A PgPyDict behaves like a Python dictionary and can be updated/set.  Update
 # bob dict with steve dict, but don't overwrite bob's primary keys.
->>> steve = Person(name='Steve')
+>>> steve = Person(name='Steve').flush()
 >>> steve
 {'name':'Steve', 'id':2}
 >>> steve.remove_pks()
@@ -170,19 +172,42 @@ Dave
 >>> Person['car'] = Person['car_id'] == Car['id']
 # Give Steve a car
 >>> steve = Person.get_where(1)
->>> steve['car_id'] = car['id']
+>>> steves_car = Car().flush()
+>>> steve['car_id'] = steves_car['id']
 >>> steve.flush()
->>> steve['car'] == car
+>>> steve['car'] == steves_car
 True
 ```
 
-Add in more tables
+### Reference a person's manager, and a manager's subordinates
+```python
+# person             | person
+# -------------------+-----------
+# id --------------> | manager_id
+>>> Person['manager'] = Person['id'] == Person['manager_id']
+>>> steve = Person.get_where(1)
+>>> bob = Person(name='Bob', manager_id=steve['id']).flush()
+>>> aly = Person(name='Aly', manager_id=steve['id']).flush()
+>>> bob['manager'] == steve
+True
+>>> aly['manager'] == steve
+True
+
+# Define that "subordinates" contains many rows by using ">".  Greater
+# than is used over "in" because __contains__ overwrites what is returned
+# with a True/False.  So ">" is used.
+>>> Person['subordinates'] = Person['id'] > Person['manager_id']
+>>> list(steve['subordinates'])
+[bob, aly]
+```
+
+### Add in more tables
 ```sql
 CREATE TABLE department (
     id SERIAL PRIMARY KEY,
     name
 );
-CREATE TABLE perons_department (
+CREATE TABLE persons_department (
     person_id INTEGER REFERENCES person(id),
     department_id INTEGER REFERENCES department(id),
     PRIMARY KEY (person_id, department)
@@ -212,10 +237,10 @@ CREATE TABLE perons_department (
 >>> sales.flush()
 
 # Add PD rows for Steve for both departments
->>> PD(person_id=steve['id'], department_id=hr['id'])
->>> PD(person_id=steve['id'], department_id=sales['id'])
+>>> PD(person_id=steve['id'], department_id=hr['id']).flush()
+>>> PD(person_id=steve['id'], department_id=sales['id']).flush()
 
 >>> steve['person_departments']
-[{'department': {'name':'HR', 'id':1}, 'department_id': 1, 'person_id': 1},
- {'department': {'name':'Sales', 'id':2}, 'department_id': 2, 'person_id': 1}]
+[{'department': hr, 'department_id': 1, 'person_id': 1},
+ {'department': sales, 'department_id': 2, 'person_id': 1}]
 ```
