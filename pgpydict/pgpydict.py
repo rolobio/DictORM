@@ -224,12 +224,11 @@ class PgPyTable(object):
         self.curs = db.curs
         self.pks = []
         self.refs = {}
-        self.refname_to_mycolumn = {}
-        self._refresh_primary_keys()
+        self._set_pks()
         self.order_by = None
 
 
-    def _refresh_primary_keys(self):
+    def _set_pks(self):
         """
         Get a list of Primary Keys set for this table in the DB.
         """
@@ -354,7 +353,6 @@ class PgPyTable(object):
     def __setitem__(self, ref_name, value):
         my_column, pgpytable, their_column, many = value
         self.refs[ref_name] = (my_column, pgpytable, their_column, many)
-        self.refname_to_mycolumn[ref_name] = ref_name
 
 
     def __getitem__(self, key):
@@ -489,7 +487,7 @@ class PgPyDict(dict):
         """
         return dict([
             (k,v) for k,v in self.items()
-                if k not in self._table.refname_to_mycolumn
+                if k not in self._table.refs
             ])
 
 
