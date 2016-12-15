@@ -78,8 +78,8 @@ Create your tables with at least one primary key:
 CREATE TABLE person (
     id SERIAL PRIMARY KEY,
     name TEXT,
-    car_id INTEGER REFERNCES car(id),
-    manager_id INTEGER REFERNCES person(id)
+    car_id INTEGER REFERENCES car(id),
+    manager_id INTEGER REFERENCES person(id)
 );
 CREATE TABLE car (
     id SERIAL PRIMARY KEY,
