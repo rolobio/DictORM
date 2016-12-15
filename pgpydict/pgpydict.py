@@ -6,7 +6,7 @@ from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
-__version__ = '0.9'
+__version__ = '1.0'
 
 class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
@@ -60,9 +60,10 @@ def insert_column_value_pairs(d):
         >>> insert_column_value_pairs({'id':10, 'person':'Dave'})
         (id, person) VALUES (%(id)s, %(person)s)
     """
+    d = sorted(d)
     return '({}) VALUES ({})'.format(
-            ', '.join(sorted(d)),
-            ', '.join(['%('+str(i)+')s' for i in sorted(d)]),
+            ', '.join(d),
+            ', '.join(['%('+str(i)+')s' for i in d]),
             )
 
 
@@ -77,6 +78,21 @@ def json_dicts(d):
 
 
 class DictDB(dict):
+    """
+    Get all the tables from the provided psycopg2 connection.  Create a
+    PgPyTable for that table, and keep it in this instance using the table's
+    name as a key.
+
+    >>> db =DictDB(your_db_connection)
+    >>> db['table1']
+    PgPyTable('table1')
+
+    >>> db['other_table']
+    PgPyTable('other_table')
+
+    If your tables have changed while your DictDB instance existed, you can call
+    DictDB.refresh_tables() to have it rebuild all PgPyTable objects.
+    """
 
     def __init__(self, psycopg2_conn):
         self.conn = psycopg2_conn
@@ -100,11 +116,16 @@ class DictDB(dict):
             self[table['table_name']] = PgPyTable(table['table_name'], self)
 
 
+
 class ResultsGenerator:
     """
     This class replicates a Generator, it mearly adds the ability to
-    get the len() of the generator.  A seperate SQL count is run to get
-    that length.
+    get the len() of the generator.  This method should only be returned by
+    PgPyTable.get_where and PgPyTable.get_one, the query passesd to this
+    instance will be modified to do that count.
+
+    Really, just use this class as if it were a generator unless you want
+    a count.
     """
 
     def __init__(self, query, vars, pgpytable):
@@ -151,6 +172,55 @@ class ResultsGenerator:
 
 
 class PgPyTable(object):
+    """
+    A representation of a Postgresql table.  You will primarily retrieve
+    rows (PgPyDicts) from the database using the PgPyTable.get_where method.
+
+    Get all rows that need to be updates:
+
+    >>> list(table.get_where(outdated=True))
+    [PgPyDict(), PgPyDict(), PgPyDict(), PgPyDict()]
+
+    Get a single row (will raise an UnexpectedRow error if more than one
+    row could have been returned):
+
+    >>> table.get_one(id=12)
+    PgPyDict()
+    >>> table.get_one(manager_id=14)
+    PgPyDict()
+
+    You can reference another table using setitem, link to an employee's
+    manager using the manager's id, and the employee's manager_id.
+
+    >>> person['manager'] = person['manager_id'] == person['id']
+    >>> person['manager']
+    PgPyDict()
+
+    Reference a manager's subordinates using their collective manager_id's.:
+    (Use > instead of "in" because __contains__'s value is overwritten by
+    python)
+
+    >>> person['subordinates'] = person['id'] > person['manager_id']
+    >>> list(person['manager'])
+    [PgPyDict(), PgPyDict()]
+
+    PgPyTable.get_where returns a generator object, this makes it so you
+    won't have an entire table's object in memory at once, they are
+    generated when gotten:
+
+    >>> person['subordinates']
+    ResultsGenerator()
+    >>> for sub in person['subordinates']:
+    >>>     print(sub)
+    PgPyDict()
+    PgPyDict()
+    PgPyDict()
+
+    Get a count of all rows in this table:
+
+    >>> person.count()
+    3
+    """
 
     def __init__(self, table_name, db):
         self.name = table_name
@@ -190,6 +260,42 @@ class PgPyTable(object):
 
 
     def get_where(self, *a, **kw):
+        """
+        Get all rows as PgPyDicts where values are as specified.  This always
+        returns a generator-like object ResultsGenerator.  You can get the
+        length of that generator see ResultsGenerator.count.
+
+        If you provide only arguments, they will be paired in their respective
+        order to the primary keys defined for this table.  If the primary keys
+        of this table was (id,) only:
+
+            get_where(4) is equal to get_where(id=4)
+
+            get_where(4, 5) would raise a NoPrimaryKey error because there is
+                            only one primary key.
+
+        Primary keys are defined automatically by during the init of the object,
+        but you can overwrite that by simply changing the value:
+
+        >>> your_table.pks = ['id', 'some_column', 'whatever_you_want']
+
+            get_where(4, 5, 6) is now equal to get_where(id=4, some_column=5,
+                                                    whatever_you_want=6)
+
+        If there were two primary keys, such as in a join table (id, group):
+
+            get_where(4, 5) is equal to get_where(id=4, group=5)
+
+        You cannot use this method without primary keys, unless you specify
+        the column you are matching.
+
+        >>> get_where(some_column=83)
+        ResultsGenerator()
+
+        >>> get_where(4) # no primary keys defined!
+        NoPrimaryKey()
+
+        """
         order_by = None
         if self.order_by:
             order_by = self.order_by
@@ -221,6 +327,13 @@ class PgPyTable(object):
 
 
     def get_one(self, *a, **kw):
+        """
+        Get a single row as a PgPyDict from the Database that matches provided
+        to this method.  See PgPyTable.get_where for more details.
+
+        If more than one row could be returned, this will raise an
+        UnexpectedRows error.
+        """
         l = list(self.get_where(*a, **kw))
         if len(l) > 1:
             raise UnexpectedRows('More than one row selected.')
@@ -234,9 +347,12 @@ class PgPyTable(object):
 
 
     def count(self):
+        """
+        Get the count of rows in this table.
+        """
         self.curs.execute('SELECT COUNT(*) FROM {table}'.format(
             table=self.name))
-        return self.curs.fetchone()[0]
+        return int(self.curs.fetchone()[0])
 
 
     def __setitem__(self, ref_name, value):
@@ -272,6 +388,33 @@ class Reference(object):
 
 
 class PgPyDict(dict):
+    """
+    This behaves exactly like a dictionary, you may update your database row
+    (this PgPyDict instance) using update or simply by setting an item.  After
+    you make changes, be sure to call PgPyDict.flush on the instance of this
+    object.
+
+    This relies heavily on primary keys and they should be specified.  Really,
+    your tables should have a primary key of some sort.  If not, this will
+    pretty much be a read-only object.
+
+    You can change the primary key of an instance.
+
+    Use setitem:
+    >>> d['manager_id'] = 4
+
+    Use an update:
+    >>> d.update({'manager_id':4})
+
+    Update using another PgPyDict:
+    >>> d1.update(d2.remove_pks())
+
+    Make sure to send your changes to the database:
+    >>> d.flush()
+
+    Remove a row:
+    >>> d.remove()
+    """
 
     def __init__(self, pgpytable, *a, **kw):
         self._table = pgpytable
@@ -284,9 +427,14 @@ class PgPyDict(dict):
     def flush(self):
         """
         Insert this dictionary into it's table if its no yet in the Database,
-        or Update it's row if it is already in the database.
+        or Update it's row if it is already in the database.  This method
+        relies heaviliy on the primary keys of the row's respective table.  If
+        no primary keys are specified, this method will not function!
 
-        All column/values will bet inserted/set by this method.
+        All original column/values will bet inserted/set by this method.  If
+        a reference sub-dictionary has been defined, it will NOT be submitted to
+        the DB.  However, the reference's respective reference column will be
+        updated.
         """
         if not self._in_db:
             d = json_dicts(self.remove_refs())
@@ -319,7 +467,8 @@ class PgPyDict(dict):
 
     def delete(self):
         """
-        Delete this row from it's table in the database.
+        Delete this row from it's table in the database.  Requires primary
+        keys to be specified.
         """
         self._curs.execute('DELETE FROM {table} WHERE {pvp}'.format(
                 table=self._table.name,
