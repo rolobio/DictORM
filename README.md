@@ -142,9 +142,17 @@ Dave
 >>> bob = Person.get_one(1)
 >>> bob
 {'name':'Bob', 'id':1}
-# Get all rows in a table
->>> Person.get_where()
+# Get all rows in a table.
+>>> list(Person.get_where())
 [{'name':'Bob', 'id':1},]
+# get_where returns a ResultsGenerator, which behaves just like a python
+# generator.  It will not retreive a result from the database until you request
+# it.
+>>> Person.get_where()
+ResultsGenerator()
+>>> for person in Person.get_where():
+>>>     person
+{'name':'Bob', 'id':1}
 ```
 
 ### Update a PgPyDict without overwriting Primary Keys
@@ -193,8 +201,8 @@ True
 >>> aly['manager'] == steve
 True
 
-# Define that "subordinates" contains many rows by using ">".  Greater
-# than is used over "in" because __contains__ overwrites what is returned
+# Define that "subordinates" contains many rows by using ">".  Greater-Than
+# is used over "in" because __contains__ overwrites what is returned
 # with a True/False.  So ">" is used.
 >>> Person['subordinates'] = Person['id'] > Person['manager_id']
 >>> list(steve['subordinates'])
@@ -207,7 +215,7 @@ CREATE TABLE department (
     id SERIAL PRIMARY KEY,
     name
 );
-CREATE TABLE persons_department (
+CREATE TABLE person_department (
     person_id INTEGER REFERENCES person(id),
     department_id INTEGER REFERENCES department(id),
     PRIMARY KEY (person_id, department)
