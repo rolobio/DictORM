@@ -38,8 +38,8 @@ pip install pgpydict
 # "dictionary" now contains.
 >>> will.flush()
 
-PgPyDict will NEVER commit or rollback changes, that is up to you.
-Make sure to commit your changes:
+# PgPyDict will NEVER commit or rollback changes, that is up to you.
+# Make sure to commit your changes:
 psycopg2_conn.commit()
 ```
 
@@ -86,10 +86,9 @@ CREATE TABLE car (
 );
 ```
 
-Connect to the database using psycopg2 and DictCursor:
+Connect to the database using psycopg2
 ```python
->>> import psycopg2, psycopg2.extras
-
+>>> import psycopg2
 >>> conn = psycopg2.connect(**db_login)
 ```
 
