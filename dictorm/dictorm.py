@@ -4,11 +4,10 @@ Access a Psycopg2 database as if it were a Python Dictionary.
 from json import dumps
 from psycopg2.extras import DictCursor
 
-__all__ = ['DictDB', 'PgTable', 'PgDict', 'NoEntryError', 'NoPrimaryKey',
+__all__ = ['DictDB', 'PgTable', 'PgDict', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
 __version__ = '1.2'
 
-class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
 
