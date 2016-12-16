@@ -171,7 +171,7 @@ class PgTable(object):
     A representation of a Postgresql table.  You will primarily retrieve
     rows (PgDicts) from the database using the PgTable.get_where method.
 
-    Get all rows that need to be updates:
+    Get all rows that need to be updated:
 
     >>> list(table.get_where(outdated=True))
     [PgDict(), PgDict(), PgDict(), PgDict()]
@@ -187,25 +187,25 @@ class PgTable(object):
     You can reference another table using setitem, link to an employee's
     manager using the manager's id, and the employee's manager_id.
 
-    >>> person['manager'] = person['manager_id'] == person['id']
-    >>> person['manager']
+    >>> Person['manager'] = Person['manager_id'] == Person['id']
+    >>> Person['manager']
     PgDict()
 
     Reference a manager's subordinates using their collective manager_id's.:
     (Use > instead of "in" because __contains__'s value is overwritten by
     python)
 
-    >>> person['subordinates'] = person['id'] > person['manager_id']
-    >>> list(person['manager'])
+    >>> Person['subordinates'] = Person['id'] > Person['manager_id']
+    >>> list(Person['manager'])
     [PgDict(), PgDict()]
 
     PgTable.get_where returns a generator object, this makes it so you
     won't have an entire table's object in memory at once, they are
     generated when gotten:
 
-    >>> person['subordinates']
+    >>> Person['subordinates']
     ResultsGenerator()
-    >>> for sub in person['subordinates']:
+    >>> for sub in Person['subordinates']:
     >>>     print(sub)
     PgDict()
     PgDict()
@@ -213,7 +213,7 @@ class PgTable(object):
 
     Get a count of all rows in this table:
 
-    >>> person.count()
+    >>> Person.count()
     3
     """
 
