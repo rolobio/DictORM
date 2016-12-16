@@ -241,7 +241,7 @@ class PgTable(object):
         self.pks = [i[0] for i in self.curs.fetchall()]
 
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return 'PgTable({}, {})'.format(self.name, self.pks)
 
 
@@ -377,7 +377,7 @@ class Reference(object):
         self.pgpytable = pgpytable
         self.column = column
 
-    def __str__(self):
+    def __repr__(self): # pragma: no cover
         return 'Reference({}, {})'.format(self.pgpytable.name, self.column)
 
     def __eq__(ref1, ref2):

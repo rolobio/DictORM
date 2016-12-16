@@ -2,7 +2,7 @@
 ## Use Postgresql as if it were a Python Dictionary
 
 [![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/dictorm)
-[![Coverage Status](https://coveralls.io/repos/github/rolobio/dictorm/badge.svg?branch=master)](https://coveralls.io/github/rolobio/dictorm?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/rolobio/DictORM/badge.svg?branch=master)](https://coveralls.io/github/rolobio/DictORM?branch=master)
 
 Many database tables are constructed similar to a Python Dictionary.  Why not
 use it as such?
