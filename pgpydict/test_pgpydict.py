@@ -281,6 +281,50 @@ class Test(unittest.TestCase):
         self.assertEqual(_remove_refs(bob['person_departments']), [bob_pd_sales.remove_refs()])
 
 
+    def test_sub_reference_many(self):
+        """
+        Creating a reference using two other references fascilitates getting
+        rows from a third table, if the second table is only a join table.
+        """
+        Person = self.db['person']
+        Department = self.db['department']
+        PD = self.db['person_department']
+        # Setup the initial references
+        Person['person_departments'] = Person['id'] > PD['person_id']
+        PD['department'] = PD['department_id'] == Department['id']
+
+        # Directly access a person's departments by getting the sub-references
+        Person['departments'] = Person['person_departments'].subReference('department')
+
+        # Create the associated rows
+        bob = Person(name='Bob').flush()
+        # Departments
+        sales = Department(name='Sales').flush()
+        hr = Department(name='HR').flush()
+        # rows linking person and department using join table "person_department"
+        bob_pd_sales = PD(department_id=sales['id'], person_id=bob['id']).flush()
+        bob_pd_hr = PD(department_id=hr['id'], person_id=bob['id']).flush()
+
+        self.assertEqual(list(bob['departments']), [sales, hr])
+
+
+    def test_sub_reference_one(self):
+        Person = self.db['person']
+        Car = self.db['car']
+        # Setup the initial references
+        Person['manager'] = Person['id'] == Person['manager_id']
+        Person['car'] = Person['car_id'] == Car['id']
+
+        # Directly access a person's manager's car by getting the sub-reference
+        Person['manager_car'] = Person['manager'].subReference('car')
+
+        bob = Person(name='Dave').flush()
+        alice_car = Car(name='Prius').flush()
+        alice = Person(name='Alice', manager_id=bob['id'], car_id=alice_car['id']).flush()
+
+        self.assertEqual(bob['manager_car'].remove_refs(), alice_car.remove_refs())
+
+
     def test_onetomany(self):
         """
         person              | car
@@ -486,6 +530,7 @@ class Test(unittest.TestCase):
         self.assertDictContains(dave, {'name':'Dave', 'manager_id':1, 'manager':None})
         self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
         bob = Person(name='Bob', manager_id=alice['id']).flush()
+        self.assertNotEqual(bob['manager'], None)
         self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
 
         # New reference, no flush required

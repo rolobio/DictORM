@@ -6,7 +6,7 @@ from psycopg2.extras import DictCursor
 
 __all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
-__version__ = '1.1'
+__version__ = '1.2'
 
 class NoEntryError(Exception): pass
 class NoPrimaryKey(Exception): pass
@@ -351,8 +351,12 @@ class PgPyTable(object):
 
 
     def __setitem__(self, ref_name, value):
-        my_column, pgpytable, their_column, many = value
-        self.refs[ref_name] = (my_column, pgpytable, their_column, many)
+        if len(value) == 3:
+            my_column, sub_reference, their_refname = value
+            self.refs[ref_name] = (my_column, sub_reference, their_refname)
+        else:
+            my_column, pgpytable, their_column, many = value
+            self.refs[ref_name] = (self, my_column, pgpytable, their_column, many)
 
 
     def __getitem__(self, key):
@@ -373,11 +377,17 @@ class Reference(object):
         self.pgpytable = pgpytable
         self.column = column
 
-    def __eq__(self, reference):
-        return (self.column, reference.pgpytable, reference.column, False)
+    def __str__(self):
+        return 'Reference({}, {})'.format(self.pgpytable.name, self.column)
 
-    def __gt__(self, reference):
-        return (self.column, reference.pgpytable, reference.column, True)
+    def __eq__(ref1, ref2):
+        return (ref1.column, ref2.pgpytable, ref2.column, False)
+
+    def __gt__(ref1, ref2):
+        return (ref1.column, ref2.pgpytable, ref2.column, True)
+
+    def subReference(self, column):
+        return (self.column, self.pgpytable[self.column], column)
 
 
 
@@ -485,10 +495,7 @@ class PgPyDict(dict):
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
-        return dict([
-            (k,v) for k,v in self.items()
-                if k not in self._table.refs
-            ])
+        return dict([(k,v) for k,v in self.items() if k not in self._table.refs])
 
 
     def __getitem__(self, key):
@@ -496,8 +503,18 @@ class PgPyDict(dict):
         Get the provided "key" from the dictionary.  If the key refers to a
         referenced row, get that row first.
         """
-        if key in self._table.refs:
-            my_column, pgpytable, their_column, many = self._table.refs[key]
+        ref = self._table.refs.get(key)
+        sub_reference = False
+        if ref:
+            if len(ref) == 3:
+                sub_reference = True
+                # This reference is linking two references, get the value of the
+                # regular reference using usual means, then pull the
+                # sub-reference.
+                my_column, pgpytable, their_sub_ref = ref
+                ref = self._table.refs[my_column]
+
+            my_table, my_column, pgpytable, their_column, many = ref
             wheres = {their_column:self[my_column]}
             if many:
                 val = pgpytable.get_where(**wheres)
@@ -507,7 +524,14 @@ class PgPyDict(dict):
                 except IndexError:
                     # No results returned, must not be set
                     val = None
+
+            if sub_reference and many:
+                val = [i[their_sub_ref] for i in val]
+            elif sub_reference:
+                val = val[their_sub_ref]
+
             super(PgPyDict, self).__setitem__(key, val)
+            return val
         return super(PgPyDict, self).__getitem__(key)
 
 
