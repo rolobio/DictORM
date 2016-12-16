@@ -6,14 +6,14 @@ python:
 install:
     "pip install -r requirements.txt"
 before_script:
-    - psql -c 'create database pgpydict;' -U postgres
+    - psql -c 'create database dictorm;' -U postgres
 script:
     # Run tests verbosely
     - "green -vv --run-coverage ."
     # Test installation
     - "python setup.py install"
-    #  Verify that pgpydict can be imported
-    - "python -c 'from pgpydict import *'"
+    #  Verify that dictorm can be imported
+    - "python -c 'from dictorm import *'"
 services:
     - postgresql
 addons:
