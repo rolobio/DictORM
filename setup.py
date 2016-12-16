@@ -1,17 +1,17 @@
 from setuptools import setup
-from pgpydict import __version__, __doc__
+from dictorm import __version__, __doc__
 
 config = {
-    'name':'pgpydict',
+    'name':'dictorm',
     'version':__version__,
     'author':'rolobio',
-    'author_email':'rolobio+pgpydict@rolobio.com',
+    'author_email':'rolobio+dictorm@rolobio.com',
     'description':'Access a Psycopg2 database as if it were a Python Dictionary',
     'license':'Apache2',
-    'keywords':'psycopg2 dictionary',
-    'url':'https://github.com/rolobio/pgpydict',
+    'keywords':'psycopg2 dictionary python dict',
+    'url':'https://github.com/rolobio/DictORM',
     'packages':[
-        'pgpydict',
+        'dictorm',
         ],
     'long_description':__doc__,
     'install_requires': [
@@ -21,7 +21,7 @@ config = {
         "Development Status :: 4 - Beta",
         "Topic :: Utilities",
         ],
-    'test_suite':'pgpydict.test_pgpydict',
+    'test_suite':'dictorm.test_dictorm',
     }
 
 setup(**config)
