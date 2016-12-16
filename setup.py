@@ -6,7 +6,7 @@ config = {
     'version':__version__,
     'author':'rolobio',
     'author_email':'rolobio+dictorm@rolobio.com',
-    'description':'Access a Psycopg2 database as if it were a Python Dictionary',
+    'description':"Psycopg2's DictCursor is a fantastic tool, but what if you could send the dictionary back into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries.",
     'license':'Apache2',
     'keywords':'psycopg2 dictionary python dict',
     'url':'https://github.com/rolobio/DictORM',

@@ -355,7 +355,8 @@ class PgTable(object):
             self.refs[ref_name] = (my_column, sub_reference, their_refname)
         else:
             my_column, pgpytable, their_column, many = value
-            self.refs[ref_name] = (self, my_column, pgpytable, their_column, many)
+            self.refs[ref_name] = (
+                    self, my_column, pgpytable, their_column, many)
 
 
     def __getitem__(self, key):
@@ -450,12 +451,14 @@ class PgDict(dict):
             self._in_db = True
         else:
             if not self._table.pks:
-                raise NoPrimaryKey('Cannot update to {}, no primary keys defined.'.format(
+                raise NoPrimaryKey(
+                        'Cannot update to {}, no primary keys defined.'.format(
                     self._table))
             combined = self.remove_refs()
             combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
             combined = json_dicts(combined)
-            self._curs.execute('UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *'.format(
+            self._curs.execute(
+                    'UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *'.format(
                     table=self._table.name,
                     cvp=column_value_pairs(self.remove_refs()),
                     pvp=self._table._pk_value_pairs(prefix='old_'),
