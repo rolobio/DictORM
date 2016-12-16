@@ -18,7 +18,7 @@ pip install dictorm
 # Create a dictionary that contains all tables in the database
 >>> from dictorm import DictDB, PgDict
 >>> db = DictDB(psycopg2_conn)
-# Get the PgPyTable object that was automatically found by DictDB
+# Get the PgTable object that was automatically found by DictDB
 >>> Person = db['person']
 
 # Define Will's initial column values
@@ -99,14 +99,14 @@ Finally, use DictORM:
 # as if DictDB was a dictionary.
 >>> db = DictDB(conn)
 
-# Get a PgPyTable object for table 'person'
+# Get a PgTable object for table 'person'
 # person table built using: (id SERIAL PRIMARY KEY, name TEXT)
 >>> Person = db['person']
 
 # DictORM relies on primary keys to successfully Update a row in the 'person'
 # table.  The primary keys found are listed when the Person object is printed.
 >>> Person
-PgPyTable(dave, ['id',])
+PgTable(dave, ['id',])
 
 # You can define your own primary keys
 Person.pks = ['id',]
