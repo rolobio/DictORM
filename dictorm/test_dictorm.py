@@ -592,6 +592,10 @@ class Test(unittest.TestCase):
         self.assertEqual(_remove_refs(list(alice['subordinates'])),
                 _remove_refs([dave, bob]))
 
+        subs = alice['subordinates']
+        self.assertEqual(len(subs), 2)
+        self.assertEqual(_remove_refs(subs), _remove_refs([dave, bob]))
+
 
     def test_empty_reference(self):
         """
