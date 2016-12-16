@@ -1,22 +1,22 @@
-# pgpydict
+# dictorm
 ## Use Postgresql as if it were a Python Dictionary
 
-[![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/pgpydict)
-[![Coverage Status](https://coveralls.io/repos/github/rolobio/pgpydict/badge.svg?branch=master)](https://coveralls.io/github/rolobio/pgpydict?branch=master)
+[![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/dictorm)
+[![Coverage Status](https://coveralls.io/repos/github/rolobio/dictorm/badge.svg?branch=master)](https://coveralls.io/github/rolobio/dictorm?branch=master)
 
 Many database tables are constructed similar to a Python Dictionary.  Why not
 use it as such?
 
 ## Installation
-Install pgpydict using pip:
+Install dictorm using pip:
 ```bash
-pip install pgpydict
+pip install dictorm
 ```
 
 ## Quick & Simple Example!
 ```python
 # Create a dictionary that contains all tables in the database
->>> from pgpydict import DictDB, PgPyDict
+>>> from dictorm import DictDB, PgDict
 >>> db = DictDB(psycopg2_conn)
 # Get the PgPyTable object that was automatically found by DictDB
 >>> Person = db['person']
@@ -39,7 +39,7 @@ pip install pgpydict
 # "dictionary" now contains.
 >>> will.flush()
 
-# PgPyDict will NEVER commit or rollback changes, that is up to you.
+# DictORM will NEVER commit or rollback changes, that is up to you.
 # Make sure to commit your changes:
 psycopg2_conn.commit()
 ```
@@ -69,7 +69,7 @@ True
 
 # I did not show 'car_id' in the first Will examples, this was to avoid
 # confusion.  You must define 'car_id' in the database before it can be
-# accessed by PgPyDict.
+# accessed by DictORM.
 ```
 
 ## Detailed Basic Usage
@@ -93,7 +93,7 @@ Connect to the database using psycopg2
 >>> conn = psycopg2.connect(**db_login)
 ```
 
-Finally, use PgPyDict:
+Finally, use DictORM:
 ```python
 # DictDB queries the database for all tables and allows them to be gotten
 # as if DictDB was a dictionary.
@@ -103,7 +103,7 @@ Finally, use PgPyDict:
 # person table built using: (id SERIAL PRIMARY KEY, name TEXT)
 >>> Person = db['person']
 
-# PgPyDict relies on primary keys to successfully Update a row in the 'person'
+# DictORM relies on primary keys to successfully Update a row in the 'person'
 # table.  The primary keys found are listed when the Person object is printed.
 >>> Person
 PgPyTable(dave, ['id',])
@@ -131,7 +131,7 @@ Dave
 >>> conn.commit()
 ```
 
-### Get a row from the database as a PgPyDict
+### Get a row from the database as a PgDict
 ```python
 # Get a row from the database, you may specify which columns must contain what
 # value.
@@ -155,9 +155,9 @@ ResultsGenerator()
 {'name':'Bob', 'id':1}
 ```
 
-### Update a PgPyDict without overwriting Primary Keys
+### Update a PgDict without overwriting Primary Keys
 ```python
-# A PgPyDict behaves like a Python dictionary and can be updated/set.  Update
+# A PgDict behaves like a Python dictionary and can be updated/set.  Update
 # bob dict with steve dict, but don't overwrite bob's primary keys.
 >>> steve = Person(name='Steve').flush()
 >>> steve

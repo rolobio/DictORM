@@ -4,7 +4,7 @@ Access a Psycopg2 database as if it were a Python Dictionary.
 from json import dumps
 from psycopg2.extras import DictCursor
 
-__all__ = ['DictDB', 'PgPyTable', 'PgPyDict', 'NoEntryError', 'NoPrimaryKey',
+__all__ = ['DictDB', 'PgTable', 'PgDict', 'NoEntryError', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
 __version__ = '1.2'
 
@@ -80,18 +80,18 @@ def json_dicts(d):
 class DictDB(dict):
     """
     Get all the tables from the provided psycopg2 connection.  Create a
-    PgPyTable for that table, and keep it in this instance using the table's
+    PgTable for that table, and keep it in this instance using the table's
     name as a key.
 
     >>> db =DictDB(your_db_connection)
     >>> db['table1']
-    PgPyTable('table1')
+    PgTable('table1')
 
     >>> db['other_table']
-    PgPyTable('other_table')
+    PgTable('other_table')
 
     If your tables have changed while your DictDB instance existed, you can call
-    DictDB.refresh_tables() to have it rebuild all PgPyTable objects.
+    DictDB.refresh_tables() to have it rebuild all PgTable objects.
     """
 
     def __init__(self, psycopg2_conn):
@@ -113,7 +113,7 @@ class DictDB(dict):
             # Reset this DictDB because it contains old tables
             super(DictDB, self).__init__()
         for table in self._list_tables():
-            self[table['table_name']] = PgPyTable(table['table_name'], self)
+            self[table['table_name']] = PgTable(table['table_name'], self)
 
 
 
@@ -121,8 +121,8 @@ class ResultsGenerator:
     """
     This class replicates a Generator, it mearly adds the ability to
     get the len() of the generator (the rowcount of the last query run).
-    This method should only be returned by PgPyTable.get_where and
-    PgPyTable.get_one.
+    This method should only be returned by PgTable.get_where and
+    PgTable.get_one.
 
     Really, just use this class as if it were a generator unless you want
     a count.
@@ -148,7 +148,7 @@ class ResultsGenerator:
 
         if not d:
             raise StopIteration
-        # Convert returned dictionary to a PgPyDict
+        # Convert returned dictionary to a PgDict
         d = self.pgpytable(d)
         d._in_db = True
         return d
@@ -167,30 +167,30 @@ class ResultsGenerator:
 
 
 
-class PgPyTable(object):
+class PgTable(object):
     """
     A representation of a Postgresql table.  You will primarily retrieve
-    rows (PgPyDicts) from the database using the PgPyTable.get_where method.
+    rows (PgDicts) from the database using the PgTable.get_where method.
 
     Get all rows that need to be updates:
 
     >>> list(table.get_where(outdated=True))
-    [PgPyDict(), PgPyDict(), PgPyDict(), PgPyDict()]
+    [PgDict(), PgDict(), PgDict(), PgDict()]
 
     Get a single row (will raise an UnexpectedRow error if more than one
     row could have been returned):
 
     >>> table.get_one(id=12)
-    PgPyDict()
+    PgDict()
     >>> table.get_one(manager_id=14)
-    PgPyDict()
+    PgDict()
 
     You can reference another table using setitem, link to an employee's
     manager using the manager's id, and the employee's manager_id.
 
     >>> person['manager'] = person['manager_id'] == person['id']
     >>> person['manager']
-    PgPyDict()
+    PgDict()
 
     Reference a manager's subordinates using their collective manager_id's.:
     (Use > instead of "in" because __contains__'s value is overwritten by
@@ -198,9 +198,9 @@ class PgPyTable(object):
 
     >>> person['subordinates'] = person['id'] > person['manager_id']
     >>> list(person['manager'])
-    [PgPyDict(), PgPyDict()]
+    [PgDict(), PgDict()]
 
-    PgPyTable.get_where returns a generator object, this makes it so you
+    PgTable.get_where returns a generator object, this makes it so you
     won't have an entire table's object in memory at once, they are
     generated when gotten:
 
@@ -208,9 +208,9 @@ class PgPyTable(object):
     ResultsGenerator()
     >>> for sub in person['subordinates']:
     >>>     print(sub)
-    PgPyDict()
-    PgPyDict()
-    PgPyDict()
+    PgDict()
+    PgDict()
+    PgDict()
 
     Get a count of all rows in this table:
 
@@ -242,11 +242,11 @@ class PgPyTable(object):
 
 
     def __repr__(self):
-        return 'PgPyTable({}, {})'.format(self.name, self.pks)
+        return 'PgTable({}, {})'.format(self.name, self.pks)
 
 
     def __call__(self, *a, **kw):
-        d = PgPyDict(self, *a, **kw)
+        d = PgDict(self, *a, **kw)
         return self._add_references(d)
 
 
@@ -256,7 +256,7 @@ class PgPyTable(object):
 
     def get_where(self, *a, **kw):
         """
-        Get all rows as PgPyDicts where values are as specified.  This always
+        Get all rows as PgDicts where values are as specified.  This always
         returns a generator-like object ResultsGenerator.  You can get the
         length of that generator see ResultsGenerator.count.
 
@@ -323,8 +323,8 @@ class PgPyTable(object):
 
     def get_one(self, *a, **kw):
         """
-        Get a single row as a PgPyDict from the Database that matches provided
-        to this method.  See PgPyTable.get_where for more details.
+        Get a single row as a PgDict from the Database that matches provided
+        to this method.  See PgTable.get_where for more details.
 
         If more than one row could be returned, this will raise an
         UnexpectedRows error.
@@ -366,7 +366,7 @@ class PgPyTable(object):
 
 class Reference(object):
     """
-    This class facilitates creating relationships between PgPyTables by using
+    This class facilitates creating relationships between PgTables by using
     == and >.
 
     I would rather use "in" instead of ">", but "__contains__" overwrites what
@@ -391,11 +391,11 @@ class Reference(object):
 
 
 
-class PgPyDict(dict):
+class PgDict(dict):
     """
     This behaves exactly like a dictionary, you may update your database row
-    (this PgPyDict instance) using update or simply by setting an item.  After
-    you make changes, be sure to call PgPyDict.flush on the instance of this
+    (this PgDict instance) using update or simply by setting an item.  After
+    you make changes, be sure to call PgDict.flush on the instance of this
     object.
 
     This relies heavily on primary keys and they should be specified.  Really,
@@ -410,7 +410,7 @@ class PgPyDict(dict):
     Use an update:
     >>> d.update({'manager_id':4})
 
-    Update using another PgPyDict:
+    Update using another PgDict:
     >>> d1.update(d2.remove_pks())
 
     Make sure to send your changes to the database:
@@ -424,7 +424,7 @@ class PgPyDict(dict):
         self._table = pgpytable
         self._in_db = False
         self._curs = pgpytable.db.curs
-        super(PgPyDict, self).__init__(*a, **kw)
+        super(PgDict, self).__init__(*a, **kw)
         self._old = self.remove_refs()
 
 
@@ -464,7 +464,7 @@ class PgPyDict(dict):
                 combined
             )
         d = self._curs.fetchone()
-        super(PgPyDict, self).__init__(d)
+        super(PgDict, self).__init__(d)
         self._old = self.remove_refs()
         return self
 
@@ -484,8 +484,8 @@ class PgPyDict(dict):
     def remove_pks(self):
         """
         Return a dictionary without the primary keys that are associated with
-        this PgPyDict in the Database.  This should be used when doing an update
-        of another PgPyDict.
+        this PgDict in the Database.  This should be used when doing an update
+        of another PgDict.
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
 
@@ -530,9 +530,9 @@ class PgPyDict(dict):
             elif sub_reference:
                 val = val[their_sub_ref]
 
-            super(PgPyDict, self).__setitem__(key, val)
+            super(PgDict, self).__setitem__(key, val)
             return val
-        return super(PgPyDict, self).__getitem__(key)
+        return super(PgDict, self).__getitem__(key)
 
 
     __getitem__.__doc__ += dict.__getitem__.__doc__

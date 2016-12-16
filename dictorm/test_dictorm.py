@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from pgpydict import (DictDB, PgPyTable, PgPyDict, UnexpectedRows, NoPrimaryKey,
+from dictorm import (DictDB, PgTable, PgDict, UnexpectedRows, NoPrimaryKey,
     ResultsGenerator, column_value_pairs)
 from pprint import pprint
 from psycopg2.extras import DictCursor
@@ -9,7 +9,7 @@ import unittest
 
 if 'CI' in os.environ.keys():
     test_db_login = {
-            'database':'pgpydict',
+            'database':'dictorm',
             'user':'postgres',
             'password':'',
             'host':'localhost',
@@ -17,15 +17,15 @@ if 'CI' in os.environ.keys():
             }
 else:
     test_db_login = {
-            'database':'pgpydict',
-            'user':'pgpydict',
-            'password':'pgpydict',
+            'database':'dictorm',
+            'user':'dictorm',
+            'password':'dictorm',
             'host':'localhost',
             'port':'5432',
             }
 
 def _remove_refs(o):
-    if type(o) == PgPyDict:
+    if type(o) == PgDict:
         return o.remove_refs()
     return [i.remove_refs() for i in o]
 
@@ -120,14 +120,14 @@ class Test(unittest.TestCase):
         alice.flush()
 
         # get_where with a single integer argument should produce a single
-        # PgPyDict row that matches that row's id
+        # PgDict row that matches that row's id
         self.assertEqual(list(Person.get_where(1)), [bob,])
         self.assertEqual(self.curs.rowcount, 1)
 
         # get_where with no parameters returns the entire table
         self.assertEqual(list(Person.get_where()), [bob, dave, alice])
 
-        # A delete sql command can be executed on a PgPyDict
+        # A delete sql command can be executed on a PgDict
         dave.delete()
         self.assertEqual(list(Person.get_where()), [bob, alice])
         self.conn.commit()
@@ -194,9 +194,9 @@ class Test(unittest.TestCase):
         Person(name='Alice').flush()
         Person([('name','Steve'),]).flush()
 
-        PgPyDict(Person, {'name':'Bob'}).flush()
-        PgPyDict(Person, name='Alice').flush()
-        PgPyDict(Person, [('name','Steve'),]).flush()
+        PgDict(Person, {'name':'Bob'}).flush()
+        PgDict(Person, name='Alice').flush()
+        PgDict(Person, [('name','Steve'),]).flush()
 
         # A fake column will fail when going into the database
         p = Person(fake_column='foo')
@@ -442,7 +442,7 @@ class Test(unittest.TestCase):
 
     def test_second_cursor(self):
         """
-        PgPyDict's cursor should not interfere with another cursor.
+        PgDict's cursor should not interfere with another cursor.
         """
         Person = self.db['person']
         bob = Person(name='Bob')
@@ -458,7 +458,7 @@ class Test(unittest.TestCase):
         curs2.execute('SELECT * FROM person')
         self.assertEqual(next(persons), aly)
 
-        # Using pgpydict's cursor will intefere
+        # Using dictorm's cursor will intefere
         persons = Person.get_where()
         self.assertEqual(next(persons), bob)
         persons.curs.execute('SELECT * FROM person')
