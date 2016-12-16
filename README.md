@@ -1,7 +1,7 @@
 # pgpydict
 ## Use Postgresql as if it were a Python Dictionary
 
-[![Build Status](https://travis-ci.org/rolobio/pgpydict.svg?branch=master)](https://travis-ci.org/rolobio/pgpydict)
+[![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/pgpydict)
 [![Coverage Status](https://coveralls.io/repos/github/rolobio/pgpydict/badge.svg?branch=master)](https://coveralls.io/github/rolobio/pgpydict?branch=master)
 
 Many database tables are constructed similar to a Python Dictionary.  Why not
