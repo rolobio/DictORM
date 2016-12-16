@@ -418,6 +418,10 @@ class Test(unittest.TestCase):
 
         self.assertRaises(UnexpectedRows, Person.get_one)
 
+        bob['not_real_column'] = 1
+        self.assertRaises(psycopg2.ProgrammingError, bob.flush)
+        self.conn.rollback()
+
         NoPk = self.db['no_pk']
         foo = NoPk(foo='bar')
         foo.flush()
