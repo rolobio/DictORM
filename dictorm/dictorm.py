@@ -1,5 +1,7 @@
 """
-Access a Psycopg2 database as if it were a Python Dictionary.
+Psycopg2's DictCursor is a fantastic tool, but what if you could send the
+dictionary back into the database?  DictORM allows you to select/insert/update
+rows of a database as if they were Python Dictionaries.
 """
 from json import dumps
 from psycopg2.extras import DictCursor
