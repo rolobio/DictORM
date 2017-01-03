@@ -270,7 +270,7 @@ class PgTable(object):
             get_where(4, 5) would raise a NoPrimaryKey error because there is
                             only one primary key.
 
-        Primary keys are defined automatically by during the init of the object,
+        Primary keys are defined automatically during the init of the PgTable,
         but you can overwrite that by simply changing the value:
 
         >>> your_table.pks = ['id', 'some_column', 'whatever_you_want']
@@ -398,7 +398,8 @@ class PgDict(dict):
     This behaves exactly like a dictionary, you may update your database row
     (this PgDict instance) using update or simply by setting an item.  After
     you make changes, be sure to call PgDict.flush on the instance of this
-    object.
+    object to send your changes to the DB.  Your changes will not be commited
+    or rolled-back, you must do that.
 
     This relies heavily on primary keys and they should be specified.  Really,
     your tables should have a primary key of some sort.  If not, this will
@@ -419,7 +420,7 @@ class PgDict(dict):
     >>> d.flush()
 
     Remove a row:
-    >>> d.remove()
+    >>> d.delete()
     """
 
     def __init__(self, pgpytable, *a, **kw):
