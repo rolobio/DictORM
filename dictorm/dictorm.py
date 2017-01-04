@@ -4,25 +4,25 @@ dictionary back into the database?  DictORM allows you to select/insert/update
 rows of a database as if they were Python Dictionaries.
 """
 from json import dumps
-try:
+try: # pragma: no cover
     from dictorm.__version__ import __version__
-except ImportError:
+except ImportError: # pragma: no cover
     from .__version__ import __version__
 
 db_package_imported = False
-try:
+try: # pragma: no cover
     from psycopg2.extras import DictCursor
     db_package_imported = True
-except ImportError:
+except ImportError: # pragma: no cover
     pass
 
-try:
+try: # pragma: no cover
     import sqlite3
     db_package_imported = True
-except ImportError:
+except ImportError: # pragma: no cover
     pass
 
-if not db_package_imported:
+if not db_package_imported: # pragma: no cover
     raise ImportError('Failed to import psycopg2 or sqlite3.  These are the only supported Databases and you must import one of them')
 
 
@@ -169,13 +169,6 @@ class DictDB(dict):
                 self[table['name']] = PgTable(table['name'], self)
             else:
                 self[table['table_name']] = PgTable(table['table_name'], self)
-
-
-def stringify_lists(d):
-    for k in d:
-        if type(d[k]) in (tuple, list):
-            d[k] = '(%s)' % ','.join([str(i) for i in d[k]])
-    return d
 
 
 class ResultsGenerator:
