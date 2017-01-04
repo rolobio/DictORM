@@ -27,7 +27,8 @@ if not db_package_imported: # pragma: no cover
 
 
 __all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
-    'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
+    'UnexpectedRows', 'ResultsGenerator', 'column_value_pairs', '__version__',
+    '__doc__']
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
