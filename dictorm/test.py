@@ -629,7 +629,7 @@ class TestPostgresql(ExtraTestMethods):
 
 
 
-class TestSqlite(ExtraTestMethods):
+class TestSqlite(TestPostgresql):
 
     def assertDictContains(self, d1, d2):
         assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
@@ -793,6 +793,12 @@ class TestSqlite(ExtraTestMethods):
         results = list(NoPk.get_where(foo='bar'))
         self.assertEqual(len(results), 1)
         self.assertEqual(results, [{'foo': 'bar'},])
+
+
+    # Not supported for sqlite
+    test_count = None
+    test_json = None
+    test_second_cursor = None
 
 
 
