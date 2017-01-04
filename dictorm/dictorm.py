@@ -4,6 +4,10 @@ dictionary back into the database?  DictORM allows you to select/insert/update
 rows of a database as if they were Python Dictionaries.
 """
 from json import dumps
+try:
+    from dictorm.__version__ import __version__
+except ImportError:
+    from .__version__ import __version__
 
 db_package_imported = False
 try:
@@ -24,7 +28,6 @@ if not db_package_imported:
 
 __all__ = ['DictDB', 'PgTable', 'PgDict', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
-__version__ = '1.2'
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
