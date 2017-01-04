@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from dictorm import (DictDB, PgTable, PgDict, UnexpectedRows, NoPrimaryKey,
+from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
     ResultsGenerator, column_value_pairs)
 from pprint import pprint
 from psycopg2.extras import DictCursor
@@ -26,7 +26,7 @@ else:
             }
 
 def _remove_refs(o):
-    if type(o) == PgDict:
+    if type(o) == Dict:
         return o.remove_refs()
     return [i.remove_refs() for i in o]
 
@@ -131,14 +131,14 @@ class TestPostgresql(ExtraTestMethods):
         alice.flush()
 
         # get_where with a single integer argument should produce a single
-        # PgDict row that matches that row's id
+        # Dict row that matches that row's id
         self.assertEqual(list(Person.get_where(1)), [bob,])
         self.assertEqual(self.curs.rowcount, 1)
 
         # get_where with no parameters returns the entire table
         self.assertEqual(list(Person.get_where()), [bob, dave, alice])
 
-        # A delete sql command can be executed on a PgDict
+        # A delete sql command can be executed on a Dict
         dave.delete()
         self.assertEqual(list(Person.get_where()), [bob, alice])
         self.conn.commit()
@@ -205,9 +205,9 @@ class TestPostgresql(ExtraTestMethods):
         Person(name='Alice').flush()
         Person([('name','Steve'),]).flush()
 
-        PgDict(Person, {'name':'Bob'}).flush()
-        PgDict(Person, name='Alice').flush()
-        PgDict(Person, [('name','Steve'),]).flush()
+        Dict(Person, {'name':'Bob'}).flush()
+        Dict(Person, name='Alice').flush()
+        Dict(Person, [('name','Steve'),]).flush()
 
         # A fake column will fail when going into the database
         p = Person(fake_column='foo')
@@ -457,7 +457,7 @@ class TestPostgresql(ExtraTestMethods):
 
     def test_second_cursor(self):
         """
-        PgDict's cursor should not interfere with another cursor.
+        Dict's cursor should not interfere with another cursor.
         """
         Person = self.db['person']
         bob = Person(name='Bob')
@@ -732,13 +732,13 @@ class TestSqlite(TestPostgresql):
         alice.flush()
 
         # get_where with a single integer argument should produce a single
-        # PgDict row that matches that row's id
+        # Dict row that matches that row's id
         self.assertEqual(list(Person.get_where(1)), [bob,])
 
         # get_where with no parameters returns the entire table
         self.assertEqual(list(Person.get_where()), [bob, dave, alice])
 
-        # A delete sql command can be executed on a PgDict
+        # A delete sql command can be executed on a Dict
         dave.delete()
         self.assertEqual(list(Person.get_where()), [bob, alice])
         self.conn.commit()

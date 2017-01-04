@@ -1,12 +1,12 @@
 # DictORM
-## Use Postgresql as if it were a Python Dictionary
+## Use Postgres/Sqlite as if it were a Python Dictionary
 
 [![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/DictORM)
 [![Coverage Status](https://coveralls.io/repos/github/rolobio/DictORM/badge.svg?branch=master)](https://coveralls.io/github/rolobio/DictORM?branch=master)
 
-Psycopg2's DictCursor is a fantastic tool, but what if you could send the
-dictionary back into the database?  DictORM allows you to select/insert/update
-rows of a database as if they were Python Dictionaries.
+What if you could insert a Python dictionary into the database?  DictORM allows
+you to select/insert/update rows of a database as if they were Python
+Dictionaries.
 
 ## Installation
 Install dictorm using pip:
@@ -17,8 +17,8 @@ pip install dictorm
 ## Quick & Simple Example!
 ```python
 # Create a dictionary that contains all tables in the database
->>> from dictorm import DictDB, PgDict
->>> db = DictDB(psycopg2_conn)
+>>> from dictorm import DictDB, Dict
+>>> db = DictDB(db_conn)
 # Get the PgTable object that was automatically found by DictDB
 >>> Person = db['person']
 
@@ -132,7 +132,7 @@ Dave
 >>> conn.commit()
 ```
 
-### Get a row from the database as a PgDict
+### Get a row from the database as a Dict
 ```python
 # Get a row from the database, you may specify which columns must contain what
 # value.
@@ -156,9 +156,9 @@ ResultsGenerator()
 {'name':'Bob', 'id':1}
 ```
 
-### Update a PgDict without overwriting Primary Keys
+### Update a Dict without overwriting Primary Keys
 ```python
-# A PgDict behaves like a Python dictionary and can be updated/set.  Update
+# A Dict behaves like a Python dictionary and can be updated/set.  Update
 # bob dict with steve dict, but don't overwrite bob's primary keys.
 >>> steve = Person(name='Steve').flush()
 >>> steve
