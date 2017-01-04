@@ -94,6 +94,12 @@ Connect to the database using psycopg2
 >>> conn = psycopg2.connect(**db_login)
 ```
 
+or Sqlite3
+```python
+>>> import sqlite3
+>>> conn = sqlite3.connect(':memory:')
+```
+
 Finally, use DictORM:
 ```python
 # DictDB queries the database for all tables and allows them to be gotten
