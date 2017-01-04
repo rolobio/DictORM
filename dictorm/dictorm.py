@@ -4,11 +4,30 @@ dictionary back into the database?  DictORM allows you to select/insert/update
 rows of a database as if they were Python Dictionaries.
 """
 from json import dumps
-from psycopg2.extras import DictCursor
+try: # pragma: no cover
+    from dictorm.__version__ import __version__
+except ImportError: # pragma: no cover
+    from .__version__ import __version__
+
+db_package_imported = False
+try: # pragma: no cover
+    from psycopg2.extras import DictCursor
+    db_package_imported = True
+except ImportError: # pragma: no cover
+    pass
+
+try: # pragma: no cover
+    import sqlite3
+    db_package_imported = True
+except ImportError: # pragma: no cover
+    pass
+
+if not db_package_imported: # pragma: no cover
+    raise ImportError('Failed to import psycopg2 or sqlite3.  These are the only supported Databases and you must import one of them')
+
 
 __all__ = ['DictDB', 'PgTable', 'PgDict', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__', 'column_value_pairs']
-__version__ = '1.2'
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
@@ -19,7 +38,7 @@ def operator_kinds(o):
     return '='
 
 
-def column_value_pairs(d, join_str=', ', prefix=''):
+def column_value_pairs(kind, d, join_str=', ', prefix=''):
     """
     Create a string of SQL that will instruct a Psycopg2 DictCursor to
     interpolate the dictionary's keys into a SELECT or UPDATE SQL query.
@@ -43,16 +62,26 @@ def column_value_pairs(d, join_str=', ', prefix=''):
         >>> column_value_pairs( {'id':12, 'person':'Dave'}, prefix='old_')
         id=%(old_id)s, person=%(old_person)s
     """
-    if type(d) == dict:
-        return join_str.join([
-                str(k) + operator_kinds(type(d[k])) + '%('+prefix+k+')s'
-                for k in sorted(d.keys())
-            ])
-    else:
-        return join_str.join([str(i)+'=%('+prefix+str(i)+')s' for i in d])
+    if kind == 'sqlite3':
+        if type(d) == dict:
+            return join_str.join([
+                    str(k) + operator_kinds(type(d[k])) + ':'+prefix+k
+                    for k in sorted(d.keys())
+                ])
+        else:
+            return join_str.join([str(i)+'=:'+prefix+str(i) for i in d])
+
+    elif kind == 'postgresql':
+        if type(d) == dict:
+            return join_str.join([
+                    str(k) + operator_kinds(type(d[k])) + '%('+prefix+k+')s'
+                    for k in sorted(d.keys())
+                ])
+        else:
+            return join_str.join([str(i)+'=%('+prefix+str(i)+')s' for i in d])
 
 
-def insert_column_value_pairs(d):
+def insert_column_value_pairs(kind, d):
     """
     Create a string of SQL that will instruct a Psycopg2 DictCursor to
     interpolate the dictionary's keys into a INSERT SQL query.
@@ -62,10 +91,16 @@ def insert_column_value_pairs(d):
         (id, person) VALUES (%(id)s, %(person)s)
     """
     d = sorted(d)
-    return '({}) VALUES ({})'.format(
-            ', '.join(d),
-            ', '.join(['%('+str(i)+')s' for i in d]),
-            )
+    if kind == 'sqlite3':
+        return '({}) VALUES ({})'.format(
+                ', '.join(d),
+                ', '.join([':'+str(i) for i in d]),
+                )
+    else:
+        return '({}) VALUES ({})'.format(
+                ', '.join(d),
+                ', '.join(['%('+str(i)+')s' for i in d]),
+                )
 
 
 def json_dicts(d):
@@ -95,17 +130,33 @@ class DictDB(dict):
     DictDB.refresh_tables() to have it rebuild all PgTable objects.
     """
 
-    def __init__(self, psycopg2_conn):
-        self.conn = psycopg2_conn
-        self.curs = self.conn.cursor(cursor_factory=DictCursor)
+    def __init__(self, db_conn):
+        self.conn = db_conn
+        if type(db_conn) == sqlite3.Connection:
+            self.kind = 'sqlite3'
+        else:
+            self.kind = 'postgresql'
+
+        if self.kind == 'sqlite3':
+            # row_factory using builtin Row which acts like a dictionary
+            self.conn.row_factory = sqlite3.Row
+            self.curs = self.conn.cursor()
+        elif self.kind == 'postgresql':
+            # using builtin DictCursor which gets/inserts/updates using
+            # dictionaries
+            self.curs = self.conn.cursor(cursor_factory=DictCursor)
+
         self.refresh_tables()
         super(DictDB, self).__init__()
 
 
     def _list_tables(self):
-        self.curs.execute('''SELECT DISTINCT table_name
-                FROM information_schema.columns
-                WHERE table_schema='public' ''')
+        if self.kind == 'sqlite3':
+            self.curs.execute('SELECT name FROM sqlite_master WHERE type = "table"')
+        else:
+            self.curs.execute('''SELECT DISTINCT table_name
+                    FROM information_schema.columns
+                    WHERE table_schema='public' ''')
         return self.curs.fetchall()
 
 
@@ -114,8 +165,10 @@ class DictDB(dict):
             # Reset this DictDB because it contains old tables
             super(DictDB, self).__init__()
         for table in self._list_tables():
-            self[table['table_name']] = PgTable(table['table_name'], self)
-
+            if self.kind == 'sqlite3':
+                self[table['name']] = PgTable(table['name'], self)
+            else:
+                self[table['table_name']] = PgTable(table['table_name'], self)
 
 
 class ResultsGenerator:
@@ -129,30 +182,55 @@ class ResultsGenerator:
     a count.
     """
 
-    def __init__(self, query, vars, pgpytable):
+    def __init__(self, query, vars, pgtable):
         self.query = query
         self.vars = vars
-        self.pgpytable = pgpytable
+        self.pgtable = pgtable
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
-        self.curs = pgpytable.db.conn.cursor(cursor_factory=DictCursor)
+        if self.pgtable.db.kind == 'sqlite3':
+            self.curs = pgtable.db.conn.cursor()
+        elif self.pgtable.db.kind == 'postgresql':
+            self.curs = pgtable.db.conn.cursor(cursor_factory=DictCursor)
+
 
     def __iter__(self): return self
 
-    def __next__(self):
-        if self.query:
-            # Run the query only once
-            self.curs.execute(self.query, self.vars)
-            self.query = None
 
+    def __next__(self):
+        self._execute_once()
         d = self.curs.fetchone()
 
         if not d:
             raise StopIteration
         # Convert returned dictionary to a PgDict
-        d = self.pgpytable(d)
+        d = self.pgtable(d)
         d._in_db = True
         return d
+
+
+    def _execute_once(self):
+        """
+        Execute the query only once
+        """
+        if self.query and self.pgtable.db.kind == 'sqlite3':
+            # sqlite3 does not support interpolation of a list/tuple during
+            # a select, replace any instances of those with a manually created
+            # string list.
+            vars = []
+            for key in sorted(self.vars):
+                if type(self.vars[key]) in (list, tuple):
+                    self.query = self.query.replace(':'+key,
+                            '('+','.join([str(i) for i in self.vars[key]])+')'
+                            )
+                else:
+                    self.query = self.query.replace(':'+key, '?')
+                    vars.append(self.vars[key])
+            self.curs.execute(self.query, vars)
+            self.query = None
+        elif self.query and self.pgtable.db.kind == 'postgresql':
+            self.curs.execute(self.query, self.vars)
+            self.query = None
 
 
     # for python 2.7
@@ -160,10 +238,10 @@ class ResultsGenerator:
 
 
     def __len__(self):
-        if self.query:
-            # Run the query only once
-            self.curs.execute(self.query, self.vars)
-            self.query = None
+        self._execute_once()
+        if self.pgtable.db.kind == 'sqlite3':
+            # sqlite3's cursor.rowcount doesn't support select statements
+            return 0
         return self.curs.rowcount
 
 
@@ -172,6 +250,11 @@ class PgTable(object):
     """
     A representation of a Postgresql table.  You will primarily retrieve
     rows (PgDicts) from the database using the PgTable.get_where method.
+
+    Insert into this table:
+
+    >>> your_table(some_column='some value', other=False)
+    {'some_column':'some value', 'other':False}
 
     Get all rows that need to be updated:
 
@@ -186,16 +269,16 @@ class PgTable(object):
     >>> table.get_one(manager_id=14)
     PgDict()
 
-    You can reference another table using setitem, link to an employee's
+    You can reference another table using setitem.  Link to an employee's
     manager using the manager's id, and the employee's manager_id.
 
     >>> Person['manager'] = Person['manager_id'] == Person['id']
     >>> Person['manager']
     PgDict()
 
-    Reference a manager's subordinates using their collective manager_id's.:
+    Reference a manager's subordinates using their collective manager_id's
     (Use > instead of "in" because __contains__'s value is overwritten by
-    python)
+    python):
 
     >>> Person['subordinates'] = Person['id'] > Person['manager_id']
     >>> list(Person['manager'])
@@ -233,13 +316,18 @@ class PgTable(object):
         """
         Get a list of Primary Keys set for this table in the DB.
         """
-        self.curs.execute('''SELECT a.attname
-                FROM pg_index i
-                JOIN pg_attribute a ON a.attrelid = i.indrelid
-                AND a.attnum = ANY(i.indkey)
-                WHERE i.indrelid = '%s'::regclass
-                AND i.indisprimary;''' % self.name)
-        self.pks = [i[0] for i in self.curs.fetchall()]
+        if self.db.kind == 'sqlite3':
+            self.curs.execute('pragma table_info(%s)' % self.name)
+            self.pks = [i['name'] for i in self.curs.fetchall() if i['pk']]
+
+        elif self.db.kind == 'postgresql':
+            self.curs.execute('''SELECT a.attname
+                    FROM pg_index i
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid
+                    AND a.attnum = ANY(i.indkey)
+                    WHERE i.indrelid = '%s'::regclass
+                    AND i.indisprimary;''' % self.name)
+            self.pks = [i[0] for i in self.curs.fetchall()]
 
 
     def __repr__(self): # pragma: no cover
@@ -247,12 +335,15 @@ class PgTable(object):
 
 
     def __call__(self, *a, **kw):
+        """
+        Used to insert a row into this table.
+        """
         d = PgDict(self, *a, **kw)
         return self._add_references(d)
 
 
     def _pk_value_pairs(self, join_str=' AND ', prefix=''):
-        return column_value_pairs(self.pks, join_str, prefix)
+        return column_value_pairs(self.db.kind, self.pks, join_str, prefix)
 
 
     def get_where(self, *a, **kw):
@@ -309,17 +400,17 @@ class PgTable(object):
 
         # Build out the query using user-provideded data, and data gathered
         # from the DB.
-        sql = 'SELECT * FROM {table} '
+        query = 'SELECT * FROM {table} '
         if kw:
-            sql += 'WHERE {wheres} '
+            query += 'WHERE {wheres} '
         if order_by:
-            sql += 'ORDER BY {order_by}'
-        sql = sql.format(
+            query += 'ORDER BY {order_by}'
+        query = query.format(
                 table=self.name,
-                wheres=column_value_pairs(kw, ' AND '),
+                wheres=column_value_pairs(self.db.kind, kw, ' AND '),
                 order_by=order_by
             )
-        return ResultsGenerator(sql, kw, self)
+        return ResultsGenerator(query, kw, self)
 
 
     def get_one(self, *a, **kw):
@@ -356,9 +447,9 @@ class PgTable(object):
             my_column, sub_reference, their_refname = value
             self.refs[ref_name] = (my_column, sub_reference, their_refname)
         else:
-            my_column, pgpytable, their_column, many = value
+            my_column, pgtable, their_column, many = value
             self.refs[ref_name] = (
-                    self, my_column, pgpytable, their_column, many)
+                    self, my_column, pgtable, their_column, many)
 
 
     def __getitem__(self, key):
@@ -375,21 +466,21 @@ class Reference(object):
     is returned and only returns a True/False value. :(
     """
 
-    def __init__(self, pgpytable, column):
-        self.pgpytable = pgpytable
+    def __init__(self, pgtable, column):
+        self.pgtable = pgtable
         self.column = column
 
     def __repr__(self): # pragma: no cover
-        return 'Reference({}, {})'.format(self.pgpytable.name, self.column)
+        return 'Reference({}, {})'.format(self.pgtable.name, self.column)
 
     def __eq__(ref1, ref2):
-        return (ref1.column, ref2.pgpytable, ref2.column, False)
+        return (ref1.column, ref2.pgtable, ref2.column, False)
 
     def __gt__(ref1, ref2):
-        return (ref1.column, ref2.pgpytable, ref2.column, True)
+        return (ref1.column, ref2.pgtable, ref2.column, True)
 
     def subReference(self, column):
-        return (self.column, self.pgpytable[self.column], column)
+        return (self.column, self.pgtable[self.column], column)
 
 
 
@@ -423,10 +514,10 @@ class PgDict(dict):
     >>> d.delete()
     """
 
-    def __init__(self, pgpytable, *a, **kw):
-        self._table = pgpytable
+    def __init__(self, pgtable, *a, **kw):
+        self._table = pgtable
         self._in_db = False
-        self._curs = pgpytable.db.curs
+        self._curs = pgtable.db.curs
         super(PgDict, self).__init__(*a, **kw)
         self._old = self.remove_refs()
 
@@ -445,13 +536,25 @@ class PgDict(dict):
         """
         if not self._in_db:
             d = json_dicts(self.remove_refs())
-            self._curs.execute('INSERT INTO {table} {cvp} RETURNING *'.format(
+            query = 'INSERT INTO {table} {cvp}'.format(
                     table=self._table.name,
-                    cvp=insert_column_value_pairs(self.remove_refs())
-                ),
-                d
-            )
+                    cvp=insert_column_value_pairs(self._table.db.kind,
+                        self.remove_refs())
+                )
+
+            if self._table.db.kind == 'postgresql':
+                query += ' RETURNING *'
+
+            # Run the insert query, interpolating the values of this dictionary
+            # into the query.
+            self._curs.execute(query, d)
             self._in_db = True
+
+            if self._table.db.kind == 'sqlite3':
+                # Get the last inserted row, postgresql uses RETURNING
+                self._curs.execute('''SELECT * FROM {table} WHERE
+                        rowid = last_insert_rowid()'''.format(
+                    table=self._table.name))
         else:
             if not self._table.pks:
                 raise NoPrimaryKey(
@@ -460,14 +563,26 @@ class PgDict(dict):
             combined = self.remove_refs()
             combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
             combined = json_dicts(combined)
-            self._curs.execute(
-                    'UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *'.format(
+            query = 'UPDATE {table} SET {cvp} WHERE {pvp}'.format(
                     table=self._table.name,
-                    cvp=column_value_pairs(self.remove_refs()),
-                    pvp=self._table._pk_value_pairs(prefix='old_'),
-                ),
-                combined
-            )
+                    cvp=column_value_pairs(self._table.db.kind,
+                        self.remove_refs()),
+                    pvp=self._table._pk_value_pairs(prefix='old_')
+                    )
+
+            if self._table.db.kind == 'postgresql':
+                query += ' RETURNING *'
+
+            self._curs.execute(query, combined)
+
+            if self._table.db.kind == 'sqlite3':
+                # Get the row that was just updated using the primary keys
+                query = 'SELECT * FROM {table} WHERE {pvp}'.format(
+                        table=self._table.name,
+                        pvp=self._table._pk_value_pairs()
+                    )
+                self._curs.execute(query, combined)
+
         d = self._curs.fetchone()
         super(PgDict, self).__init__(d)
         self._old = self.remove_refs()
@@ -516,16 +631,16 @@ class PgDict(dict):
                 # This reference is linking two references, get the value of the
                 # regular reference using usual means, then pull the
                 # sub-reference.
-                my_column, pgpytable, their_sub_ref = ref
+                my_column, pgtable, their_sub_ref = ref
                 ref = self._table.refs[my_column]
 
-            my_table, my_column, pgpytable, their_column, many = ref
+            my_table, my_column, pgtable, their_column, many = ref
             wheres = {their_column:self[my_column]}
             if many:
-                val = pgpytable.get_where(**wheres)
+                val = pgtable.get_where(**wheres)
             else:
                 try:
-                    val = pgpytable.get_one(**wheres)
+                    val = pgtable.get_one(**wheres)
                 except IndexError:
                     # No results returned, must not be set
                     val = None

@@ -1,7 +1,7 @@
 # DictORM
 ## Use Postgresql as if it were a Python Dictionary
 
-[![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/dictorm)
+[![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/DictORM)
 [![Coverage Status](https://coveralls.io/repos/github/rolobio/DictORM/badge.svg?branch=master)](https://coveralls.io/github/rolobio/DictORM?branch=master)
 
 Psycopg2's DictCursor is a fantastic tool, but what if you could send the

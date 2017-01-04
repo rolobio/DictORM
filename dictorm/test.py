@@ -5,6 +5,7 @@ from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
 import psycopg2
+import sqlite3
 import unittest
 
 if 'CI' in os.environ.keys():
@@ -30,11 +31,21 @@ def _remove_refs(o):
     return [i.remove_refs() for i in o]
 
 
-class Test(unittest.TestCase):
+class ExtraTestMethods(unittest.TestCase):
 
     def assertDictContains(self, d1, d2):
         assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
 
+    def assertRaisesAny(self, exps, func, a=[], kw={}):
+        try:
+            func(*a, **kw)
+        except Exception as e:
+            if type(e) in exps: return
+        raise Exception('Did not raise one of the exceptions provided!')
+
+
+
+class TestPostgresql(ExtraTestMethods):
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
@@ -67,10 +78,10 @@ class Test(unittest.TestCase):
         CREATE TABLE station (
             person_id INTEGER
         );
-        CREATE TABLE posession (
+        CREATE TABLE possession (
             id SERIAL PRIMARY KEY,
             person_id INTEGER,
-            posession JSONB
+            possession JSONB
         );
         ''')
         self.conn.commit()
@@ -200,7 +211,7 @@ class Test(unittest.TestCase):
 
         # A fake column will fail when going into the database
         p = Person(fake_column='foo')
-        self.assertRaises(psycopg2.ProgrammingError, p.flush)
+        self.assertRaisesAny((psycopg2.ProgrammingError, sqlite3.OperationalError), p.flush)
         self.conn.rollback()
 
 
@@ -419,7 +430,7 @@ class Test(unittest.TestCase):
         self.assertRaises(UnexpectedRows, Person.get_one)
 
         bob['not_real_column'] = 1
-        self.assertRaises(psycopg2.ProgrammingError, bob.flush)
+        self.assertRaisesAny((psycopg2.ProgrammingError, sqlite3.OperationalError), bob.flush)
         self.conn.rollback()
 
         NoPk = self.db['no_pk']
@@ -434,13 +445,13 @@ class Test(unittest.TestCase):
 
 
     def test_column_value_pairs(self):
-        self.assertEqual(column_value_pairs({'id':10, 'person':'Dave'}),
+        self.assertEqual(column_value_pairs('postgresql', {'id':10, 'person':'Dave'}),
                 'id=%(id)s, person=%(person)s')
-        self.assertEqual(column_value_pairs(('id', 'person')),
+        self.assertEqual(column_value_pairs('postgresql', ('id', 'person')),
                 'id=%(id)s, person=%(person)s')
-        self.assertEqual(column_value_pairs({'id':(10,11,13), 'group':'foo'}, ' AND '),
+        self.assertEqual(column_value_pairs('postgresql', {'id':(10,11,13), 'group':'foo'}, ' AND '),
                 'group=%(group)s AND id IN %(id)s')
-        self.assertEqual(column_value_pairs({'id':12, 'person':'Dave'}, prefix='old_'),
+        self.assertEqual(column_value_pairs('postgresql', {'id':12, 'person':'Dave'}, prefix='old_'),
                 'id=%(old_id)s, person=%(old_person)s')
 
 
@@ -503,13 +514,13 @@ class Test(unittest.TestCase):
 
 
     def test_json(self):
-        Posession = self.db['posession']
-        p = Posession(posession={'foo':'bar', 'baz':1, True:False})
+        Possession = self.db['possession']
+        p = Possession(possession={'foo':'bar', 'baz':1, True:False})
         p.flush()
 
-        p['posession'] = {'foo':'baz'}
+        p['possession'] = {'foo':'baz'}
         p.flush()
-        self.assertEqual(Posession.get_one()['posession'], {'foo':'baz'})
+        self.assertEqual(Possession.get_one()['possession'], {'foo':'baz'})
 
 
     def test_multiple_references(self):
@@ -616,6 +627,178 @@ class Test(unittest.TestCase):
         Person['manager'] = Person['id'] == Person['manager_id']
         self.assertEqual(alice['manager'], None)
 
+
+
+class TestSqlite(TestPostgresql):
+
+    def assertDictContains(self, d1, d2):
+        assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
+
+
+    def setUp(self):
+        self.conn = sqlite3.connect(':memory:')
+        self.db = DictDB(self.conn)
+        self.curs = self.db.curs
+        self.tearDown()
+        self.curs.executescript('''
+        CREATE TABLE person (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            manager_id INTEGER REFERENCES person(id)
+        );
+        CREATE TABLE department (
+            id INTEGER PRIMARY KEY,
+            name TEXT
+        );
+        CREATE TABLE person_department (
+            person_id INTEGER REFERENCES person(id),
+            department_id INTEGER REFERENCES department(id),
+            PRIMARY KEY (person_id, department_id)
+        );
+        CREATE TABLE car (
+            id INTEGER PRIMARY KEY,
+            license_plate TEXT,
+            name TEXT,
+            person_id INTEGER REFERENCES person(id)
+        );
+        ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
+        CREATE TABLE no_pk (foo TEXT);
+        CREATE TABLE station (
+            person_id INTEGER
+        );
+        CREATE TABLE possession (
+            id INTEGER PRIMARY KEY,
+            person_id INTEGER,
+            possession JSONB
+        );
+        ''')
+        self.conn.commit()
+        self.db.refresh_tables()
+
+
+    def tearDown(self):
+        self.conn.rollback()
+        self.curs.execute("""select 'drop table ' || name || ';' from
+                sqlite_master where type = 'table';""")
+        self.conn.commit()
+
+
+    # Sqlite functions mostly like Postgresql
+    test_DictDB = TestPostgresql.test_DictDB
+    test_already_in_db = TestPostgresql.test_already_in_db
+    test_changing_pks = TestPostgresql.test_changing_pks
+    test_column_value_pairs = TestPostgresql.test_column_value_pairs
+    test_dict_inits = TestPostgresql.test_dict_inits
+    test_empty_reference = TestPostgresql.test_empty_reference
+    test_errors = TestPostgresql.test_errors
+    test_get_where_multiple_pks = TestPostgresql.test_get_where_multiple_pks
+    test_manytomany = TestPostgresql.test_manytomany
+    test_multiple_references = TestPostgresql.test_multiple_references
+    test_onetomany = TestPostgresql.test_onetomany
+    test_onetomany_alter_primary_key = TestPostgresql.test_onetomany_alter_primary_key
+    test_onetoone = TestPostgresql.test_onetoone
+    test_remove_pks = TestPostgresql.test_remove_pks
+    test_sub_reference_many = TestPostgresql.test_sub_reference_many
+    test_sub_reference_one = TestPostgresql.test_sub_reference_one
+
+
+    def test_get_where(self):
+        Person = self.db['person']
+        self.assertEqual(0, Person.count())
+
+        bob = Person(name='Bob')
+        self.assertEqual({'name':'Bob'}, bob)
+        bob.flush()
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
+        self.assertEqual(list(Person.get_where(1)), [bob,])
+
+        # A second flush does not fail
+        bob.flush()
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
+        self.assertEqual(list(Person.get_where(1)), [bob,])
+
+        bob['name'] = 'Jon'
+        bob.flush()
+        self.assertDictContains(bob, {'name':'Jon', 'id':1})
+        self.assertEqual(list(Person.get_where(1)), [bob,])
+
+        self.conn.commit()
+        self.assertEqual(list(Person.get_where({'id':1})), [bob,])
+
+        # Items are inserted in the order they are flushed
+        alice = Person(name='Alice')
+        dave = Person(name='Dave')
+        dave.flush()
+        alice.flush()
+
+        # get_where with a single integer argument should produce a single
+        # PgDict row that matches that row's id
+        self.assertEqual(list(Person.get_where(1)), [bob,])
+
+        # get_where with no parameters returns the entire table
+        self.assertEqual(list(Person.get_where()), [bob, dave, alice])
+
+        # A delete sql command can be executed on a PgDict
+        dave.delete()
+        self.assertEqual(list(Person.get_where()), [bob, alice])
+        self.conn.commit()
+        self.assertEqual(list(Person.get_where()), [bob, alice])
+
+        # get_where accepts a tuple of ids, and returns those rows
+        self.assertEqual(list(Person.get_where(id=(1,3))),
+                [bob, alice])
+
+        # Database row survives an object deletion
+        del bob
+        del alice
+        self.conn.commit()
+        self.assertEqual(len(list(Person.get_where())), 2)
+
+        bob, alice = Person.get_where()
+        bob.delete()
+        alice.delete()
+        self.assertEqual(len(list(Person.get_where())), 0)
+
+
+
+    def test_order_by(self):
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
+        wil = Person(name='Wil').flush()
+
+        self.assertEqual(list(Person.get_where()), [bob, aly, wil])
+        Person.order_by = 'id asc'
+        self.assertEqual(list(Person.get_where()), [bob, aly, wil])
+        Person.order_by = 'id desc'
+        self.assertEqual(list(Person.get_where()), [wil, aly, bob])
+
+        NoPk = self.db['no_pk']
+        NoPk(foo='bar').flush()
+        NoPk(foo='baz').flush()
+        self.assertEqual(len(list(NoPk.get_where())), 2)
+        NoPk.order_by = 'foo desc'
+        results = list(NoPk.get_where())
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results, [{'foo': 'baz'}, {'foo': 'bar'}])
+
+        NoPk.order_by = 'foo asc'
+        results = list(NoPk.get_where())
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results, [{'foo': 'bar'}, {'foo': 'baz'}])
+
+        NoPk.order_by = None
+        self.assertEqual(len(list(NoPk.get_where(foo='bar'))), 1)
+        NoPk.order_by = 'foo desc'
+        results = list(NoPk.get_where(foo='bar'))
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results, [{'foo': 'bar'},])
+
+
+    # Not supported for sqlite
+    test_count = None
+    test_json = None
+    test_second_cursor = None
 
 
 
