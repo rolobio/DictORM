@@ -19,7 +19,7 @@ pip install dictorm
 # Create a dictionary that contains all tables in the database
 >>> from dictorm import DictDB, Dict
 >>> db = DictDB(db_conn)
-# Get the PgTable object that was automatically found by DictDB
+# Get the Table object that was automatically found by DictDB
 >>> Person = db['person']
 
 # Define Will's initial column values
@@ -100,14 +100,14 @@ Finally, use DictORM:
 # as if DictDB was a dictionary.
 >>> db = DictDB(conn)
 
-# Get a PgTable object for table 'person'
+# Get a Table object for table 'person'
 # person table built using: (id SERIAL PRIMARY KEY, name TEXT)
 >>> Person = db['person']
 
 # DictORM relies on primary keys to successfully Update a row in the 'person'
 # table.  The primary keys found are listed when the Person object is printed.
 >>> Person
-PgTable(dave, ['id',])
+Table(dave, ['id',])
 
 # You can define your own primary keys
 Person.pks = ['id',]
