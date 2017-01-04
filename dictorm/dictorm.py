@@ -59,26 +59,23 @@ def column_value_pairs(kind, d, join_str=', ', prefix=''):
         group=%(group)s AND id IN %(id)s
 
     Example 4:
-        >>> column_value_pairs( {'id':12, 'person':'Dave'}, prefix='old_')
+        >>> column_value_pairs({'id':12, 'person':'Dave'}, prefix='old_')
         id=%(old_id)s, person=%(old_person)s
     """
-    if kind == 'sqlite3':
-        if type(d) == dict:
-            return join_str.join([
-                    str(k) + operator_kinds(type(d[k])) + ':'+prefix+k
-                    for k in sorted(d.keys())
-                ])
-        else:
-            return join_str.join([str(i)+'=:'+prefix+str(i) for i in d])
-
-    elif kind == 'postgresql':
-        if type(d) == dict:
-            return join_str.join([
-                    str(k) + operator_kinds(type(d[k])) + '%('+prefix+k+')s'
-                    for k in sorted(d.keys())
-                ])
-        else:
-            return join_str.join([str(i)+'=%('+prefix+str(i)+')s' for i in d])
+    ret = ''
+    final_item = len(d)-1
+    for idx, key in enumerate(sorted(d)):
+        ret += str(key) + operator_kinds(type(d[key] if type(d) == dict else type(key)))
+        if kind == 'sqlite3':
+            if type(d) == dict and type(d[key]) in (list, tuple):
+                ret += '('+','.join([str(i) for i in d[key]])+')'
+            else:
+                ret += ':' + prefix + key
+        elif kind == 'postgresql':
+            ret += '%('+ prefix + key +')s'
+        if idx != final_item:
+            ret += join_str
+    return ret
 
 
 def insert_column_value_pairs(kind, d):
@@ -213,22 +210,7 @@ class ResultsGenerator:
         """
         Execute the query only once
         """
-        if self.query and self.table.db.kind == 'sqlite3':
-            # sqlite3 does not support interpolation of a list/tuple during
-            # a select, replace any instances of those with a manually created
-            # string list.
-            vars = []
-            for key in sorted(self.vars):
-                if type(self.vars[key]) in (list, tuple):
-                    self.query = self.query.replace(':'+key,
-                            '('+','.join([str(i) for i in self.vars[key]])+')'
-                            )
-                else:
-                    self.query = self.query.replace(':'+key, '?')
-                    vars.append(self.vars[key])
-            self.curs.execute(self.query, vars)
-            self.query = None
-        elif self.query and self.table.db.kind == 'postgresql':
+        if self.query:
             self.curs.execute(self.query, self.vars)
             self.query = None
 

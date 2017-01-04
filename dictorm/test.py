@@ -795,6 +795,17 @@ class TestSqlite(TestPostgresql):
         self.assertEqual(results, [{'foo': 'bar'},])
 
 
+    def test_column_value_pairs(self):
+        self.assertEqual(column_value_pairs('sqlite3', {'id':10, 'person':'Dave'}),
+                'id=:id, person=:person')
+        self.assertEqual(column_value_pairs('sqlite3', ('id', 'person')),
+                'id=:id, person=:person')
+        self.assertEqual(column_value_pairs('sqlite3', {'id':(10,11,13), 'group':'foo'}, ' AND '),
+                'group=:group AND id IN (10,11,13)')
+        self.assertEqual(column_value_pairs('sqlite3', {'id':12, 'person':'Dave'}, prefix='old_'),
+                'id=:old_id, person=:old_person')
+
+
     # Not supported for sqlite
     test_count = None
     test_json = None
