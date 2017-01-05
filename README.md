@@ -43,6 +43,9 @@ pip install dictorm
 # DictORM will NEVER commit or rollback changes, that is up to you.
 # Make sure to commit your changes:
 psycopg2_conn.commit()
+
+# If you're using sqlite3
+sqlite3_conn.commit()
 ```
 
 ## References will be represented as a sub-dictionary
