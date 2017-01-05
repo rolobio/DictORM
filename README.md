@@ -291,7 +291,7 @@ bob
 
 # Much easier and intuitive!
 >>> for dept in steve['departments']:
->>>    dept['name']
+>>>    dept
 {'name':'HR', 'id':1}
 {'name':'Sales', 'id':2}
 ```
