@@ -427,8 +427,8 @@ class Table(object):
 
     def __setitem__(self, ref_name, value):
         if len(value) == 3:
-            my_column, sub_reference, their_refname = value
-            self.refs[ref_name] = (my_column, sub_reference, their_refname)
+            my_column, substratum, their_refname = value
+            self.refs[ref_name] = (my_column, substratum, their_refname)
         else:
             my_column, table, their_column, many = value
             self.refs[ref_name] = (
@@ -543,6 +543,8 @@ class Dict(dict):
                 raise NoPrimaryKey(
                         'Cannot update to {}, no primary keys defined.'.format(
                     self._table))
+            # Combine old values with new values, this is needed to change
+            # primary keys.
             combined = self.remove_refs()
             combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
             combined = json_dicts(combined)
@@ -607,14 +609,14 @@ class Dict(dict):
         referenced row, get that row first.
         """
         ref = self._table.refs.get(key)
-        sub_reference = False
+        substratum = False
         if ref:
             if len(ref) == 3:
-                sub_reference = True
+                substratum = True
                 # This reference is linking two references, get the value of the
                 # regular reference using usual means, then pull the
                 # sub-reference.
-                my_column, table, their_sub_ref = ref
+                my_column, table, their_substratum = ref
                 ref = self._table.refs[my_column]
 
             my_table, my_column, table, their_column, many = ref
@@ -628,10 +630,10 @@ class Dict(dict):
                     # No results returned, must not be set
                     val = None
 
-            if sub_reference and many:
-                val = [i[their_sub_ref] for i in val]
-            elif sub_reference:
-                val = val[their_sub_ref]
+            if substratum and many:
+                val = [i[their_substratum] for i in val]
+            elif substratum:
+                val = val[their_substratum]
 
             super(Dict, self).__setitem__(key, val)
             return val
