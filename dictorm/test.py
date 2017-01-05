@@ -292,10 +292,11 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(_remove_refs(bob['person_departments']), [bob_pd_sales.remove_refs()])
 
 
-    def test_sub_reference_many(self):
+    def test_substratum_many(self):
         """
         Creating a reference using two other references fascilitates getting
-        rows from a third table, if the second table is only a join table.
+        rows from a third table, if the second table's contents aren't needed
+        often, like a join table.
         """
         Person = self.db['person']
         Department = self.db['department']
@@ -305,7 +306,7 @@ class TestPostgresql(ExtraTestMethods):
         PD['department'] = PD['department_id'] == Department['id']
 
         # Directly access a person's departments by getting the sub-references
-        Person['departments'] = Person['person_departments'].subReference('department')
+        Person['departments'] = Person['person_departments'].substratum('department')
 
         # Create the associated rows
         bob = Person(name='Bob').flush()
@@ -319,7 +320,7 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(list(bob['departments']), [sales, hr])
 
 
-    def test_sub_reference_one(self):
+    def test_substratum_one(self):
         Person = self.db['person']
         Car = self.db['car']
         # Setup the initial references
@@ -327,7 +328,7 @@ class TestPostgresql(ExtraTestMethods):
         Person['car'] = Person['car_id'] == Car['id']
 
         # Directly access a person's manager's car by getting the sub-reference
-        Person['manager_car'] = Person['manager'].subReference('car')
+        Person['manager_car'] = Person['manager'].substratum('car')
 
         bob = Person(name='Dave').flush()
         alice_car = Car(name='Prius').flush()
@@ -698,8 +699,8 @@ class TestSqlite(TestPostgresql):
     test_onetomany_alter_primary_key = TestPostgresql.test_onetomany_alter_primary_key
     test_onetoone = TestPostgresql.test_onetoone
     test_remove_pks = TestPostgresql.test_remove_pks
-    test_sub_reference_many = TestPostgresql.test_sub_reference_many
-    test_sub_reference_one = TestPostgresql.test_sub_reference_one
+    test_substratum_many = TestPostgresql.test_substratum_many
+    test_substratum_one = TestPostgresql.test_substratum_one
 
 
     def test_get_where(self):

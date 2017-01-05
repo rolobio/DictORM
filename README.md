@@ -248,6 +248,8 @@ CREATE TABLE person_department (
 
 # Create HR and Sales departments
 >>> hr = Department(name='HR').flush()
+>>> hr
+{'name':'HR', 'id':1}
 >>> sales = Department(name='Sales').flush()
 
 # Add PD rows for Steve for both departments
@@ -266,4 +268,24 @@ CREATE TABLE person_department (
 steve
 aly
 bob
+```
+
+### Substratum
+```python
+# Having to remember to iterate through steve['person_departments'] and then
+# access ['department'] is a little cumbersome, why not skip over the join-table
+# (person_departments) and go straight to the referenced department?
+>>> Person['departments'] = Person['person_departments'].substratum('department')
+# Person['person_departments'] must be created first (it was created in the
+# previous example), then you can substratum a reference on it.
+
+>>> steve['departments']
+[{'name':'HR', 'id':1},
+ {'name':'Sales', 'id':2},]
+
+# Much easier and intuitive!
+>>> for dept in steve['departments']:
+>>>    dept['name']
+HR
+Sales
 ```

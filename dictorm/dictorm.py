@@ -462,7 +462,7 @@ class Reference(object):
     def __gt__(ref1, ref2):
         return (ref1.column, ref2.table, ref2.column, True)
 
-    def subReference(self, column):
+    def substratum(self, column):
         return (self.column, self.table[self.column], column)
 
 
