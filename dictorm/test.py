@@ -516,9 +516,11 @@ class TestPostgresql(ExtraTestMethods):
 
     def test_json(self):
         Possession = self.db['possession']
-        p = Possession(possession={'foo':'bar', 'baz':1, True:False})
+        p = Possession(possession={'foo':'bar', 'baz':1})
         p.flush()
+        self.assertEqual(Possession.get_one()['possession'], {'foo':'bar', 'baz':1})
 
+        # Testing an update of a json
         p['possession'] = {'foo':'baz'}
         p.flush()
         self.assertEqual(Possession.get_one()['possession'], {'foo':'baz'})
@@ -682,25 +684,6 @@ class TestSqlite(TestPostgresql):
         self.curs.execute("""select 'drop table ' || name || ';' from
                 sqlite_master where type = 'table';""")
         self.conn.commit()
-
-
-    # Sqlite functions mostly like Postgresql
-    test_DictDB = TestPostgresql.test_DictDB
-    test_already_in_db = TestPostgresql.test_already_in_db
-    test_changing_pks = TestPostgresql.test_changing_pks
-    test_column_value_pairs = TestPostgresql.test_column_value_pairs
-    test_dict_inits = TestPostgresql.test_dict_inits
-    test_empty_reference = TestPostgresql.test_empty_reference
-    test_errors = TestPostgresql.test_errors
-    test_get_where_multiple_pks = TestPostgresql.test_get_where_multiple_pks
-    test_manytomany = TestPostgresql.test_manytomany
-    test_multiple_references = TestPostgresql.test_multiple_references
-    test_onetomany = TestPostgresql.test_onetomany
-    test_onetomany_alter_primary_key = TestPostgresql.test_onetomany_alter_primary_key
-    test_onetoone = TestPostgresql.test_onetoone
-    test_remove_pks = TestPostgresql.test_remove_pks
-    test_substratum_many = TestPostgresql.test_substratum_many
-    test_substratum_one = TestPostgresql.test_substratum_one
 
 
     def test_get_where(self):
