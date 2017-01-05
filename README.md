@@ -260,6 +260,12 @@ CREATE TABLE person_department (
 [{'department': hr, 'department_id': 1, 'person_id': 1},
  {'department': sales, 'department_id': 2, 'person_id': 1}]
 
+# Iterate through Steve's departments
+>>> for pd in steve['person_departments']:
+>>>    pd['department']
+{'name':'HR', 'id':1}
+{'name':'Sales', 'id':2}
+
 # Get all persons who are in sales:
 >>> PD(person_id=aly['id'], department_id=sales['id']).flush()
 >>> PD(person_id=bob['id'], department_id=sales['id']).flush()
@@ -286,6 +292,6 @@ bob
 # Much easier and intuitive!
 >>> for dept in steve['departments']:
 >>>    dept['name']
-HR
-Sales
+{'name':'HR', 'id':1}
+{'name':'Sales', 'id':2}
 ```
