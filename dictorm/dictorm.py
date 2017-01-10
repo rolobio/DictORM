@@ -643,7 +643,14 @@ class Dict(dict):
         return super(Dict, self).__getitem__(key)
 
 
+    def get(self, key, default=None):
+        # Provide the same functionality as a dict.get, but use this class's
+        # __getitem__ instead of builtin __getitem__
+        return self[key] if key in self else default
+
+
     __getitem__.__doc__ += dict.__getitem__.__doc__
+    get.__doc__ = dict.get.__doc__
 
 
 

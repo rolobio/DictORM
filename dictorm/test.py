@@ -351,10 +351,14 @@ class TestPostgresql(ExtraTestMethods):
         Person['cars'] = Person['id'] > Car['person_id']
 
         bob = Person(name='Bob').flush()
+
+        self.assertEqual(list(bob.get('cars')), [])
+
         toyota = Car(name='Toyota', person_id=bob['id']).flush()
         honda = Car(name='Honda', person_id=bob['id']).flush()
         ford = Car(name='Ford', person_id=bob['id']).flush()
 
+        self.assertEqual(list(bob.get('cars')), [toyota, honda, ford])
         self.assertEqual(list(bob['cars']), [toyota, honda, ford])
 
 
@@ -416,6 +420,7 @@ class TestPostgresql(ExtraTestMethods):
         stratus.flush()
         will.flush()
 
+        self.assertEqual(will.get('car').remove_refs(), stratus.remove_refs())
         self.assertEqual(will['car'].remove_refs(), stratus.remove_refs())
         self.assertEqual(stratus['person'].remove_refs(), will.remove_refs())
 
