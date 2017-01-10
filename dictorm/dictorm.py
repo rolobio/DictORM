@@ -70,7 +70,7 @@ def column_value_pairs(kind, d, join_str=', ', prefix=''):
         ret += str(key) + operator_kinds(type(d[key] if type(d) == dict else type(key)))
         if kind == 'sqlite3':
             if type(d) == dict and type(d[key]) in (list, tuple):
-                ret += '('+','.join([str(i) for i in d[key]])+')'
+                ret += '('+','.join([str(int(i)) for i in d[key]])+')'
             else:
                 ret += ':' + prefix + key
         elif kind == 'postgresql':
@@ -332,7 +332,7 @@ class Table(object):
 
     def get_where(self, *a, **kw):
         """
-        Get all rows as Dicts where values are as specified.  This always
+        Get all rows as Dicts where column values are as specified.  This always
         returns a generator-like object ResultsGenerator.  You can get the
         length of that generator see ResultsGenerator.count.
 

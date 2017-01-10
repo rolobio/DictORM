@@ -786,14 +786,19 @@ class TestSqlite(TestPostgresql):
 
 
     def test_column_value_pairs(self):
-        self.assertEqual(column_value_pairs('sqlite3', {'id':10, 'person':'Dave'}),
+        self.assertEqual(column_value_pairs('sqlite3',
+            {'id':10, 'person':'Dave'}),
                 'id=:id, person=:person')
         self.assertEqual(column_value_pairs('sqlite3', ('id', 'person')),
                 'id=:id, person=:person')
-        self.assertEqual(column_value_pairs('sqlite3', {'id':(10,11,13), 'group':'foo'}, ' AND '),
+        self.assertEqual(column_value_pairs('sqlite3',
+            {'id':(10,11,13), 'group':'foo'}, ' AND '),
                 'group=:group AND id IN (10,11,13)')
-        self.assertEqual(column_value_pairs('sqlite3', {'id':12, 'person':'Dave'}, prefix='old_'),
+        self.assertEqual(column_value_pairs('sqlite3',
+            {'id':12, 'person':'Dave'}, prefix='old_'),
                 'id=:old_id, person=:old_person')
+        self.assertRaises(ValueError, column_value_pairs,
+                'sqlite3', {'id':(10,11,'foo'), 'group':'foo'})
 
 
     # Not supported for sqlite
