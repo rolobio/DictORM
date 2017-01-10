@@ -3,6 +3,7 @@ What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update rows of a database as if they were Python
 Dictionaries.
 """
+from sys import modules
 from json import dumps
 try: # pragma: no cover
     from dictorm.__version__ import __version__
@@ -28,11 +29,10 @@ if not db_package_imported: # pragma: no cover
 
 __all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', 'column_value_pairs', '__version__',
-    '__doc__', 'NoRows']
+    '__doc__']
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
-class NoRows(Exception): pass
 
 def operator_kinds(o):
     if o in (tuple, list):
@@ -131,7 +131,7 @@ class DictDB(dict):
 
     def __init__(self, db_conn):
         self.conn = db_conn
-        if type(db_conn) == sqlite3.Connection:
+        if 'sqlite3' in modules and type(db_conn) == sqlite3.Connection:
             self.kind = 'sqlite3'
         else:
             self.kind = 'postgresql'
@@ -406,9 +406,7 @@ class Table(object):
         UnexpectedRows error.
         """
         l = list(self.get_where(*a, **kw))
-        if len(l) == 0:
-            raise NoRows('No rows matching: ({}, {})'.format(a, kw))
-        elif len(l) > 1:
+        if len(l) > 1:
             raise UnexpectedRows('More than one row selected.')
         return l[0]
 
@@ -629,7 +627,7 @@ class Dict(dict):
             else:
                 try:
                     val = table.get_one(**wheres)
-                except NoRows:
+                except IndexError:
                     # No results returned, must not be set
                     val = None
 

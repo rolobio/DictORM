@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, column_value_pairs, NoRows)
+    ResultsGenerator, column_value_pairs)
 from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
@@ -430,9 +430,6 @@ class TestPostgresql(ExtraTestMethods):
         A table with no primary key(s) can be gotten, but not updated.
         """
         Person = self.db['person']
-
-        # No persons, so no rows!
-        self.assertRaises(NoRows, Person.get_one, 1)
 
         bob = Person(name='Bob').flush()
         aly = Person(name='Aly').flush()
