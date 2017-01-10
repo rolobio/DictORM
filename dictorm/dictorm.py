@@ -28,10 +28,11 @@ if not db_package_imported: # pragma: no cover
 
 __all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', 'column_value_pairs', '__version__',
-    '__doc__']
+    '__doc__', 'NoRows']
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
+class NoRows(Exception): pass
 
 def operator_kinds(o):
     if o in (tuple, list):
@@ -405,7 +406,9 @@ class Table(object):
         UnexpectedRows error.
         """
         l = list(self.get_where(*a, **kw))
-        if len(l) > 1:
+        if len(l) == 0:
+            raise NoRows('No rows matching: ({}, {})'.format(a, kw))
+        elif len(l) > 1:
             raise UnexpectedRows('More than one row selected.')
         return l[0]
 
@@ -626,7 +629,7 @@ class Dict(dict):
             else:
                 try:
                     val = table.get_one(**wheres)
-                except IndexError:
+                except NoRows:
                     # No results returned, must not be set
                     val = None
 
