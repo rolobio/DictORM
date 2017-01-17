@@ -262,21 +262,15 @@ class TestPostgresql(ExtraTestMethods):
 
         sales = Department(name='Sales')
         sales.flush()
-        bob_pd_sales = PD(department_id=sales['id'], person_id=bob['id'])
-        bob_pd_sales.flush()
-        bob.flush()
+        bob_pd_sales = PD(department_id=sales['id'], person_id=bob['id']).flush()
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales,])
 
-        hr = Department(name='HR')
-        hr.flush()
-        bob_pd_hr = PD(department_id=hr['id'], person_id=bob['id'])
-        bob_pd_hr.flush()
-        bob.flush()
+        hr = Department(name='HR').flush()
+        bob_pd_hr = PD(department_id=hr['id'], person_id=bob['id']).flush()
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
-        aly = Person(name='Aly')
-        aly.flush()
-        bob.flush()
+        # Adding another person doesn't break the list
+        aly = Person(name='Aly').flush()
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
         aly_pd_sales = PD(department_id=sales['id'], person_id=aly['id'])
@@ -423,6 +417,23 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(will.get('car').remove_refs(), stratus.remove_refs())
         self.assertEqual(will['car'].remove_refs(), stratus.remove_refs())
         self.assertEqual(stratus['person'].remove_refs(), will.remove_refs())
+
+
+    def test_onetoself(self):
+        """
+        person              | person
+        --------------------+--------------------------------------------------
+        id     <----------- | manager_id
+        """
+        Person = self.db['person']
+        Person['manager'] = Person['manager_id'] == Person['id']
+        alice = Person(name='Alice').flush()
+        bob = Person(name='Bob', manager_id=alice['id']).flush()
+        self.assertEqual(bob['manager'], alice)
+
+        bob['manager_id'] = bob['id']
+        bob.flush()
+        self.assertEqual(bob['manager'].remove_refs(), bob.remove_refs())
 
 
     def test_errors(self):
@@ -637,12 +648,32 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(alice['manager'], None)
 
 
+    def test_reexecute(self):
+        """
+        References are only gotten once, until they are changed.
+        """
+        Person = self.db['person']
+        Person['manager'] = Person['manager_id'] == Person['id']
+
+        bob = Person(name='Bob').flush()
+        alice = Person(name='Alice', manager_id=bob['id']).flush()
+        self.assertEqual(alice['manager'], bob)
+
+        def fail(*a, **kw): raise Exception('get_where was called twice!')
+        original_get_where = alice._table.get_where
+        alice._table.get_where = fail
+        self.assertEqual(alice['manager'], bob)
+
+        steve = Person(name='Steve').flush()
+
+        alice._table.get_where = original_get_where
+        alice['manager_id'] = steve['id']
+        alice.flush()
+        self.assertEqual(alice['manager'].remove_refs(), steve.remove_refs())
+
+
 
 class TestSqlite(TestPostgresql):
-
-    def assertDictContains(self, d1, d2):
-        assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
-
 
     def setUp(self):
         self.conn = sqlite3.connect(':memory:')

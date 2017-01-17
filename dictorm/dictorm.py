@@ -172,10 +172,11 @@ class DictDB(dict):
 
 class ResultsGenerator:
     """
-    This class replicates a Generator, it mearly adds the ability to
-    get the len() of the generator (the rowcount of the last query run).
-    This method should only be returned by Table.get_where and
-    Table.get_one.
+    This class replicates a Generator, it mearly adds the ability to get the
+    len() of the generator (the rowcount of the last query run).  This method
+    should only be returned by Table.get_where and Table.get_one.  It will
+    cache the values gotten by "next" and once all rows have been fetched,
+    it will continue to return that cache.
 
     Really, just use this class as if it were a generator unless you want
     a count.
@@ -185,6 +186,8 @@ class ResultsGenerator:
         self.query = query
         self.vars = vars
         self.table = table
+        self.cache = []
+        self.completed = False
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
         if self.table.db.kind == 'sqlite3':
@@ -193,7 +196,11 @@ class ResultsGenerator:
             self.curs = table.db.conn.cursor(cursor_factory=DictCursor)
 
 
-    def __iter__(self): return self
+    def __iter__(self):
+        if self.completed:
+            return iter(self.cache)
+        else:
+            return self
 
 
     def __next__(self):
@@ -201,10 +208,12 @@ class ResultsGenerator:
         d = self.curs.fetchone()
 
         if not d:
+            self.completed = True
             raise StopIteration
         # Convert returned dictionary to a Dict
         d = self.table(d)
         d._in_db = True
+        self.cache.append(d)
         return d
 
 
@@ -294,6 +303,7 @@ class Table(object):
         self.refs = {}
         self._set_pks()
         self.order_by = None
+        self.my_columns = {}
 
 
     def _set_pks(self):
@@ -432,6 +442,7 @@ class Table(object):
             self.refs[ref_name] = (my_column, substratum, their_refname)
         else:
             my_column, table, their_column, many = value
+            self.my_columns[my_column] = ref_name
             self.refs[ref_name] = (
                     self, my_column, table, their_column, many)
 
@@ -504,6 +515,7 @@ class Dict(dict):
         self._curs = table.db.curs
         super(Dict, self).__init__(*a, **kw)
         self._old = self.remove_refs()
+        self._outdated = {}
 
 
     def flush(self):
@@ -607,11 +619,15 @@ class Dict(dict):
     def __getitem__(self, key):
         """
         Get the provided "key" from the dictionary.  If the key refers to a
-        referenced row, get that row first.
+        referenced SINGLE row, get that row first.  Will only get a referenced
+        row once, until the referenced row's column is changed.
         """
         ref = self._table.refs.get(key)
         substratum = False
-        if ref:
+        # Only get the referenced row once, if it has a value, the reference's
+        # column hasn't been changed.
+        val = super(Dict, self).get(key)
+        if ref and not super(Dict, self).get(key):
             if len(ref) == 3:
                 substratum = True
                 # This reference is linking two references, get the value of the
@@ -636,7 +652,10 @@ class Dict(dict):
             elif substratum:
                 val = val[their_substratum]
 
-            super(Dict, self).__setitem__(key, val)
+            if not many:
+                # TODO Only caching one-to-one references, will need to cache
+                # one-to-many
+                super(Dict, self).__setitem__(key, val)
             return val
         return super(Dict, self).__getitem__(key)
 
@@ -645,6 +664,17 @@ class Dict(dict):
         # Provide the same functionality as a dict.get, but use this class's
         # __getitem__ instead of builtin __getitem__
         return self[key] if key in self else default
+
+
+    def __setitem__(self, key, value):
+        """
+        Set self[key] to value.  If key is a reference's matching column,
+        set the reference to None.
+        """
+        ref = self._table.my_columns.get(key)
+        if ref:
+            super(Dict, self).__setitem__(ref, None)
+        return super(Dict, self).__setitem__(key, value)
 
 
     __getitem__.__doc__ += dict.__getitem__.__doc__
