@@ -656,7 +656,6 @@ class Dict(dict):
                 # TODO Only caching one-to-one references, will need to cache
                 # one-to-many
                 super(Dict, self).__setitem__(key, val)
-            return val
         return val
 
 
