@@ -627,7 +627,7 @@ class Dict(dict):
         # Only get the referenced row once, if it has a value, the reference's
         # column hasn't been changed.
         val = super(Dict, self).get(key)
-        if ref and not super(Dict, self).get(key):
+        if ref and not val:
             if len(ref) == 3:
                 substratum = True
                 # This reference is linking two references, get the value of the
@@ -657,7 +657,7 @@ class Dict(dict):
                 # one-to-many
                 super(Dict, self).__setitem__(key, val)
             return val
-        return super(Dict, self).__getitem__(key)
+        return val
 
 
     def get(self, key, default=None):
