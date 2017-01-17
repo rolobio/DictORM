@@ -164,17 +164,14 @@ class TestPostgresql(ExtraTestMethods):
     def test_get_where_multiple_pks(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
-        bob = Person(name='Bob')
-        bob.flush()
+        bob = Person(name='Bob').flush()
 
         Department = self.db['department']
         self.assertEqual(0, Department.count())
-        sales = Department(name='Sales')
-        sales.flush()
+        sales = Department(name='Sales').flush()
 
         PD = self.db['person_department']
-        bob_sales = PD(person_id=bob['id'], department_id=sales['id'])
-        bob_sales.flush()
+        bob_sales = PD(person_id=bob['id'], department_id=sales['id']).flush()
         self.assertEqual(bob_sales['person_id'], bob['id'])
         self.assertEqual(bob_sales['department_id'], sales['id'])
         # Searching person_department with two key/value pairs returns the new
@@ -191,8 +188,7 @@ class TestPostgresql(ExtraTestMethods):
     def test_already_in_db(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
-        bob = Person(name='Bob')
-        bob.flush()
+        bob = Person(name='Bob').flush()
 
         bob_copy = Person.get_one(1)
         bob_copy.flush()
@@ -256,12 +252,10 @@ class TestPostgresql(ExtraTestMethods):
         PD['person'] = PD['person_id'] == Person['id']
         Person['person_departments'] = Person['id'] > PD['person_id']
 
-        bob = Person(name='Bob')
-        bob.flush()
+        bob = Person(name='Bob').flush()
         self.assertDictContains(bob, {'name':'Bob', 'id':1})
 
-        sales = Department(name='Sales')
-        sales.flush()
+        sales = Department(name='Sales').flush()
         bob_pd_sales = PD(department_id=sales['id'], person_id=bob['id']).flush()
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales,])
 
@@ -273,8 +267,7 @@ class TestPostgresql(ExtraTestMethods):
         aly = Person(name='Aly').flush()
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
-        aly_pd_sales = PD(department_id=sales['id'], person_id=aly['id'])
-        aly_pd_sales.flush()
+        aly_pd_sales = PD(department_id=sales['id'], person_id=aly['id']).flush()
         aly.flush()
         self.assertEqual(list(aly['person_departments']), [aly_pd_sales,])
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
@@ -386,8 +379,7 @@ class TestPostgresql(ExtraTestMethods):
 
     def test_changing_pks(self):
         Person = self.db['person']
-        bob = Person(name='Bob')
-        bob.flush()
+        bob = Person(name='Bob').flush()
         self.assertEqual(bob['id'], 1)
         bob['id'] = 2
         bob.flush()
@@ -406,10 +398,8 @@ class TestPostgresql(ExtraTestMethods):
         Person['car'] = Person['car_id'] == Car['id']
         Car['person'] = Car['person_id'] == Person['id']
 
-        will = Person(name='Will')
-        will.flush()
-        stratus = Car(name='Dodge Stratus', license_plate='123ABC')
-        stratus.flush()
+        will = Person(name='Will').flush()
+        stratus = Car(name='Dodge Stratus', license_plate='123ABC').flush()
         stratus['person_id'], will['car_id'] = will['id'], stratus['id']
         stratus.flush()
         will.flush()
@@ -478,10 +468,8 @@ class TestPostgresql(ExtraTestMethods):
         Dict's cursor should not interfere with another cursor.
         """
         Person = self.db['person']
-        bob = Person(name='Bob')
-        bob.flush()
-        aly = Person(name='Aly')
-        aly.flush()
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
         self.assertDictContains(bob, {'name':'Bob', 'id':1})
 
         curs2 = self.conn.cursor(cursor_factory=DictCursor)
@@ -533,8 +521,7 @@ class TestPostgresql(ExtraTestMethods):
 
     def test_json(self):
         Possession = self.db['possession']
-        p = Possession(possession={'foo':'bar', 'baz':1})
-        p.flush()
+        p = Possession(possession={'foo':'bar', 'baz':1}).flush()
         self.assertEqual(Possession.get_one()['possession'], {'foo':'bar', 'baz':1})
 
         # Testing an update of a json
