@@ -138,6 +138,13 @@ class TestPostgresql(ExtraTestMethods):
         # get_where with no parameters returns the entire table
         self.assertEqual(list(Person.get_where()), [bob, dave, alice])
 
+
+    def test_delete(self):
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        dave = Person(name='Dave').flush()
+        alice = Person(name='Alice').flush()
+
         # A delete sql command can be executed on a Dict
         dave.delete()
         self.assertEqual(list(Person.get_where()), [bob, alice])

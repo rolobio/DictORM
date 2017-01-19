@@ -525,16 +525,15 @@ class Dict(dict):
         relies heaviliy on the primary keys of the row's respective table.  If
         no primary keys are specified, this method will not function!
 
-        All original column/values will bet inserted/set by this method.  If
-        a reference sub-dictionary has been defined, it will NOT be submitted to
-        the DB.  However, the reference's respective reference column will be
-        updated.
+        All original column/values will bet inserted/updated by this method.
+        All references will be flushed as well.
         """
         if self._table.refs:
             for ref in [i for i in self.references().values() if i]:
                 ref.flush()
 
         if not self._in_db:
+            # Insert this dictionary into it's respective table
             d = json_dicts(self.remove_refs())
             query = 'INSERT INTO {table} {cvp}'.format(
                     table=self._table.name,
@@ -556,6 +555,7 @@ class Dict(dict):
                         rowid = last_insert_rowid()'''.format(
                     table=self._table.name))
         else:
+            # Update this dictionary's row
             if not self._table.pks:
                 raise NoPrimaryKey(
                         'Cannot update to {}, no primary keys defined.'.format(
@@ -630,7 +630,7 @@ class Dict(dict):
         """
         Get the provided "key" from the dictionary.  If the key refers to a
         referenced SINGLE row, get that row first.  Will only get a referenced
-        row once, until the referenced row's column is changed.
+        row once, until the referenced row's foreign key is changed.
         """
         ref = self._table.refs.get(key)
         substratum = False
@@ -677,7 +677,7 @@ class Dict(dict):
 
     def __setitem__(self, key, value):
         """
-        Set self[key] to value.  If key is a reference's matching column,
+        Set self[key] to value.  If key is a reference's matching foreign key,
         set the reference to None.
         """
         ref = self._table.my_columns.get(key)
