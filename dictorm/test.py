@@ -816,16 +816,14 @@ class TestPostgresql(ExtraTestMethods):
         bob = Person(name='Bob').flush()
         # Insert the employees with IDs that are reverse of the entrydate
         alice = Person(name='Alice', manager_id=bob['id'], id=3, other=2).flush()
-        import time
-        time.sleep(2)
         dave = Person(name='Dave', manager_id=bob['id'], id=2, other=3).flush()
         # Ordered by their ID by default
         result = Person.get_where()
         self.assertEqual(_remove_refs(Person.get_where()),
                 _remove_refs([bob, dave, alice]))
 
-        # Refine the results by ordering by entrydate, which is the
-        # reverse of how they were flushed
+        # Refine the results by ordering by other, which is the
+        # reverse of how they were inserted
         self.assertEqual(_remove_refs(bob['subordinates'].refine(order_by='other ASC')),
                 _remove_refs([alice, dave]))
         self.assertEqual(_remove_refs(bob['subordinates']),
