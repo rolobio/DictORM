@@ -530,6 +530,9 @@ class Dict(dict):
         the DB.  However, the reference's respective reference column will be
         updated.
         """
+        for ref in [i for i in self.references().values() if i]:
+            ref.flush()
+
         if not self._in_db:
             d = json_dicts(self.remove_refs())
             query = 'INSERT INTO {table} {cvp}'.format(
@@ -614,6 +617,12 @@ class Dict(dict):
         should never be sent in the query to the Database.
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.refs])
+
+    def references(self):
+        """
+        Return a dictionary of only the referenced rows.
+        """
+        return dict([(k,v) for k,v in self.items() if k in self._table.refs])
 
 
     def __getitem__(self, key):

@@ -659,6 +659,30 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(alice['manager'].remove_refs(), steve.remove_refs())
 
 
+    def test_modify_subdict(self):
+        Person = self.db['person']
+        Car = self.db['car']
+        Person['car'] = Person['car_id'] == Car['id']
+
+        will = Person(name='Will').flush()
+        stratus = Car(name='Stratus').flush()
+        will['car_id'] = stratus['id']
+
+        will['car']['license_plate'] = 'foo'
+        # Flush will, this should also flush car
+        will.flush()
+
+        # Get another copy of car
+        stratus2 = Car.get_one()
+        self.assertEqual(stratus2['license_plate'], 'foo')
+        self.assertNotEqual(stratus, stratus2)
+
+        # Flushing the original object overwrites the copy's changes
+        stratus.flush()
+        self.assertNotEqual(stratus['license_plate'], 'foo')
+        self.assertNotEqual(stratus, stratus2)
+
+
 
 class TestSqlite(TestPostgresql):
 
