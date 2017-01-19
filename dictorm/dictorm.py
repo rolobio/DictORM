@@ -182,12 +182,14 @@ class ResultsGenerator:
     a count.
     """
 
-    def __init__(self, query, vars, table):
+    def __init__(self, query, vars, table, order_by=None):
         self.query = query
         self.vars = vars
         self.table = table
         self.cache = []
         self.completed = False
+        self.refined = False
+        self.order_by = order_by
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
         if self.table.db.kind == 'sqlite3':
@@ -222,6 +224,9 @@ class ResultsGenerator:
         Execute the query only once
         """
         if self.query:
+            if not self.refined:
+                # Use the default order by
+                self.refine(order_by=self.order_by)
             self.curs.execute(self.query, self.vars)
             self.query = None
 
@@ -236,6 +241,16 @@ class ResultsGenerator:
             # sqlite3's cursor.rowcount doesn't support select statements
             return 0
         return self.curs.rowcount
+
+
+    def refine(self, order_by=''):
+        """
+        Refine the results of this generator before the results are fetched.
+        """
+        self.refined = True
+        if order_by:
+            self.query += ' ORDER BY '+str(order_by)
+        return self
 
 
 
@@ -401,14 +416,11 @@ class Table(object):
         query = 'SELECT * FROM {table} '
         if kw:
             query += 'WHERE {wheres} '
-        if order_by:
-            query += 'ORDER BY {order_by}'
         query = query.format(
                 table=self.name,
                 wheres=column_value_pairs(self.db.kind, kw, ' AND '),
-                order_by=order_by
             )
-        return ResultsGenerator(query, kw, self)
+        return ResultsGenerator(query, kw, self, order_by=order_by)
 
 
     def get_one(self, *a, **kw):

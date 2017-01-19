@@ -56,6 +56,7 @@ class TestPostgresql(ExtraTestMethods):
         CREATE TABLE person (
             id SERIAL PRIMARY KEY,
             name TEXT,
+            other INTEGER,
             manager_id INTEGER REFERENCES person(id)
         );
         CREATE TABLE department (
@@ -804,6 +805,33 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(_remove_refs(car_owners), _remove_refs([milton, peter]))
 
 
+    def test_refine(self):
+        """
+        A result set can be refined using order by.  A reference can be refined
+        using the same technique.
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['manager'] = Person['id'] == Person['manager_id']
+        bob = Person(name='Bob').flush()
+        # Insert the employees with IDs that are reverse of the entrydate
+        alice = Person(name='Alice', manager_id=bob['id'], id=3, other=2).flush()
+        import time
+        time.sleep(2)
+        dave = Person(name='Dave', manager_id=bob['id'], id=2, other=3).flush()
+        # Ordered by their ID by default
+        result = Person.get_where()
+        self.assertEqual(_remove_refs(Person.get_where()),
+                _remove_refs([bob, dave, alice]))
+
+        # Refine the results by ordering by entrydate, which is the
+        # reverse of how they were flushed
+        self.assertEqual(_remove_refs(bob['subordinates'].refine(order_by='other ASC')),
+                _remove_refs([alice, dave]))
+        self.assertEqual(_remove_refs(bob['subordinates']),
+                _remove_refs([dave, alice]))
+
+
 
 class TestSqlite(TestPostgresql):
 
@@ -816,6 +844,7 @@ class TestSqlite(TestPostgresql):
         CREATE TABLE person (
             id INTEGER PRIMARY KEY,
             name TEXT,
+            other INTEGER,
             manager_id INTEGER REFERENCES person(id)
         );
         CREATE TABLE department (
