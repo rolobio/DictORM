@@ -81,7 +81,7 @@ class TestPostgresql(ExtraTestMethods):
         CREATE TABLE possession (
             id SERIAL PRIMARY KEY,
             person_id INTEGER,
-            possession JSONB
+            description JSONB
         );
         ''')
         self.conn.commit()
@@ -165,7 +165,6 @@ class TestPostgresql(ExtraTestMethods):
         bob.delete()
         alice.delete()
         self.assertEqual(len(list(Person.get_where())), 0)
-
 
 
     def test_get_where_multiple_pks(self):
@@ -442,6 +441,8 @@ class TestPostgresql(ExtraTestMethods):
         bob = Person(name='Bob').flush()
         aly = Person(name='Aly').flush()
 
+        self.assertRaises(KeyError, bob.__getitem__, 'foo')
+
         self.assertRaises(UnexpectedRows, Person.get_one)
 
         bob['not_real_column'] = 1
@@ -528,13 +529,13 @@ class TestPostgresql(ExtraTestMethods):
 
     def test_json(self):
         Possession = self.db['possession']
-        p = Possession(possession={'foo':'bar', 'baz':1}).flush()
-        self.assertEqual(Possession.get_one()['possession'], {'foo':'bar', 'baz':1})
+        p = Possession(description={'foo':'bar', 'baz':1}).flush()
+        self.assertEqual(Possession.get_one()['description'], {'foo':'bar', 'baz':1})
 
         # Testing an update of a json
-        p['possession'] = {'foo':'baz'}
+        p['description'] = {'foo':'baz'}
         p.flush()
-        self.assertEqual(Possession.get_one()['possession'], {'foo':'baz'})
+        self.assertEqual(Possession.get_one()['description'], {'foo':'baz'})
 
 
     def test_multiple_references(self):
@@ -718,6 +719,91 @@ class TestPostgresql(ExtraTestMethods):
         self.assertIs(will['car']._table, Car)
 
 
+    def test_real(self):
+        """
+        An attempt at a real-world example.
+        """
+        Person, Car = self.db['person'], self.db['car']
+        PD, Department = self.db['person_department'], self.db['department']
+        Possession = self.db['possession']
+
+        Person['manager'] = Person['manager_id'] == Person['id']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['person_departments'] = Person['id'] > PD['person_id']
+        Person['departments'] = Person['person_departments'].substratum('department')
+        Person['car'] = Person['car_id'] == Car['id']
+        Car['person'] = Car['person_id'] == Person['id']
+        PD['person'] = PD['person_id'] == Person['id']
+        PD['department'] =  PD['department_id'] == Department['id']
+        Department['person_departments'] = Department['id'] > PD['department_id']
+        Department['persons'] = Department['person_departments'].substratum('person')
+        Possession['person'] = Possession['person_id'] == Person['id']
+
+        # Milton has a car
+        milton = Person(name='Milton').flush()
+        miltons_car = Car(name='Ford', person_id=milton['id']).flush()
+        milton['car_id'] = miltons_car['id']
+        sales = Department(name='Sales').flush()
+        self.assertEqual(milton['car'], miltons_car)
+        milton.flush()
+        miltons_car.flush()
+        self.assertEqual(milton['car'], miltons_car)
+
+        # Milton is in Sales
+        milton_sales = PD(person_id=milton['id'], department_id=sales['id']).flush()
+        self.assertEqual(milton_sales, PD.get_one())
+        self.assertEqual(milton_sales['person'].remove_refs(), milton.remove_refs())
+        self.assertEqual(milton_sales['department'].remove_refs(), sales.remove_refs())
+        self.assertEqual(milton['departments'], [sales,])
+        self.assertEqual(_remove_refs(sales['persons']), [milton.remove_refs(),])
+
+        # Milton has a stapler
+        miltons_stapler = Possession(person_id=milton['id'],
+                description={'kind':'stapler', 'brand':'Swingline', 'color':'Red'}
+                ).flush()
+        self.assertEqual(miltons_stapler['person'].remove_refs(), milton.remove_refs())
+
+        # Milton has a manager
+        tom = Person(name='Tom').flush()
+        milton['manager_id'] = tom['id']
+        milton.flush()
+        self.assertEqual(milton['manager'], tom)
+
+        # Tom takes milton's stapler
+        miltons_stapler['person_id'] = tom['id']
+        toms_stapler = miltons_stapler
+        self.assertEqual(toms_stapler['person'].remove_refs(), tom.remove_refs())
+
+        # Peter is Tom's subordinate
+        peter = Person(name='Peter', manager_id=tom['id']).flush()
+        self.assertEqual(peter['manager'], tom)
+        self.assertIn(peter.remove_refs(), _remove_refs(tom['subordinates']))
+        self.assertIn(milton.remove_refs(), _remove_refs(tom['subordinates']))
+
+        # Peter is also in sales
+        PD(person_id=peter['id'], department_id=sales['id']).flush()
+        self.assertIn(peter.remove_refs(), _remove_refs(sales['persons']))
+        self.assertIn(milton.remove_refs(), _remove_refs(sales['persons']))
+
+        # There are 3 people
+        self.assertEqual(Person.count(), 3)
+        if self.db.kind == 'postgresql':
+            self.assertEqual(len(Person), 3)
+            self.assertEqual(len(Person.get_where()), 3)
+
+        # There are two salesmen
+        self.assertEqual(len(list(PD.get_where(department_id=sales['id']))), 2)
+
+        # Milton's car is shared
+        peter['car_id'] = miltons_car['id']
+        peter.flush()
+        self.assertEqual(peter['car'], miltons_car)
+        self.assertEqual(miltons_car['person'].remove_refs(), milton.remove_refs())
+        self.assertEqual(peter['car'].remove_refs(), miltons_car.remove_refs())
+        car_owners = Person.get_where(car_id=miltons_car['id'])
+        self.assertEqual(_remove_refs(car_owners), _remove_refs([milton, peter]))
+
+
 
 class TestSqlite(TestPostgresql):
 
@@ -755,7 +841,7 @@ class TestSqlite(TestPostgresql):
         CREATE TABLE possession (
             id INTEGER PRIMARY KEY,
             person_id INTEGER,
-            possession JSONB
+            description JSONB
         );
         ''')
         self.conn.commit()

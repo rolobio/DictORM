@@ -336,6 +336,10 @@ class Table(object):
         return self._add_references(d)
 
 
+    def __len__(self):
+        return len(self.get_where())
+
+
     def _pk_value_pairs(self, join_str=' AND ', prefix=''):
         return column_value_pairs(self.db.kind, self.pks, join_str, prefix)
 
@@ -522,7 +526,7 @@ class Dict(dict):
         """
         Insert this dictionary into it's table if its no yet in the Database,
         or Update it's row if it is already in the database.  This method
-        relies heaviliy on the primary keys of the row's respective table.  If
+        relies heavily on the primary keys of the row's respective table.  If
         no primary keys are specified, this method will not function!
 
         All original column/values will bet inserted/updated by this method.
@@ -633,6 +637,8 @@ class Dict(dict):
         row once, until the referenced row's foreign key is changed.
         """
         ref = self._table.refs.get(key)
+        if not ref and key not in self:
+            raise KeyError(str(key))
         substratum = False
         # Only get the referenced row once, if it has a value, the reference's
         # column hasn't been changed.
