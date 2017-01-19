@@ -530,8 +530,9 @@ class Dict(dict):
         the DB.  However, the reference's respective reference column will be
         updated.
         """
-        for ref in [i for i in self.references().values() if i]:
-            ref.flush()
+        if self._table.refs:
+            for ref in [i for i in self.references().values() if i]:
+                ref.flush()
 
         if not self._in_db:
             d = json_dicts(self.remove_refs())

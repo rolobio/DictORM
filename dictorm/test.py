@@ -683,6 +683,34 @@ class TestPostgresql(ExtraTestMethods):
         self.assertNotEqual(stratus, stratus2)
 
 
+    def test_table_equal(self):
+        """
+        A Dicts hidden _table can be compared to itself or other tables.
+        """
+        Person = self.db['person']
+        self.assertEqual(Person, self.db['person'])
+        self.assertIs(Person, self.db['person'])
+
+        will = Person(name='Will').flush()
+        bob = Person(name='Bob').flush()
+        self.assertEqual(will._table, bob._table)
+        self.assertIs(will._table, bob._table)
+
+        Car = self.db['car']
+        self.assertNotEqual(Person, Car)
+
+        Person['car'] = Person['car_id'] == Car['id']
+        stratus = Car(name='Stratus').flush()
+        will['car_id'] = stratus['id']
+        will.flush()
+        will['car']['license_plate'] = 'foo'
+
+        self.assertEqual(stratus._table, Car)
+        self.assertIs(stratus._table, Car)
+        self.assertEqual(will['car']._table, Car)
+        self.assertIs(will['car']._table, Car)
+
+
 
 class TestSqlite(TestPostgresql):
 
