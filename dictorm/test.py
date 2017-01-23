@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, column_value_pairs)
+    ResultsGenerator, column_value_pairs,
+    Insert, Update, Delete, Select)
 from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
@@ -31,6 +32,9 @@ def _remove_refs(o):
     return [i.remove_refs() for i in o]
 
 
+def error(*a, **kw): raise Exception()
+
+
 class ExtraTestMethods(unittest.TestCase):
 
     def assertDictContains(self, d1, d2):
@@ -42,6 +46,9 @@ class ExtraTestMethods(unittest.TestCase):
         except Exception as e:
             if type(e) in exps: return
         raise Exception('Did not raise one of the exceptions provided!')
+
+    def assertType(self, a, b):
+        assert type(a) == b, TypeError('{} is not type {}'.format(str(a), b0))
 
 
 
@@ -733,6 +740,7 @@ class TestPostgresql(ExtraTestMethods):
         Person['person_departments'] = Person['id'] > PD['person_id']
         Person['departments'] = Person['person_departments'].substratum('department')
         Person['car'] = Person['car_id'] == Car['id']
+        Person['possessions'] = Person['id'] > Possession['person_id']
         Car['person'] = Car['person_id'] == Person['id']
         PD['person'] = PD['person_id'] == Person['id']
         PD['department'] =  PD['department_id'] == Department['id']
@@ -763,6 +771,7 @@ class TestPostgresql(ExtraTestMethods):
                 description={'kind':'stapler', 'brand':'Swingline', 'color':'Red'}
                 ).flush()
         self.assertEqual(miltons_stapler['person'].remove_refs(), milton.remove_refs())
+        self.assertEqual(_remove_refs(milton['possessions']), _remove_refs([miltons_stapler,]))
 
         # Milton has a manager
         tom = Person(name='Tom').flush()
@@ -772,8 +781,9 @@ class TestPostgresql(ExtraTestMethods):
 
         # Tom takes milton's stapler
         miltons_stapler['person_id'] = tom['id']
-        toms_stapler = miltons_stapler
+        toms_stapler = miltons_stapler.flush()
         self.assertEqual(toms_stapler['person'].remove_refs(), tom.remove_refs())
+        self.assertEqual(_remove_refs(tom['possessions']), _remove_refs([toms_stapler,]))
 
         # Peter is Tom's subordinate
         peter = Person(name='Peter', manager_id=tom['id']).flush()
@@ -822,12 +832,65 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(_remove_refs(Person.get_where()),
                 _remove_refs([bob, dave, alice]))
 
-        # Refine the results by ordering by other, which is the
-        # reverse of how they were inserted
+        # Refine the results by ordering by other, which is the reverse of how
+        # they were inserted
         self.assertEqual(_remove_refs(bob['subordinates'].refine(order_by='other ASC')),
                 _remove_refs([alice, dave]))
         self.assertEqual(_remove_refs(bob['subordinates']),
                 _remove_refs([dave, alice]))
+
+        steve = Person(name='Steve', manager_id=alice['id'], id=4).flush()
+        self.assertEqual(_remove_refs(alice['subordinates']),
+                _remove_refs([steve,]))
+
+        all_subordinates = Person.get_where(manager_id=(1,3))
+        self.assertEqual(list(all_subordinates), [dave, alice, steve])
+
+        all_subordinates = Person.get_where(manager_id=(1,3))
+        self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
+
+
+    def test_onetoone_cache(self):
+        """
+        One-to-one relationships are cached.
+        """
+        Person = self.db['person']
+        Person['manager'] = Person['manager_id'] == Person['id']
+        bob = Person(name='Bob').flush()
+        bill = Person(name='Bill').flush()
+        bob['manager_id'] = bill['id']
+
+        self.assertEqual(bob['manager'], bill)
+        bob._table.get_one = error
+        # Error fuction shouldn't be called, since manager is cached
+        self.assertEqual(bob['manager'], bill)
+
+
+    def test_results_cache(self):
+        """
+        A result will not be gotten again, since it's results were cached.
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        bob = Person(name='Bob').flush()
+        bill = Person(name='Bill').flush()
+        alice = Person(name='Alice').flush()
+        steve = Person(name='Steve').flush()
+
+        bill['manager_id'] = bob['id'];
+        bill.flush()
+        alice['manager_id'] = bob['id']
+        alice.flush()
+        steve['manager_id'] = bob['id']
+        steve.flush()
+
+        subordinates = bob['subordinates']
+        for sub in subordinates:
+            self.assertType(sub, Dict)
+        # Error would be raised if subordinates isn't cached
+        bob._table.get_where = error
+        for sub in subordinates:
+            self.assertType(sub, Dict)
 
 
 
@@ -995,6 +1058,79 @@ class TestSqlite(TestPostgresql):
     test_count = None
     test_json = None
     test_second_cursor = None
+
+
+class FakeTable(Table):
+    """
+    A Table-like object used to test queries below
+    """
+    refs = ['id',]
+    name = 'fake'
+    pks = ['id',]
+    class db:
+        kind = 'postgresql'
+        curs = None
+
+    def __init__(self): pass
+
+fake_table = FakeTable()
+
+
+
+class TestQuery(ExtraTestMethods):
+
+    def test_insert(self):
+        steve = Dict(fake_table, name='Steve')
+        query = Insert(steve)
+        self.assertEqual(query.build(),
+                "INSERT INTO fake (name) VALUES (%(name)s) RETURNING *")
+
+        alice = Dict(fake_table, name='Alice', foo='bar')
+        query = Insert(alice)
+        self.assertEqual(query.build(),
+                "INSERT INTO fake (foo, name) VALUES (%(foo)s, %(name)s) RETURNING *")
+
+
+    def test_update(self):
+        steve = Dict(fake_table, name='Steve')
+        query = Update(steve)
+        self.assertEqual(query.build(),
+                "UPDATE fake SET name=%(name)s WHERE id=%(old_id)s RETURNING *")
+
+        alice = Dict(fake_table, name='Alice', foo='bar')
+        query = Update(alice)
+        self.assertEqual(query.build(),
+                "UPDATE fake SET foo=%(foo)s, name=%(name)s WHERE id=%(old_id)s RETURNING *")
+
+
+    def test_delete(self):
+        steve = Dict(fake_table, name='Steve')
+        query = Delete(steve)
+        self.assertEqual(query.build(), "DELETE FROM fake WHERE id=%(id)s")
+
+        alice = Dict(fake_table, name='Alice', foo='bar')
+        query = Delete(alice)
+        self.assertEqual(query.build(), "DELETE FROM fake WHERE id=%(id)s")
+
+
+    def test_select(self):
+        query = Select(fake_table)
+        self.assertEqual(query.build(), "SELECT * FROM fake ORDER BY id")
+        self.assertEqual(query.build(name='Alice'),
+                "SELECT * FROM fake WHERE name=%(name)s ORDER BY id")
+        self.assertEqual(query.build(name='Alice', foo='bar'),
+                "SELECT * FROM fake WHERE foo=%(foo)s AND name=%(name)s ORDER BY id")
+
+        query.refine(order_by='baz')
+        self.assertEqual(query.build(name='Alice', foo='bar'),
+                "SELECT * FROM fake WHERE foo=%(foo)s AND name=%(name)s ORDER BY baz")
+
+
+    def test_select_no_pks(self):
+        fake_table2 = FakeTable()
+        fake_table2.pks = []
+        query = Select(fake_table2)
+        self.assertEqual(query.build(), "SELECT * FROM fake")
 
 
 

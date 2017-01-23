@@ -29,7 +29,7 @@ if not db_package_imported: # pragma: no cover
 
 __all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', 'column_value_pairs', '__version__',
-    '__doc__']
+    '__doc__', 'Query', 'Insert', 'Update', 'Delete', 'Select']
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
@@ -170,6 +170,100 @@ class DictDB(dict):
                 self[table['table_name']] = Table(table['table_name'], self)
 
 
+class Query(object):
+
+    def __init__(self, dict, kind, _table=None):
+        self.kind = kind
+        if _table != None:
+            self.table = _table
+        else:
+            self.dict = dict
+            self.table = dict._table
+        self.query = None
+        self.parts = {}
+        self.built = False
+        self.wheres = {}
+        self.order_by = None
+        self.queries = {
+                'postgresql': {
+                    'insert':'INSERT INTO {table} {cvp} RETURNING *',
+                    'update':'UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *',
+                    'delete':'DELETE FROM {table} WHERE {pvp}',
+                    'select':'SELECT * FROM {table}',
+                    },
+                'sqlite3':{
+                    'insert':'INSERT INTO {table} {cvp}',
+                    'update':'UPDATE {table} SET {cvp} WHERE {pvp}',
+                    'delete':'DELETE FROM {table} WHERE {pvp}',
+                    'select':'SELECT * FROM {table}',
+                    },
+                }
+
+
+    def build(self, **kw):
+        self.built = True
+        self.query = self.queries[self.table.db.kind][self.kind]
+        self.wheres.update(kw)
+        if self.kind == 'insert':
+            self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
+                        self.dict.remove_refs())
+        elif self.kind == 'update':
+            self.parts['cvp'] = column_value_pairs(self.table.db.kind,
+                self.dict.remove_refs())
+            self.parts['pvp'] = self.table._pk_value_pairs(prefix='old_')
+        elif self.kind == 'delete':
+            self.parts['pvp'] = self.table._pk_value_pairs()
+        elif self.kind == 'select':
+            self.parts['pvp'] = self.table._pk_value_pairs()
+            if self.wheres:
+                self.query += ' WHERE '
+                self.query += column_value_pairs(self.table.db.kind,
+                        self.wheres, ' AND ')
+            if 'order_by' in self.parts:
+                self.query += ' ORDER BY '+str(self.parts['order_by'])
+            elif self.order_by:
+                self.query += ' ORDER BY '+self.order_by
+            elif self.table.pks:
+                self.query += ' ORDER BY '+str(self.table.pks[0])
+
+        self.query = self.query.format(table=self.table.name, **self.parts)
+        return self.query
+
+
+    def refine(self, order_by=None, **kw):
+        if order_by:
+            self.parts['order_by'] = order_by
+        self.wheres.update(kw)
+
+
+
+class Insert(Query):
+
+    def __init__(self, table):
+        super(Insert, self).__init__(table, 'insert')
+
+
+
+class Update(Query):
+
+    def __init__(self, table):
+        super(Update, self).__init__(table, 'update')
+
+
+
+class Delete(Query):
+    def __init__(self, table):
+        super(Delete, self).__init__(table, 'delete')
+
+
+
+class Select(Query):
+
+    def __init__(self, table):
+        super(Select, self).__init__({}, 'select', _table=table)
+
+
+
 class ResultsGenerator:
     """
     This class replicates a Generator, it mearly adds the ability to get the
@@ -182,20 +276,19 @@ class ResultsGenerator:
     a count.
     """
 
-    def __init__(self, query, vars, table, order_by=None):
+    def __init__(self, query):
         self.query = query
-        self.vars = vars
-        self.table = table
         self.cache = []
         self.completed = False
         self.refined = False
-        self.order_by = order_by
+        self.order_by = None
+        self.executed = False
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
-        if self.table.db.kind == 'sqlite3':
-            self.curs = table.db.conn.cursor()
-        elif self.table.db.kind == 'postgresql':
-            self.curs = table.db.conn.cursor(cursor_factory=DictCursor)
+        if query.table.db.kind == 'sqlite3':
+            self.curs = query.table.db.conn.cursor()
+        elif query.table.db.kind == 'postgresql':
+            self.curs = query.table.db.conn.cursor(cursor_factory=DictCursor)
 
 
     def __iter__(self):
@@ -208,12 +301,11 @@ class ResultsGenerator:
     def __next__(self):
         self._execute_once()
         d = self.curs.fetchone()
-
         if not d:
             self.completed = True
             raise StopIteration
         # Convert returned dictionary to a Dict
-        d = self.table(d)
+        d = self.query.table(d)
         d._in_db = True
         self.cache.append(d)
         return d
@@ -223,12 +315,12 @@ class ResultsGenerator:
         """
         Execute the query only once
         """
-        if self.query:
+        if not self.executed:
+            self.executed = True
             if not self.refined:
                 # Use the default order by
                 self.refine(order_by=self.order_by)
-            self.curs.execute(self.query, self.vars)
-            self.query = None
+            self.curs.execute(self.query.query, self.query.wheres)
 
 
     # for python 2.7
@@ -237,19 +329,18 @@ class ResultsGenerator:
 
     def __len__(self):
         self._execute_once()
-        if self.table.db.kind == 'sqlite3':
+        if self.query.table.db.kind == 'sqlite3':
             # sqlite3's cursor.rowcount doesn't support select statements
             return 0
         return self.curs.rowcount
 
 
-    def refine(self, order_by=''):
+    def refine(self, **kw):
         """
         Refine the results of this generator before the results are fetched.
         """
-        self.refined = True
-        if order_by:
-            self.query += ' ORDER BY '+str(order_by)
+        self.query.refine(**kw)
+        self.query.build()
         return self
 
 
@@ -348,7 +439,9 @@ class Table(object):
         Used to insert a row into this table.
         """
         d = Dict(self, *a, **kw)
-        return self._add_references(d)
+        for ref_name in self.refs:
+            d[ref_name] = None
+        return d
 
 
     def __len__(self):
@@ -396,12 +489,6 @@ class Table(object):
         NoPrimaryKey()
 
         """
-        order_by = None
-        if self.order_by:
-            order_by = self.order_by
-        elif self.pks:
-            order_by = self.pks[0]
-
         if a and len(a) == 1 and type(a[0]) == dict:
             # A single dictionary has been passed as an argument, use it as
             # the keyword arguments.
@@ -413,20 +500,17 @@ class Table(object):
 
         # Build out the query using user-provideded data, and data gathered
         # from the DB.
-        query = 'SELECT * FROM {table} '
-        if kw:
-            query += 'WHERE {wheres} '
-        query = query.format(
-                table=self.name,
-                wheres=column_value_pairs(self.db.kind, kw, ' AND '),
-            )
-        return ResultsGenerator(query, kw, self, order_by=order_by)
+        query = Select(self)
+        query.order_by = self.order_by
+        query.build(**kw)
+        return ResultsGenerator(query)
 
 
     def get_one(self, *a, **kw):
         """
-        Get a single row as a Dict from the Database that matches provided
-        to this method.  See Table.get_where for more details.
+        Get a single row as a Dict from the Database that matches the
+        arguments provided to this method.  See Table.get_where for more
+        details.
 
         If more than one row could be returned, this will raise an
         UnexpectedRows error.
@@ -435,12 +519,6 @@ class Table(object):
         if len(l) > 1:
             raise UnexpectedRows('More than one row selected.')
         return l[0]
-
-
-    def _add_references(self, d):
-        for ref_name in self.refs:
-            d[ref_name] = None
-        return d
 
 
     def count(self):
@@ -454,9 +532,11 @@ class Table(object):
 
     def __setitem__(self, ref_name, value):
         if len(value) == 3:
+            # Set a substraum reference
             my_column, substratum, their_refname = value
             self.refs[ref_name] = (my_column, substratum, their_refname)
         else:
+            # Set a reference
             my_column, table, their_column, many = value
             self.my_columns[my_column] = ref_name
             self.refs[ref_name] = (
@@ -484,11 +564,11 @@ class Reference(object):
     def __repr__(self): # pragma: no cover
         return 'Reference({}, {})'.format(self.table.name, self.column)
 
-    def __eq__(ref1, ref2):
-        return (ref1.column, ref2.table, ref2.column, False)
+    def __eq__(fk1, fk2):
+        return (fk1.column, fk2.table, fk2.column, False)
 
-    def __gt__(ref1, ref2):
-        return (ref1.column, ref2.table, ref2.column, True)
+    def __gt__(fk1, fk2):
+        return (fk1.column, fk2.table, fk2.column, True)
 
     def substratum(self, column):
         return (self.column, self.table[self.column], column)
@@ -531,7 +611,6 @@ class Dict(dict):
         self._curs = table.db.curs
         super(Dict, self).__init__(*a, **kw)
         self._old = self.remove_refs()
-        self._outdated = {}
 
 
     def flush(self):
@@ -549,24 +628,15 @@ class Dict(dict):
                 ref.flush()
 
         if not self._in_db:
-            # Insert this dictionary into it's respective table
+            # Insert this Dict into it's respective table, interpolating
+            # my values into the query
+            query = Insert(self)
             d = json_dicts(self.remove_refs())
-            query = 'INSERT INTO {table} {cvp}'.format(
-                    table=self._table.name,
-                    cvp=insert_column_value_pairs(self._table.db.kind,
-                        self.remove_refs())
-                )
-
-            if self._table.db.kind == 'postgresql':
-                query += ' RETURNING *'
-
-            # Run the insert query, interpolating the values of this dictionary
-            # into the query.
-            self._curs.execute(query, d)
+            self._curs.execute(query.build(), d)
             self._in_db = True
 
             if self._table.db.kind == 'sqlite3':
-                # Get the last inserted row, postgresql uses RETURNING
+                # Get the last inserted row
                 self._curs.execute('''SELECT * FROM {table} WHERE
                         rowid = last_insert_rowid()'''.format(
                     table=self._table.name))
@@ -581,17 +651,8 @@ class Dict(dict):
             combined = self.remove_refs()
             combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
             combined = json_dicts(combined)
-            query = 'UPDATE {table} SET {cvp} WHERE {pvp}'.format(
-                    table=self._table.name,
-                    cvp=column_value_pairs(self._table.db.kind,
-                        self.remove_refs()),
-                    pvp=self._table._pk_value_pairs(prefix='old_')
-                    )
-
-            if self._table.db.kind == 'postgresql':
-                query += ' RETURNING *'
-
-            self._curs.execute(query, combined)
+            query = Update(self)
+            self._curs.execute(query.build(), combined)
 
             if self._table.db.kind == 'sqlite3':
                 # Get the row that was just updated using the primary keys
@@ -612,11 +673,8 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        self._curs.execute('DELETE FROM {table} WHERE {pvp}'.format(
-                table=self._table.name,
-                pvp=self._table._pk_value_pairs()),
-            self
-            )
+        query = Delete(self)
+        self._curs.execute(query.build(), self)
 
 
     def remove_pks(self):
