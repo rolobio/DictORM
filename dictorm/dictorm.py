@@ -334,13 +334,11 @@ class ResultsGenerator:
         return self.curs.rowcount
 
 
-    def refine(self, order_by='', **kw):
+    def refine(self, **kw):
         """
         Refine the results of this generator before the results are fetched.
         """
-        self.refined = True
-        if order_by:
-            self.query.refine(order_by=order_by)
+        self.query.refine(**kw)
         self.query.build()
         return self
 
