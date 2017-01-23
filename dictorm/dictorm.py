@@ -230,9 +230,10 @@ class Query(object):
         return self.query
 
 
-    def refine(self, order_by=None):
+    def refine(self, order_by=None, **kw):
         if order_by:
             self.parts['order_by'] = order_by
+        self.wheres.update(kw)
 
 
 

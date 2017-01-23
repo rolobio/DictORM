@@ -839,6 +839,16 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(_remove_refs(bob['subordinates']),
                 _remove_refs([dave, alice]))
 
+        steve = Person(name='Steve', manager_id=alice['id'], id=4).flush()
+        self.assertEqual(_remove_refs(alice['subordinates']),
+                _remove_refs([steve,]))
+
+        all_subordinates = Person.get_where(manager_id=(1,3))
+        self.assertEqual(list(all_subordinates), [dave, alice, steve])
+
+        all_subordinates = Person.get_where(manager_id=(1,3))
+        self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
+
 
     def test_onetoone_cache(self):
         """
