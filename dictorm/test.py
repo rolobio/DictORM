@@ -740,6 +740,7 @@ class TestPostgresql(ExtraTestMethods):
         Person['person_departments'] = Person['id'] > PD['person_id']
         Person['departments'] = Person['person_departments'].substratum('department')
         Person['car'] = Person['car_id'] == Car['id']
+        Person['possessions'] = Person['id'] > Possession['person_id']
         Car['person'] = Car['person_id'] == Person['id']
         PD['person'] = PD['person_id'] == Person['id']
         PD['department'] =  PD['department_id'] == Department['id']
@@ -770,6 +771,7 @@ class TestPostgresql(ExtraTestMethods):
                 description={'kind':'stapler', 'brand':'Swingline', 'color':'Red'}
                 ).flush()
         self.assertEqual(miltons_stapler['person'].remove_refs(), milton.remove_refs())
+        self.assertEqual(_remove_refs(milton['possessions']), _remove_refs([miltons_stapler,]))
 
         # Milton has a manager
         tom = Person(name='Tom').flush()
@@ -779,8 +781,9 @@ class TestPostgresql(ExtraTestMethods):
 
         # Tom takes milton's stapler
         miltons_stapler['person_id'] = tom['id']
-        toms_stapler = miltons_stapler
+        toms_stapler = miltons_stapler.flush()
         self.assertEqual(toms_stapler['person'].remove_refs(), tom.remove_refs())
+        self.assertEqual(_remove_refs(tom['possessions']), _remove_refs([toms_stapler,]))
 
         # Peter is Tom's subordinate
         peter = Person(name='Peter', manager_id=tom['id']).flush()
@@ -829,8 +832,8 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(_remove_refs(Person.get_where()),
                 _remove_refs([bob, dave, alice]))
 
-        # Refine the results by ordering by other, which is the
-        # reverse of how they were inserted
+        # Refine the results by ordering by other, which is the reverse of how
+        # they were inserted
         self.assertEqual(_remove_refs(bob['subordinates'].refine(order_by='other ASC')),
                 _remove_refs([alice, dave]))
         self.assertEqual(_remove_refs(bob['subordinates']),
