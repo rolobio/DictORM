@@ -32,6 +32,9 @@ def _remove_refs(o):
     return [i.remove_refs() for i in o]
 
 
+def error(*a, **kw): raise Exception()
+
+
 class ExtraTestMethods(unittest.TestCase):
 
     def assertDictContains(self, d1, d2):
@@ -43,6 +46,9 @@ class ExtraTestMethods(unittest.TestCase):
         except Exception as e:
             if type(e) in exps: return
         raise Exception('Did not raise one of the exceptions provided!')
+
+    def assertType(self, a, b):
+        assert type(a) == b, TypeError('{} is not type {}'.format(str(a), b0))
 
 
 
@@ -829,6 +835,49 @@ class TestPostgresql(ExtraTestMethods):
                 _remove_refs([alice, dave]))
         self.assertEqual(_remove_refs(bob['subordinates']),
                 _remove_refs([dave, alice]))
+
+
+    def test_onetoone_cache(self):
+        """
+        One-to-one relationships are cached.
+        """
+        Person = self.db['person']
+        Person['manager'] = Person['manager_id'] == Person['id']
+        bob = Person(name='Bob').flush()
+        bill = Person(name='Bill').flush()
+        bob['manager_id'] = bill['id']
+
+        self.assertEqual(bob['manager'], bill)
+        bob._table.get_one = error
+        # Error fuction shouldn't be called, since manager is cached
+        self.assertEqual(bob['manager'], bill)
+
+
+    def test_results_cache(self):
+        """
+        A result will not be gotten again, since it's results were cached.
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        bob = Person(name='Bob').flush()
+        bill = Person(name='Bill').flush()
+        alice = Person(name='Alice').flush()
+        steve = Person(name='Steve').flush()
+
+        bill['manager_id'] = bob['id'];
+        bill.flush()
+        alice['manager_id'] = bob['id']
+        alice.flush()
+        steve['manager_id'] = bob['id']
+        steve.flush()
+
+        subordinates = bob['subordinates']
+        for sub in subordinates:
+            self.assertType(sub, Dict)
+        # Error would be raised if subordinates isn't cached
+        bob._table.get_where = error
+        for sub in subordinates:
+            self.assertType(sub, Dict)
 
 
 
