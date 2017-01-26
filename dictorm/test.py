@@ -40,7 +40,7 @@ class ExtraTestMethods(unittest.TestCase):
     @classmethod
     def assertDictContains(cls, d1, d2):
         if not set(d2.items()).issubset(set(d1.items())):
-            raise ValueError('{} does not contain {}'.format(d1, d2))
+            raise TypeError('{} does not contain {}'.format(d1, d2))
 
     @classmethod
     def assertRaisesAny(cls, exps, func, a=None, kw=None):
