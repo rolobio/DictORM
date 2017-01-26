@@ -67,9 +67,9 @@ def column_value_pairs(kind, d, join_str=', ', prefix=''):
     ret = ''
     final_item = len(d)-1
     for idx, key in enumerate(sorted(d)):
-        ret += str(key) + operator_kinds(type(d[key] if type(d) == dict else type(key)))
+        ret += str(key) + operator_kinds(type(d[key] if isinstance(d, dict) else type(key)))
         if kind == 'sqlite3':
-            if type(d) == dict and type(d[key]) in (list, tuple):
+            if isinstance(d, dict) and isinstance(d[key], (list, tuple)):
                 ret += '('+','.join([str(int(i)) for i in d[key]])+')'
             else:
                 ret += ':' + prefix + key
@@ -107,7 +107,7 @@ def json_dicts(d):
     Convert all dictionaries contained in this object into JSON strings.
     """
     for key, value in d.items():
-        if type(value) == dict:
+        if isinstance(value, dict):
             d[key] = dumps(value)
     return d
 
@@ -131,7 +131,7 @@ class DictDB(dict):
 
     def __init__(self, db_conn):
         self.conn = db_conn
-        if 'sqlite3' in modules and type(db_conn) == sqlite3.Connection:
+        if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
             self.kind = 'sqlite3'
         else:
             self.kind = 'postgresql'
@@ -489,7 +489,7 @@ class Table(object):
         NoPrimaryKey()
 
         """
-        if a and len(a) == 1 and type(a[0]) == dict:
+        if a and len(a) == 1 and isinstance(a[0], dict):
             # A single dictionary has been passed as an argument, use it as
             # the keyword arguments.
             kw = a[0]

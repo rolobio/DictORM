@@ -27,7 +27,7 @@ else:
             }
 
 def _remove_refs(o):
-    if type(o) == Dict:
+    if isinstance(o, Dict):
         return o.remove_refs()
     return [i.remove_refs() for i in o]
 
@@ -37,18 +37,25 @@ def error(*a, **kw): raise Exception()
 
 class ExtraTestMethods(unittest.TestCase):
 
-    def assertDictContains(self, d1, d2):
-        assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
+    @classmethod
+    def assertDictContains(cls, d1, d2):
+        if not set(d2.items()).issubset(set(d1.items())):
+            raise ValueError('{} does not contain {}'.format(d1, d2))
 
-    def assertRaisesAny(self, exps, func, a=[], kw={}):
+    @classmethod
+    def assertRaisesAny(cls, exps, func, a=None, kw=None):
+        a = a or []
+        kw = kw or {}
         try:
             func(*a, **kw)
         except Exception as e:
-            if type(e) in exps: return
+            if isinstance(e, exps): return
         raise Exception('Did not raise one of the exceptions provided!')
 
-    def assertType(self, a, b):
-        assert type(a) == b, TypeError('{} is not type {}'.format(str(a), b0))
+    @classmethod
+    def assertType(cls, a, b):
+        if not isinstance(a, b):
+            raise TypeError('{} is not type {}'.format(str(a), b0))
 
 
 
@@ -644,8 +651,7 @@ class TestPostgresql(ExtraTestMethods):
         alice = Person(name='Alice').flush()
 
         self.assertEqual(len(alice['subordinates']), 0)
-        for sub in alice['subordinates']:
-            raise Exception('There should not be any subordinates')
+        self.assertEqual(len(iter(alice['subordinates'])), 0)
 
         Person['manager'] = Person['id'] == Person['manager_id']
         self.assertEqual(alice['manager'], None)
