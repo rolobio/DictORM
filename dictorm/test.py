@@ -27,7 +27,7 @@ else:
             }
 
 def _remove_refs(o):
-    if type(o) == Dict:
+    if isinstance(o, Dict):
         return o.remove_refs()
     return [i.remove_refs() for i in o]
 
@@ -37,18 +37,21 @@ def error(*a, **kw): raise Exception()
 
 class ExtraTestMethods(unittest.TestCase):
 
-    def assertDictContains(self, d1, d2):
+    @classmethod
+    def assertDictContains(cls, d1, d2):
         assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
 
-    def assertRaisesAny(self, exps, func, a=[], kw={}):
+    @classmethod
+    def assertRaisesAny(cls, exps, func, a=[], kw={}):
         try:
             func(*a, **kw)
         except Exception as e:
             if type(e) in exps: return
         raise Exception('Did not raise one of the exceptions provided!')
 
-    def assertType(self, a, b):
-        assert type(a) == b, TypeError('{} is not type {}'.format(str(a), b0))
+    @classmethod
+    def assertType(cls, a, b):
+        assert isinstance(a, b), TypeError('{} is not type {}'.format(str(a), b0))
 
 
 
