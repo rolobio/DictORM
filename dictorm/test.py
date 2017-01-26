@@ -43,7 +43,9 @@ class ExtraTestMethods(unittest.TestCase):
             raise ValueError('{} does not contain {}'.format(d1, d2))
 
     @classmethod
-    def assertRaisesAny(cls, exps, func, a=[], kw={}):
+    def assertRaisesAny(cls, exps, func, a=None, kw=None):
+        a = a or []
+        kw = kw or {}
         try:
             func(*a, **kw)
         except Exception as e:
