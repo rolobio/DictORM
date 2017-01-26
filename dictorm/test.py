@@ -668,9 +668,8 @@ class TestPostgresql(ExtraTestMethods):
         alice = Person(name='Alice', manager_id=bob['id']).flush()
         self.assertEqual(alice['manager'], bob)
 
-        def fail(*a, **kw): raise Exception('get_where was called twice!')
         original_get_where = alice._table.get_where
-        alice._table.get_where = fail
+        alice._table.get_where = error
         self.assertEqual(alice['manager'], bob)
 
         steve = Person(name='Steve').flush()
