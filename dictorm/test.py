@@ -651,8 +651,7 @@ class TestPostgresql(ExtraTestMethods):
         alice = Person(name='Alice').flush()
 
         self.assertEqual(len(alice['subordinates']), 0)
-        for sub in alice['subordinates']:
-            raise Exception('There should not be any subordinates')
+        self.assertEqual(len(iter(alice['subordinates'])), 0)
 
         Person['manager'] = Person['id'] == Person['manager_id']
         self.assertEqual(alice['manager'], None)
