@@ -39,7 +39,8 @@ class ExtraTestMethods(unittest.TestCase):
 
     @classmethod
     def assertDictContains(cls, d1, d2):
-        assert set(d2.items()).issubset(set(d1.items())), '{} does not contain {}'.format(d1, d2)
+        if not set(d2.items()).issubset(set(d1.items())):
+            raise ValueError('{} does not contain {}'.format(d1, d2))
 
     @classmethod
     def assertRaisesAny(cls, exps, func, a=[], kw={}):
@@ -51,7 +52,8 @@ class ExtraTestMethods(unittest.TestCase):
 
     @classmethod
     def assertType(cls, a, b):
-        assert isinstance(a, b), TypeError('{} is not type {}'.format(str(a), b0))
+        if not isinstance(a, b):
+            raise TypeError('{} is not type {}'.format(str(a), b0))
 
 
 
