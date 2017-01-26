@@ -69,7 +69,7 @@ def column_value_pairs(kind, d, join_str=', ', prefix=''):
     for idx, key in enumerate(sorted(d)):
         ret += str(key) + operator_kinds(type(d[key] if isinstance(d, dict) else type(key)))
         if kind == 'sqlite3':
-            if type(d) == dict and isinstance(d[key], (list, tuple)):
+            if isinstance(d, dict) and isinstance(d[key], (list, tuple)):
                 ret += '('+','.join([str(int(i)) for i in d[key]])+')'
             else:
                 ret += ':' + prefix + key

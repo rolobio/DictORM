@@ -47,7 +47,7 @@ class ExtraTestMethods(unittest.TestCase):
         try:
             func(*a, **kw)
         except Exception as e:
-            if type(e) in exps: return
+            if isinstance(e, exps): return
         raise Exception('Did not raise one of the exceptions provided!')
 
     @classmethod
