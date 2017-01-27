@@ -175,6 +175,7 @@ class Query(object):
     def __init__(self, dict, kind, _table=None):
         self.kind = kind
         if _table != None:
+            self.dict = None
             self.table = _table
         else:
             self.dict = dict
@@ -205,8 +206,12 @@ class Query(object):
         self.query = self.queries[self.table.db.kind][self.kind]
         self.wheres.update(kw)
         if self.kind == 'insert':
-            self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
-                        self.dict.remove_refs())
+            if self.dict:
+                self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
+                            self.dict.remove_refs())
+            else:
+                self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
+                            self.wheres)
         elif self.kind == 'update':
             self.parts['cvp'] = column_value_pairs(self.table.db.kind,
                 self.dict.remove_refs())
@@ -239,21 +244,24 @@ class Query(object):
 
 class Insert(Query):
 
-    def __init__(self, table):
-        super(Insert, self).__init__(table, 'insert')
+    def __init__(self, dict):
+        if isinstance(dict, Dict):
+            super(Insert, self).__init__(dict, 'insert')
+        else:
+            super(Insert, self).__init__({}, 'insert', _table=dict)
 
 
 
 class Update(Query):
 
-    def __init__(self, table):
-        super(Update, self).__init__(table, 'update')
+    def __init__(self, dict):
+        super(Update, self).__init__(dict, 'update')
 
 
 
 class Delete(Query):
-    def __init__(self, table):
-        super(Delete, self).__init__(table, 'delete')
+    def __init__(self, dict):
+        super(Delete, self).__init__(dict, 'delete')
 
 
 

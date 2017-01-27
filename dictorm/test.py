@@ -1095,6 +1095,12 @@ class TestQuery(ExtraTestMethods):
         self.assertEqual(query.build(),
                 "INSERT INTO fake (foo, name) VALUES (%(foo)s, %(name)s) RETURNING *")
 
+        # Insert new dictionary into table
+        query = Insert(fake_table)
+        query.refine(foo='bar')
+        self.assertEqual(query.build(),
+                "INSERT INTO fake (foo) VALUES (%(foo)s) RETURNING *")
+
 
     def test_update(self):
         steve = Dict(fake_table, name='Steve')
