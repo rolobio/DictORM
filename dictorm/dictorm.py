@@ -90,7 +90,9 @@ def insert_column_value_pairs(kind, d):
         (id, person) VALUES (%(id)s, %(person)s)
     """
     d = sorted(d)
-    if kind == 'sqlite3':
+    if not d:
+        return 'DEFAULT VALUES'
+    elif kind == 'sqlite3':
         return '({}) VALUES ({})'.format(
                 ', '.join(d),
                 ', '.join([':'+str(i) for i in d]),

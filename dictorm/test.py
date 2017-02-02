@@ -154,6 +154,12 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(list(Person.get_where()), [bob, dave, alice])
 
 
+    def test_empty(self):
+        Person = self.db['person']
+        p = Person().flush()
+        self.assertEqual(p['id'], 1)
+
+
     def test_delete(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
