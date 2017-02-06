@@ -233,13 +233,23 @@ class Query(object):
             elif self.table.pks:
                 self.query += ' ORDER BY '+str(self.table.pks[0])
 
+            if 'limit' in self.parts:
+                self.query += ' LIMIT '+str(self.parts['limit'])
+
+            if 'offset' in self.parts:
+                self.query += ' OFFSET '+str(self.parts['offset'])
+
         self.query = self.query.format(table=self.table.name, **self.parts)
         return self.query
 
 
-    def refine(self, order_by=None, **kw):
+    def refine(self, order_by=None, limit=None, offset=None, **kw):
         if order_by:
             self.parts['order_by'] = order_by
+        if offset:
+            self.parts['offset'] = int(offset)
+        if limit:
+            self.parts['limit'] = limit
         self.wheres.update(kw)
 
 
