@@ -861,6 +861,27 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
 
 
+    def test_refine2(self):
+        """
+        A result set can be refined using an offset and limit.
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
+        tom = Person(name='Tom').flush()
+        abe = Person(name='Abe').flush()
+        gus = Person(name='Gus').flush()
+
+        self.assertEqual(list(Person.get_where()), [bob, aly, tom, abe, gus])
+        # Using limit and offset, but in such a way that it returns everything
+        if self.db.kind == 'postgresql':
+            self.assertEqual(list(Person.get_where().refine(limit='ALL', offset=0)),
+                    [bob, aly, tom, abe, gus])
+
+        self.assertEqual(list(Person.get_where().refine(limit=2)), [bob, aly])
+        self.assertEqual(list(Person.get_where().refine(limit=2, offset=3)), [abe, gus])
+
+
     def test_onetoone_cache(self):
         """
         One-to-one relationships are cached.
