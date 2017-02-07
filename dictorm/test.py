@@ -825,6 +825,16 @@ class TestPostgresql(ExtraTestMethods):
         car_owners = Person.get_where(car_id=miltons_car['id'])
         self.assertEqual(_remove_refs(car_owners), _remove_refs([milton, peter]))
 
+        # You can reuse a ResultsGenerator
+        minions = tom['subordinates']
+        self.assertEqual(_remove_refs(minions),
+                _remove_refs([milton, peter]))
+        limited_minions = minions.refine(limit=1)
+        self.assertEqual(_remove_refs(limited_minions),
+                _remove_refs([milton,]))
+        self.assertEqual(_remove_refs(limited_minions.refine(order_by='id DESC')),
+                _remove_refs([peter,]))
+
 
     def test_refine_order_by(self):
         """

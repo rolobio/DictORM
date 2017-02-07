@@ -299,3 +299,21 @@ bob
 {'name':'HR', 'id':1}
 {'name':'Sales', 'id':2}
 ```
+
+### Reuse a ResultsGenerator
+```python
+# get_where and get_one return a ResultsGenerator, which does nothing until you
+# attempt to get a result from it.  This means we can reuse a ResultsGenerator
+# to refine the results.
+>>> minions = steve['subordinates']
+>>> minions
+[bob, aly]
+
+# Limit the results to only one row
+>>> list(minions.refine(limit=1))
+[bob,]
+
+# Reverse the order, limit to one row
+>>> list(minions.refine(order_by='id ASC', limit=1)
+[aly,]
+```
