@@ -337,10 +337,8 @@ class ResultsGenerator:
         """
         if not self.executed:
             self.executed = True
-            if not self.refined:
-                # Use the default order by
-                self.refine(order_by=self.order_by)
-            self.curs.execute(self.query.query, self.query.wheres)
+            query = self.query.build()
+            self.curs.execute(query, self.query.wheres)
 
 
     # for python 2.7
@@ -357,11 +355,13 @@ class ResultsGenerator:
 
     def refine(self, **kw):
         """
-        Refine the results of this generator before the results are fetched.
+        Get a new ResultsGenerator built from this generator's properties, but
+        now with the additional properties provided as arguments.
+
+        See Query.refine for supported refinements.
         """
         self.query.refine(**kw)
-        self.query.build()
-        return self
+        return ResultsGenerator(self.query)
 
 
 

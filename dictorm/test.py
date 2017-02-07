@@ -826,7 +826,7 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(_remove_refs(car_owners), _remove_refs([milton, peter]))
 
 
-    def test_refine(self):
+    def test_refine_order_by(self):
         """
         A result set can be refined using order by.  A reference can be refined
         using the same technique.
@@ -861,7 +861,7 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
 
 
-    def test_refine2(self):
+    def test_refine_offset_limit(self):
         """
         A result set can be refined using an offset and limit.
         """
@@ -872,14 +872,23 @@ class TestPostgresql(ExtraTestMethods):
         abe = Person(name='Abe').flush()
         gus = Person(name='Gus').flush()
 
-        self.assertEqual(list(Person.get_where()), [bob, aly, tom, abe, gus])
+        persons = Person.get_where()
+        self.assertEqual(list(persons), [bob, aly, tom, abe, gus])
+        self.assertEqual(list(persons), [bob, aly, tom, abe, gus])
+
         # Using limit and offset, but in such a way that it returns everything
         if self.db.kind == 'postgresql':
-            self.assertEqual(list(Person.get_where().refine(limit='ALL', offset=0)),
+            self.assertEqual(list(persons.refine(limit='ALL', offset=0)),
                     [bob, aly, tom, abe, gus])
 
-        self.assertEqual(list(Person.get_where().refine(limit=2)), [bob, aly])
-        self.assertEqual(list(Person.get_where().refine(limit=2, offset=3)), [abe, gus])
+        # Single refine
+        limited = persons.refine(limit=2)
+        self.assertEqual(list(limited), [bob, aly])
+        self.assertEqual(list(limited), [bob, aly])
+
+        self.assertEqual(list(limited.refine(offset=3)), [abe, gus])
+        # Multiple refinings
+        self.assertEqual(list(persons.refine(limit=2).refine(offset=2)), [tom, abe])
 
 
     def test_onetoone_cache(self):
