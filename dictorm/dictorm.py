@@ -5,6 +5,8 @@ Dictionaries.
 """
 from sys import modules
 from json import dumps
+from dictorm.query import *
+
 try: # pragma: no cover
     from dictorm.__version__ import __version__
 except ImportError: # pragma: no cover
@@ -29,7 +31,7 @@ if not db_package_imported: # pragma: no cover
 
 __all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
     'UnexpectedRows', 'ResultsGenerator', '__version__',
-    'Query', 'Select']
+    'Select', 'Or']
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
@@ -102,33 +104,6 @@ class DictDB(dict):
                 self[table['name']] = Table(table['name'], self)
             else:
                 self[table['table_name']] = Table(table['table_name'], self)
-
-
-
-class Query(object):
-
-    queries = {
-            'select':'SELECT * FROM {table} WHERE {exps}',
-            }
-
-    def __init__(self, kind, table, exps):
-        self.table = table
-        self.query = self.queries[kind]
-        self.exps = exps
-
-
-    def __str__(self):
-        sql = self.query.format(table=self.table,
-                exps=' AND '.join([str(e) for e in self.exps]))
-        return sql
-
-
-
-
-class Select(Query):
-
-    def __init__(self, table, *exps):
-        super().__init__('select', table, exps)
 
 
 
@@ -418,66 +393,6 @@ class Table(object):
 
     def __getitem__(self, key):
         return Column(self, key)
-
-
-
-class Column(object):
-
-    def __init__(self, table, column):
-        self.table = table
-        self.column = column
-
-    def __eq__(self, column): return Expression(self, column, '=')
-    def __gt__(self, column): return Expression(self, column, '>')
-    def __ge__(self, column): return Expression(self, column, '>=')
-    def __lt__(self, column): return Expression(self, column, '<')
-    def __le__(self, column): return Expression(self, column, '<=')
-    def __ne__(self, column): return Expression(self, column, '!=')
-
-
-
-class Expression(object):
-
-    def __init__(self, column1, column2, kind):
-        self.column1 = column1
-        self.column2 = column2
-        self.kind = kind
-
-    def __str__(self):
-        c1 = self.column1.column
-        if isinstance(self.column2, str):
-            c2 = "'{}'".format(self.column2)
-        elif isinstance(self.column2, (int, float)):
-            c2 = str(self.column2)
-        return '{}{}{}'.format(c1, self.kind, c2)
-
-
-
-
-class Reference(object):
-    """
-    This class facilitates creating relationships between Tables by using
-    == and >.
-
-    I would rather use "in" instead of ">", but "__contains__" overwrites what
-    is returned and only returns a True/False value. :(
-    """
-
-    def __init__(self, table, column):
-        self.table = table
-        self.column = column
-
-    def __repr__(self): # pragma: no cover
-        return 'Reference({}, {})'.format(self.table.name, self.column)
-
-    def __eq__(fk1, fk2):
-        return (fk1.column, fk2.table, fk2.column, False)
-
-    def __gt__(fk1, fk2):
-        return (fk1.column, fk2.table, fk2.column, True)
-
-    def substratum(self, column):
-        return (self.column, self.table[self.column], column)
 
 
 

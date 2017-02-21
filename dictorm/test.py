@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, Select)
+    ResultsGenerator, Select,
+    Or)
 from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
@@ -941,27 +942,6 @@ class TestPostgresql(ExtraTestMethods):
         bob._table.get_where = error
         for sub in subordinates:
             self.assertType(sub, Dict)
-
-
-    def test_select(self):
-        Person = self.db['person']
-        q = Select('some_table', Person['name'] == 'Bob')
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name='Bob'")
-        q = Select('some_table', 'Bob' == Person['name'])
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name='Bob'")
-        q = Select('some_table', Person['name'] > 'Bob')
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name>'Bob'")
-        q = Select('some_table', Person['name'] >= 'Bob')
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name>='Bob'")
-        q = Select('some_table', Person['name'] < 'Bob')
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name<'Bob'")
-        q = Select('some_table', Person['name'] <= 'Bob')
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name<='Bob'")
-        q = Select('some_table', Person['name'] != 'Bob')
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name!='Bob'")
-
-        q = Select('some_table', Person['name'] == 'Bob', Person['car_id'] == 2)
-        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name='Bob' AND car_id=2")
 
 
 
