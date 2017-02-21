@@ -28,80 +28,12 @@ if not db_package_imported: # pragma: no cover
 
 
 __all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
-    'UnexpectedRows', 'ResultsGenerator', 'column_value_pairs', '__version__',
-    'Query', 'Insert', 'Update', 'Delete', 'Select']
+    'UnexpectedRows', 'ResultsGenerator', '__version__',
+    'Query', 'Select']
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
 
-def operator_kinds(o):
-    if o in (tuple, list):
-        return ' IN '
-    return '='
-
-
-def column_value_pairs(kind, d, join_str=', ', prefix=''):
-    """
-    Create a string of SQL that will instruct a Psycopg2 DictCursor to
-    interpolate the dictionary's keys into a SELECT or UPDATE SQL query.
-
-    If old is True, prefix all values with old_ .  This is used to change
-    primary key values.
-
-    Example 1:
-        >>> column_value_pairs({'id':10, 'person':'Dave'})
-        id=%(id)s, person=%(person)s
-
-    Example 2:
-        >>> column_value_pairs(('id', 'person'))
-        id=%(id)s, person=%(person)s
-
-    Example 3:
-        >>> column_value_pairs({'id':(10,11,13), 'group':'group'}, ' AND ')
-        group=%(group)s AND id IN %(id)s
-
-    Example 4:
-        >>> column_value_pairs({'id':12, 'person':'Dave'}, prefix='old_')
-        id=%(old_id)s, person=%(old_person)s
-    """
-    ret = ''
-    final_item = len(d)-1
-    for idx, key in enumerate(sorted(d)):
-        ret += str(key) + operator_kinds(type(d[key] if isinstance(d, dict) else type(key)))
-        if kind == 'sqlite3':
-            if isinstance(d, dict) and isinstance(d[key], (list, tuple)):
-                ret += '('+','.join([str(int(i)) for i in d[key]])+')'
-            else:
-                ret += ':' + prefix + key
-        elif kind == 'postgresql':
-            ret += '%('+ prefix + key +')s'
-        if idx != final_item:
-            ret += join_str
-    return ret
-
-
-def insert_column_value_pairs(kind, d):
-    """
-    Create a string of SQL that will instruct a Psycopg2 DictCursor to
-    interpolate the dictionary's keys into a INSERT SQL query.
-
-    Example:
-        >>> insert_column_value_pairs({'id':10, 'person':'Dave'})
-        (id, person) VALUES (%(id)s, %(person)s)
-    """
-    d = sorted(d)
-    if not d:
-        return 'DEFAULT VALUES'
-    elif kind == 'sqlite3':
-        return '({}) VALUES ({})'.format(
-                ', '.join(d),
-                ', '.join([':'+str(i) for i in d]),
-                )
-    else:
-        return '({}) VALUES ({})'.format(
-                ', '.join(d),
-                ', '.join(['%('+str(i)+')s' for i in d]),
-                )
 
 
 def json_dicts(d):
@@ -172,115 +104,31 @@ class DictDB(dict):
                 self[table['table_name']] = Table(table['table_name'], self)
 
 
+
 class Query(object):
 
-    def __init__(self, dict, kind, _table=None):
-        self.kind = kind
-        if _table != None:
-            self.dict = None
-            self.table = _table
-        else:
-            self.dict = dict
-            self.table = dict._table
-        self.query = None
-        self.parts = {}
-        self.built = False
-        self.wheres = {}
-        self.order_by = None
-        self.queries = {
-                'postgresql': {
-                    'insert':'INSERT INTO {table} {cvp} RETURNING *',
-                    'update':'UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *',
-                    'delete':'DELETE FROM {table} WHERE {pvp}',
-                    'select':'SELECT * FROM {table}',
-                    },
-                'sqlite3':{
-                    'insert':'INSERT INTO {table} {cvp}',
-                    'update':'UPDATE {table} SET {cvp} WHERE {pvp}',
-                    'delete':'DELETE FROM {table} WHERE {pvp}',
-                    'select':'SELECT * FROM {table}',
-                    },
-                }
+    queries = {
+            'select':'SELECT * FROM {table} WHERE {exps}',
+            }
+
+    def __init__(self, kind, table, exps):
+        self.table = table
+        self.query = self.queries[kind]
+        self.exps = exps
 
 
-    def build(self, **kw):
-        self.built = True
-        self.query = self.queries[self.table.db.kind][self.kind]
-        self.wheres.update(kw)
-        if self.kind == 'insert':
-            if self.dict:
-                self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
-                            self.dict.remove_refs())
-            else:
-                self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
-                            self.wheres)
-        elif self.kind == 'update':
-            self.parts['cvp'] = column_value_pairs(self.table.db.kind,
-                self.dict.remove_refs())
-            self.parts['pvp'] = self.table._pk_value_pairs(prefix='old_')
-        elif self.kind == 'delete':
-            self.parts['pvp'] = self.table._pk_value_pairs()
-        elif self.kind == 'select':
-            self.parts['pvp'] = self.table._pk_value_pairs()
-            if self.wheres:
-                self.query += ' WHERE '
-                self.query += column_value_pairs(self.table.db.kind,
-                        self.wheres, ' AND ')
-            if 'order_by' in self.parts:
-                self.query += ' ORDER BY '+str(self.parts['order_by'])
-            elif self.order_by:
-                self.query += ' ORDER BY '+self.order_by
-            elif self.table.pks:
-                self.query += ' ORDER BY '+str(self.table.pks[0])
+    def __str__(self):
+        sql = self.query.format(table=self.table,
+                exps=' AND '.join([str(e) for e in self.exps]))
+        return sql
 
-            if 'limit' in self.parts:
-                self.query += ' LIMIT '+str(self.parts['limit'])
-
-            if 'offset' in self.parts:
-                self.query += ' OFFSET '+str(self.parts['offset'])
-
-        self.query = self.query.format(table=self.table.name, **self.parts)
-        return self.query
-
-
-    def refine(self, order_by=None, limit=None, offset=None, **kw):
-        if order_by:
-            self.parts['order_by'] = order_by
-        if offset:
-            self.parts['offset'] = int(offset)
-        if limit:
-            self.parts['limit'] = limit
-        self.wheres.update(kw)
-
-
-
-class Insert(Query):
-
-    def __init__(self, dict):
-        if isinstance(dict, Dict):
-            super(Insert, self).__init__(dict, 'insert')
-        else:
-            super(Insert, self).__init__({}, 'insert', _table=dict)
-
-
-
-class Update(Query):
-
-    def __init__(self, dict):
-        super(Update, self).__init__(dict, 'update')
-
-
-
-class Delete(Query):
-    def __init__(self, dict):
-        super(Delete, self).__init__(dict, 'delete')
 
 
 
 class Select(Query):
 
-    def __init__(self, table):
-        super(Select, self).__init__({}, 'select', _table=table)
+    def __init__(self, table, *exps):
+        super().__init__('select', table, exps)
 
 
 
@@ -541,6 +389,11 @@ class Table(object):
         return l[0]
 
 
+    def get_query(self, query):
+        query = StrQuery(self, query)
+        return ResultsGenerator(query)
+
+
     def count(self):
         """
         Get the count of rows in this table.
@@ -564,7 +417,40 @@ class Table(object):
 
 
     def __getitem__(self, key):
-        return Reference(self, key)
+        return Column(self, key)
+
+
+
+class Column(object):
+
+    def __init__(self, table, column):
+        self.table = table
+        self.column = column
+
+    def __eq__(self, column): return Expression(self, column, '=')
+    def __gt__(self, column): return Expression(self, column, '>')
+    def __ge__(self, column): return Expression(self, column, '>=')
+    def __lt__(self, column): return Expression(self, column, '<')
+    def __le__(self, column): return Expression(self, column, '<=')
+    def __ne__(self, column): return Expression(self, column, '!=')
+
+
+
+class Expression(object):
+
+    def __init__(self, column1, column2, kind):
+        self.column1 = column1
+        self.column2 = column2
+        self.kind = kind
+
+    def __str__(self):
+        c1 = self.column1.column
+        if isinstance(self.column2, str):
+            c2 = "'{}'".format(self.column2)
+        elif isinstance(self.column2, (int, float)):
+            c2 = str(self.column2)
+        return '{}{}{}'.format(c1, self.kind, c2)
+
 
 
 

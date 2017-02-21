@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, column_value_pairs,
-    Insert, Update, Delete, Select)
+    ResultsGenerator, Select)
 from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
@@ -944,6 +943,27 @@ class TestPostgresql(ExtraTestMethods):
             self.assertType(sub, Dict)
 
 
+    def test_select(self):
+        Person = self.db['person']
+        q = Select('some_table', Person['name'] == 'Bob')
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name='Bob'")
+        q = Select('some_table', 'Bob' == Person['name'])
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name='Bob'")
+        q = Select('some_table', Person['name'] > 'Bob')
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name>'Bob'")
+        q = Select('some_table', Person['name'] >= 'Bob')
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name>='Bob'")
+        q = Select('some_table', Person['name'] < 'Bob')
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name<'Bob'")
+        q = Select('some_table', Person['name'] <= 'Bob')
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name<='Bob'")
+        q = Select('some_table', Person['name'] != 'Bob')
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name!='Bob'")
+
+        q = Select('some_table', Person['name'] == 'Bob', Person['car_id'] == 2)
+        self.assertEqual(str(q), "SELECT * FROM some_table WHERE name='Bob' AND car_id=2")
+
+
 
 class TestSqlite(TestPostgresql):
 
@@ -1110,84 +1130,6 @@ class TestSqlite(TestPostgresql):
     test_json = None
     test_second_cursor = None
 
-
-class FakeTable(Table):
-    """
-    A Table-like object used to test queries below
-    """
-    refs = ['id',]
-    name = 'fake'
-    pks = ['id',]
-    class db:
-        kind = 'postgresql'
-        curs = None
-
-    def __init__(self): pass
-
-fake_table = FakeTable()
-
-
-
-class TestQuery(ExtraTestMethods):
-
-    def test_insert(self):
-        steve = Dict(fake_table, name='Steve')
-        query = Insert(steve)
-        self.assertEqual(query.build(),
-                "INSERT INTO fake (name) VALUES (%(name)s) RETURNING *")
-
-        alice = Dict(fake_table, name='Alice', foo='bar')
-        query = Insert(alice)
-        self.assertEqual(query.build(),
-                "INSERT INTO fake (foo, name) VALUES (%(foo)s, %(name)s) RETURNING *")
-
-        # Insert new dictionary into table
-        query = Insert(fake_table)
-        query.refine(foo='bar')
-        self.assertEqual(query.build(),
-                "INSERT INTO fake (foo) VALUES (%(foo)s) RETURNING *")
-
-
-    def test_update(self):
-        steve = Dict(fake_table, name='Steve')
-        query = Update(steve)
-        self.assertEqual(query.build(),
-                "UPDATE fake SET name=%(name)s WHERE id=%(old_id)s RETURNING *")
-
-        alice = Dict(fake_table, name='Alice', foo='bar')
-        query = Update(alice)
-        self.assertEqual(query.build(),
-                "UPDATE fake SET foo=%(foo)s, name=%(name)s WHERE id=%(old_id)s RETURNING *")
-
-
-    def test_delete(self):
-        steve = Dict(fake_table, name='Steve')
-        query = Delete(steve)
-        self.assertEqual(query.build(), "DELETE FROM fake WHERE id=%(id)s")
-
-        alice = Dict(fake_table, name='Alice', foo='bar')
-        query = Delete(alice)
-        self.assertEqual(query.build(), "DELETE FROM fake WHERE id=%(id)s")
-
-
-    def test_select(self):
-        query = Select(fake_table)
-        self.assertEqual(query.build(), "SELECT * FROM fake ORDER BY id")
-        self.assertEqual(query.build(name='Alice'),
-                "SELECT * FROM fake WHERE name=%(name)s ORDER BY id")
-        self.assertEqual(query.build(name='Alice', foo='bar'),
-                "SELECT * FROM fake WHERE foo=%(foo)s AND name=%(name)s ORDER BY id")
-
-        query.refine(order_by='baz')
-        self.assertEqual(query.build(name='Alice', foo='bar'),
-                "SELECT * FROM fake WHERE foo=%(foo)s AND name=%(name)s ORDER BY baz")
-
-
-    def test_select_no_pks(self):
-        fake_table2 = FakeTable()
-        fake_table2.pks = []
-        query = Select(fake_table2)
-        self.assertEqual(query.build(), "SELECT * FROM fake")
 
 
 
