@@ -139,9 +139,6 @@ class TestPostgresql(PostgresTestBase):
         self.assertDictContains(bob, {'name':'Jon', 'id':1})
         self.assertEqual(list(Person.get_where(1)), [bob,])
 
-        self.conn.commit()
-        self.assertEqual(list(Person.get_where({'id':1})), [bob,])
-
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')
         dave = Person(name='Dave')

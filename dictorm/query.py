@@ -26,7 +26,7 @@ class Select(object):
 
 
     def values(self):
-        return list(self.logicals_or_exp)
+        return list(self.logicals_or_exp or [])
 
 
     def build(self):
@@ -119,6 +119,9 @@ class Column(object):
         self.table = table
         self.column = column
 
+    def __repr__(self):
+        return 'Column({}.{})'.format(self.table, self.column)
+
     def __eq__(self, column): return Expression(self, column, '=')
     def __gt__(self, column): return Expression(self, column, '>')
     def __ge__(self, column): return Expression(self, column, '>=')
@@ -134,6 +137,11 @@ class Expression(object):
         self.column1 = column1
         self.column2 = column2
         self.kind = kind
+        self._substratum = None
+
+    def __repr__(self):
+        return 'Expression({}{}{})'.format(self.column1,
+                self.kind, self.column2)
 
     def __str__(self):
         c1 = self.column1.column
@@ -148,6 +156,19 @@ class Expression(object):
         return iter([self.column2,])
 
 
+    def foreign_key(self):
+        return [self.column1.column,
+                self.column2.table,
+                self.column2.column,
+                False if self.kind == '=' else True,
+                self._substratum]
+
+
+    def substratum(self, column):
+        self._substratum = column
+        return self
+
+
     def Or(self, exp2): return Or(self, exp2)
     def Xor(self, exp2): return Xor(self, exp2)
     def And(self, exp2): return And(self, exp2)
@@ -158,7 +179,12 @@ class Logical(object):
 
     def __init__(self, kind, *logicals_or_exp):
         self.kind = kind
-        self.logicals_or_exp = logicals_or_exp
+        self.logicals_or_exp = list(logicals_or_exp)
+        self.extend = self.logicals_or_exp.extend
+        self.append = self.logicals_or_exp.append
+
+    def __repr__(self):
+        return '{}({})'.format(self.kind, repr(self.logicals_or_exp))
 
     def __str__(self):
         kind = ' '+self.kind+' '
@@ -176,8 +202,10 @@ class Logical(object):
         for exp in self.logicals_or_exp:
             if isinstance(exp, Logical):
                 i.extend(list(exp))
-            else:
+            elif isinstance(exp, Expression):
                 i.append(exp.value())
+            else:
+                i.append(exp)
         return iter(i)
 
 

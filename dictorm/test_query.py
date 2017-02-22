@@ -183,6 +183,14 @@ class TestUpdate(unittest.TestCase):
             'UPDATE some_table SET car_id=%s, name=%s WHERE id=%s AND car_id=%s RETURNING *',
             [2, 'Bob', 3, 4]))
 
+        wheres = And()
+        wheres.append(Person['id']==3)
+        wheres.append(Person['car_id']==4)
+        q = Update('some_table', name='Bob', car_id=2).where(wheres).returning('*')
+        self.assertEqual(q.build(), (
+            'UPDATE some_table SET car_id=%s, name=%s WHERE id=%s AND car_id=%s RETURNING *',
+            [2, 'Bob', 3, 4]))
+
 
 
 if __name__ == '__main__':

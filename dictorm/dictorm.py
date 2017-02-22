@@ -159,7 +159,8 @@ class ResultsGenerator:
         """
         if not self.executed:
             self.executed = True
-            self.curs.execute(*self.query.build())
+            sql, values = self.query.build()
+            self.curs.execute(sql, values)
 
 
     # for python 2.7
@@ -377,20 +378,16 @@ class Table(object):
 
 
     def __setitem__(self, ref_name, value):
-        if len(value) == 3:
-            # Set a substraum reference
-            my_column, substratum, their_refname = value
-            self.refs[ref_name] = (my_column, substratum, their_refname)
-        else:
-            # Set a reference
-            my_column, table, their_column, many = value
-            self.my_columns[my_column] = ref_name
-            self.refs[ref_name] = (
-                    self, my_column, table, their_column, many)
+        my_column, table, their_column, many, substratum = value.foreign_key()
+        self.my_columns[my_column] = ref_name
+        self.refs[ref_name] = value
 
 
-    def __getitem__(self, key):
-        return Column(self, key)
+    def __getitem__(self, ref_name):
+        try:
+            return self.refs[ref_name]
+        except:
+            return Column(self, ref_name)
 
 
 
@@ -450,7 +447,8 @@ class Dict(dict):
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
             query = Insert(self._table.name, **self.remove_refs()).returning('*')
-            self._curs.execute(*query.build())
+            sql, values = query.build()
+            self._curs.execute(sql, values)
             self._in_db = True
 
             if self._table.db.kind == 'sqlite3':
@@ -464,13 +462,16 @@ class Dict(dict):
                 raise NoPrimaryKey(
                         'Cannot update to {}, no primary keys defined.'.format(
                     self._table))
-            # Combine old values with new values, this is needed to change
-            # primary keys.
-            combined = self.remove_refs()
-            combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
-            combined = json_dicts(combined)
-            query = Update(self)
-            self._curs.execute(query.build(), combined)
+            # Pair all primary keys in an And so that the correct row is updated
+            pk_pairs = And()
+            for k,v in self._old.items():
+                if k in self._table.pks:
+                    pk_pairs.append(self._table[k] == v)
+            # Update without references, "wheres" are the primary values
+            query = Update(self._table.name, **self.remove_refs()
+                    ).where(pk_pairs).returning('*')
+            sql, values = query.build()
+            self._curs.execute(sql, values)
 
             if self._table.db.kind == 'sqlite3':
                 # Get the row that was just updated using the primary keys
@@ -491,8 +492,9 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        query = Delete(self)
-        self._curs.execute(query.build(), self)
+        query = Delete(self._table.name)
+        sql, values = query.build()
+        self._curs.execute(sql, values)
 
 
     def remove_pks(self):
@@ -527,20 +529,11 @@ class Dict(dict):
         ref = self._table.refs.get(key)
         if not ref and key not in self:
             raise KeyError(str(key))
-        substratum = False
         # Only get the referenced row once, if it has a value, the reference's
         # column hasn't been changed.
         val = super(Dict, self).get(key)
         if ref and not val:
-            if len(ref) == 3:
-                substratum = True
-                # This reference is linking two references, get the value of the
-                # regular reference using usual means, then pull the
-                # sub-reference.
-                my_column, table, their_substratum = ref
-                ref = self._table.refs[my_column]
-
-            my_table, my_column, table, their_column, many = ref
+            my_column, table, their_column, many, substratum = ref.foreign_key()
             wheres = {their_column:self[my_column]}
             if many:
                 val = table.get_where(**wheres)
@@ -552,9 +545,9 @@ class Dict(dict):
                     val = None
 
             if substratum and many:
-                val = [i[their_substratum] for i in val]
+                val = [i[substratum] for i in val]
             elif substratum:
-                val = val[their_substratum]
+                val = val[substratum]
 
             if not many:
                 # TODO Only caching one-to-one references, will need to cache
