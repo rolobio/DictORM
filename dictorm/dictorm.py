@@ -5,7 +5,9 @@ Dictionaries.
 """
 from sys import modules
 from json import dumps
-from dictorm.query import *
+from dictorm.query import Select, Insert, Update
+from dictorm.query import Or, And, Xor
+from dictorm.query import Column, Expression, Logical
 
 try: # pragma: no cover
     from dictorm.__version__ import __version__
@@ -29,13 +31,8 @@ if not db_package_imported: # pragma: no cover
     raise ImportError('Failed to import psycopg2 or sqlite3.  These are the only supported Databases and you must import one of them')
 
 
-__all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
-    'UnexpectedRows', 'ResultsGenerator', '__version__',
-    'Select', 'Or']
-
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
-
 
 
 def json_dicts(d):
@@ -119,19 +116,21 @@ class ResultsGenerator:
     a count.
     """
 
-    def __init__(self, query):
+    def __init__(self, table, query, db):
+        self.table = table
         self.query = query
         self.cache = []
         self.completed = False
         self.refined = False
         self.order_by = None
         self.executed = False
+        self.db_kind = db.kind
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
-        if query.table.db.kind == 'sqlite3':
-            self.curs = query.table.db.conn.cursor()
-        elif query.table.db.kind == 'postgresql':
-            self.curs = query.table.db.conn.cursor(cursor_factory=DictCursor)
+        if db.kind == 'sqlite3':
+            self.curs = db.conn.cursor()
+        elif db.kind == 'postgresql':
+            self.curs = db.conn.cursor(cursor_factory=DictCursor)
 
 
     def __iter__(self):
@@ -148,7 +147,7 @@ class ResultsGenerator:
             self.completed = True
             raise StopIteration
         # Convert returned dictionary to a Dict
-        d = self.query.table(d)
+        d = self.table(d)
         d._in_db = True
         self.cache.append(d)
         return d
@@ -160,8 +159,7 @@ class ResultsGenerator:
         """
         if not self.executed:
             self.executed = True
-            query = self.query.build()
-            self.curs.execute(query, self.query.wheres)
+            self.curs.execute(*self.query.build())
 
 
     # for python 2.7
@@ -170,7 +168,7 @@ class ResultsGenerator:
 
     def __len__(self):
         self._execute_once()
-        if self.query.table.db.kind == 'sqlite3':
+        if self.db_kind == 'sqlite3':
             # sqlite3's cursor.rowcount doesn't support select statements
             return 0
         return self.curs.rowcount
@@ -332,21 +330,21 @@ class Table(object):
         NoPrimaryKey()
 
         """
-        if a and len(a) == 1 and isinstance(a[0], dict):
-            # A single dictionary has been passed as an argument, use it as
-            # the keyword arguments.
-            kw = a[0]
-        elif a:
-            if not self.pks:
-                raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
-            kw = dict(zip(self.pks, a))
+        # Need a list to replace single integers as expressions
+        a = list(a)
+        # Add any key/values as expressions
+        for key, value in kw.items():
+            a.append(self[key] == value)
 
-        # Build out the query using user-provideded data, and data gathered
-        # from the DB.
-        query = Select(self)
-        query.order_by = self.order_by
-        query.build(**kw)
-        return ResultsGenerator(query)
+        # Replace single integers with expressions
+        pk_uses = 0
+        for idx, exp in enumerate(a):
+            if isinstance(exp, (Expression, Logical)):
+                continue
+            a[idx] = self[self.pks[pk_uses]] == exp
+            pk_uses += 1
+        query = Select(self.name, *a)
+        return ResultsGenerator(self, query, self.db)
 
 
     def get_one(self, *a, **kw):
@@ -451,9 +449,8 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = Insert(self)
-            d = json_dicts(self.remove_refs())
-            self._curs.execute(query.build(), d)
+            query = Insert(self._table.name, **self.remove_refs()).returning('*')
+            self._curs.execute(*query.build())
             self._in_db = True
 
             if self._table.db.kind == 'sqlite3':

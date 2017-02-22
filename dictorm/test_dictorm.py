@@ -58,8 +58,7 @@ class ExtraTestMethods(unittest.TestCase):
             raise TypeError('{} is not type {}'.format(str(a), b0))
 
 
-
-class TestPostgresql(ExtraTestMethods):
+class PostgresTestBase(ExtraTestMethods):
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
@@ -111,6 +110,10 @@ class TestPostgresql(ExtraTestMethods):
                 GRANT ALL ON SCHEMA public TO public;''')
         self.conn.commit()
 
+
+
+
+class TestPostgresql(PostgresTestBase):
 
     def test_DictDB(self):
         self.db.refresh_tables()
