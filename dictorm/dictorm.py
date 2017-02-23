@@ -401,7 +401,7 @@ class Table(object):
 
 
     def __setitem__(self, ref_name, value):
-        my_column, table, their_column, many, substratum = value.foreign_key()
+        my_column = value.foreign_key()[0]
         self.my_columns[my_column] = ref_name
         self.refs[ref_name] = value
 
