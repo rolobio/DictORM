@@ -137,7 +137,7 @@ class Update(Insert):
 
     def __init__(self, table, **values):
         self.logicals_or_exp = None
-        super().__init__(table, **values)
+        super(Update, self).__init__(table, **values)
 
 
     def _build_cvp(self):
@@ -156,7 +156,7 @@ class Update(Insert):
 
 
     def values(self):
-        values = super().values()
+        values = super(Update, self).values()
         if self.logicals_or_exp:
             values.extend(list(self.logicals_or_exp))
         return values
@@ -279,15 +279,15 @@ class Logical(object):
 
 class Or(Logical):
     def __init__(self, *logicals_or_exp):
-        super().__init__('OR', *logicals_or_exp)
+        super(Or, self).__init__('OR', *logicals_or_exp)
 
 class Xor(Logical):
     def __init__(self, *logicals_or_exp):
-        super().__init__('XOR', *logicals_or_exp)
+        super(Xor, self).__init__('XOR', *logicals_or_exp)
 
 class And(Logical):
     def __init__(self, *logicals_or_exp):
-        super().__init__('AND', *logicals_or_exp)
+        super(And, self).__init__('AND', *logicals_or_exp)
 
 
 
