@@ -28,9 +28,12 @@ class Select(object):
     def __str__(self):
         sql = self.query
         formats = {'table':self.table,}
-        if str(self.logicals_or_exp):
+        loe = self.logicals_or_exp
+        if (isinstance(loe, Logical) and loe.logicals_or_exp) or (
+                isinstance(loe, Expression)
+                ):
             sql += ' WHERE {exp}'
-            formats['exp'] = str(self.logicals_or_exp)
+            formats['exp'] = str(loe)
         if self._order_by:
             sql += ' ORDER BY '+str(self._order_by)
         if self.returning:

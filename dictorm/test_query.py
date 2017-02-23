@@ -21,6 +21,8 @@ class TestSelect(unittest.TestCase):
     def test_basic(self):
         q = Select('some_table')
         self.assertEqual(str(q), "SELECT * FROM some_table")
+        q = Select('some_table', And())
+        self.assertEqual(str(q), "SELECT * FROM some_table")
         q = Select('some_table', Person['name'] == 'Bob')
         self.assertEqual(str(q), "SELECT * FROM some_table WHERE name=%s")
         q = Select('some_table', 'Bob' == Person['name'])
