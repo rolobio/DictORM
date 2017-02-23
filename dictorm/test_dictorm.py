@@ -341,10 +341,11 @@ class TestPostgresql(PostgresTestBase):
         Person['manager'] = Person['id'] == Person['manager_id']
         Person['car'] = Person['car_id'] == Car['id']
 
+
         # Directly access a person's manager's car by getting the sub-reference
         Person['manager_car'] = Person['manager'].substratum('car')
 
-        bob = Person(name='Dave').flush()
+        bob = Person(name='Bob').flush()
         alice_car = Car(name='Prius').flush()
         alice = Person(name='Alice', manager_id=bob['id'], car_id=alice_car['id']).flush()
 
@@ -503,6 +504,7 @@ class TestPostgresql(PostgresTestBase):
 
         curs2 = self.conn.cursor(cursor_factory=DictCursor)
         persons = Person.get_where()
+        print(persons.query)
         self.assertEqual(next(persons), bob)
 
         curs2.execute('SELECT * FROM person')
@@ -829,10 +831,10 @@ class TestPostgresql(PostgresTestBase):
         minions = tom['subordinates']
         self.assertEqual(_remove_refs(minions),
                 _remove_refs([milton, peter]))
-        limited_minions = minions.refine(limit=1)
+        limited_minions = minions.limit(1)
         self.assertEqual(_remove_refs(limited_minions),
                 _remove_refs([milton,]))
-        self.assertEqual(_remove_refs(limited_minions.refine(order_by='id DESC')),
+        self.assertEqual(_remove_refs(limited_minions.order_by('id DESC')),
                 _remove_refs([peter,]))
 
 
@@ -855,7 +857,7 @@ class TestPostgresql(PostgresTestBase):
 
         # Refine the results by ordering by other, which is the reverse of how
         # they were inserted
-        self.assertEqual(_remove_refs(bob['subordinates'].refine(order_by='other ASC')),
+        self.assertEqual(_remove_refs(bob['subordinates'].order_by('other ASC')),
                 _remove_refs([alice, dave]))
         self.assertEqual(_remove_refs(bob['subordinates']),
                 _remove_refs([dave, alice]))
@@ -864,10 +866,10 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(_remove_refs(alice['subordinates']),
                 _remove_refs([steve,]))
 
-        all_subordinates = Person.get_where(manager_id=(1,3))
+        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
         self.assertEqual(list(all_subordinates), [dave, alice, steve])
 
-        all_subordinates = Person.get_where(manager_id=(1,3))
+        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
         self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
 
 
@@ -888,17 +890,17 @@ class TestPostgresql(PostgresTestBase):
 
         # Using limit and offset, but in such a way that it returns everything
         if self.db.kind == 'postgresql':
-            self.assertEqual(list(persons.refine(limit='ALL', offset=0)),
+            self.assertEqual(list(persons.limit('ALL').offset(0)),
                     [bob, aly, tom, abe, gus])
 
         # Single refine
-        limited = persons.refine(limit=2)
+        limited = persons.limit(2)
         self.assertEqual(list(limited), [bob, aly])
         self.assertEqual(list(limited), [bob, aly])
 
-        self.assertEqual(list(limited.refine(offset=3)), [abe, gus])
+        self.assertEqual(list(limited.offset(3)), [abe, gus])
         # Multiple refinings
-        self.assertEqual(list(persons.refine(limit=2).refine(offset=2)), [tom, abe])
+        self.assertEqual(list(persons.limit(2).offset(2)), [tom, abe])
 
 
     def test_onetoone_cache(self):

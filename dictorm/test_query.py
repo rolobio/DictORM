@@ -1,6 +1,6 @@
 import unittest
 from dictorm.test_dictorm import PostgresTestBase
-from dictorm.query import (Select, Insert, Update,
+from dictorm.query import (Select, Insert, Update, Delete,
         Or, Xor, And, Column)
 
 class PersonTable(object):
@@ -111,6 +111,57 @@ class TestSelect(unittest.TestCase):
                     )
                 )
 
+    def test_order_by(self):
+        q = Select('other_table', Person['name'] == 'Steve').order_by('id ASC')
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name=%s ORDER BY id ASC',
+                    ['Steve',]
+                    )
+                )
+
+
+    def test_limit(self):
+        q = Select('other_table', Person['name'] == 'Steve').order_by('id ASC'
+                ).limit(12)
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name=%s ORDER BY id ASC LIMIT 12',
+                    ['Steve',]
+                    )
+                )
+
+
+    def test_offset(self):
+        q = Select('other_table', Person['name'] == 'Steve').order_by('id ASC'
+                ).offset(8)
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name=%s ORDER BY id ASC OFFSET 8',
+                    ['Steve',]
+                    )
+                )
+        q = Select('other_table', Person['name'] == 'Steve').order_by('id ASC'
+                ).offset(8).limit(12)
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name=%s ORDER BY id ASC LIMIT 12 OFFSET 8',
+                    ['Steve',]
+                    )
+                )
+
+
+    def test_select_tuple(self):
+        q = Select('cool_table', Person['id'].In((1,2)))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM cool_table WHERE id IN %s',
+                    [(1,2),]
+                    )
+                )
+
+        q = Select('cool_table', Person['id'].In((1,2))).order_by('id DESC')
+        self.assertEqual(q.build(),
+                ('SELECT * FROM cool_table WHERE id IN %s ORDER BY id DESC',
+                    [(1,2),]
+                    )
+                )
+
 
 
 class TestInsert(unittest.TestCase):
@@ -190,6 +241,21 @@ class TestUpdate(unittest.TestCase):
         self.assertEqual(q.build(), (
             'UPDATE some_table SET car_id=%s, name=%s WHERE id=%s AND car_id=%s RETURNING *',
             [2, 'Bob', 3, 4]))
+
+
+
+class TestDelete(unittest.TestCase):
+
+    def test_build(self):
+        q = Delete('some_table').where(Person['name']=='Bob')
+        self.assertEqual(q.build(), (
+            "DELETE FROM some_table WHERE name=%s",
+            ['Bob',]))
+
+        q = Delete('some_table').where(Person['name']>='Bob')
+        self.assertEqual(q.build(), (
+            "DELETE FROM some_table WHERE name>=%s",
+            ['Bob',]))
 
 
 

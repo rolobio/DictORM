@@ -6,23 +6,30 @@ class Select(object):
 
     query = 'SELECT * FROM {table}'
 
-    def __init__(self, table, logicals_or_exp=None, returning=None):
+    def __init__(self, table, logicals_or_exp=[], returning=None):
         self.table = table
         self.logicals_or_exp = logicals_or_exp
         self.returning = returning
+        self._order_by = None
+        self._limit = None
+        self._offset= None
+
 
     def __str__(self):
         sql = self.query
+        formats = {'table':self.table,}
         if self.logicals_or_exp:
             sql += ' WHERE {exp}'
+            formats['exp'] = str(self.logicals_or_exp)
+        if self._order_by:
+            sql += ' ORDER BY '+str(self._order_by)
         if self.returning:
             sql += ' RETURNING '+str(self.returning)
-        if self.logicals_or_exp:
-            sql = sql.format(table=self.table,
-                    exp=str(self.logicals_or_exp))
-        else:
-            sql = sql.format(table=self.table)
-        return sql
+        if self._limit:
+            sql += ' LIMIT '+str(self._limit)
+        if self._offset:
+            sql += ' OFFSET '+str(self._offset)
+        return sql.format(**formats)
 
 
     def values(self):
@@ -31,6 +38,28 @@ class Select(object):
 
     def build(self):
         return (str(self), self.values())
+
+
+    def order_by(self, order_by):
+        self._order_by = order_by
+        return self
+
+
+    def limit(self, limit):
+        self._limit = limit
+        return self
+
+
+    def offset(self, offset):
+        self._offset = offset
+        return self
+
+
+    def append(self, item):
+        try:
+            self.logicals_or_exp.append(item)
+        except AttributeError:
+            self.logicals_or_exp = And(self.logicals_or_exp, item)
 
 
 
@@ -112,6 +141,11 @@ class Update(Insert):
         return self
 
 
+class Delete(Update):
+
+    query = 'DELETE FROM {table}'
+
+
 
 class Column(object):
 
@@ -128,6 +162,9 @@ class Column(object):
     def __lt__(self, column): return Expression(self, column, '<')
     def __le__(self, column): return Expression(self, column, '<=')
     def __ne__(self, column): return Expression(self, column, '!=')
+
+    def In(self, tup):
+        return Expression(self, tup, ' IN ')
 
 
 

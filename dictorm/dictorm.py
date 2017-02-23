@@ -5,7 +5,7 @@ Dictionaries.
 """
 from sys import modules
 from json import dumps
-from dictorm.query import Select, Insert, Update
+from dictorm.query import Select, Insert, Update, Delete
 from dictorm.query import Or, And, Xor
 from dictorm.query import Column, Expression, Logical
 
@@ -122,15 +122,21 @@ class ResultsGenerator:
         self.cache = []
         self.completed = False
         self.refined = False
-        self.order_by = None
         self.executed = False
         self.db_kind = db.kind
+        self.db = db
+
+
+    def _new_cursor(self):
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
-        if db.kind == 'sqlite3':
-            self.curs = db.conn.cursor()
-        elif db.kind == 'postgresql':
-            self.curs = db.conn.cursor(cursor_factory=DictCursor)
+        if 'curs' in dir(self):
+            del self.curs
+
+        if self.db.kind == 'sqlite3':
+            self.curs = self.db.conn.cursor()
+        elif self.db.kind == 'postgresql':
+            self.curs = self.db.conn.cursor(cursor_factory=DictCursor)
 
 
     def __iter__(self):
@@ -158,8 +164,10 @@ class ResultsGenerator:
         Execute the query only once
         """
         if not self.executed:
+            self._new_cursor()
             self.executed = True
             sql, values = self.query.build()
+            print(sql, values)
             self.curs.execute(sql, values)
 
 
@@ -176,14 +184,25 @@ class ResultsGenerator:
 
 
     def refine(self, **kw):
-        """
-        Get a new ResultsGenerator built from this generator's properties, but
-        now with the additional properties provided as arguments.
+        self.executed = False
+        for k,v in kw.items():
+            self.query.append(self.table[k]==v)
+        return ResultsGenerator(self.table, self.query, self.db)
 
-        See Query.refine for supported refinements.
-        """
-        self.query.refine(**kw)
-        return ResultsGenerator(self.query)
+
+    def order_by(self, order_by):
+        self.query.order_by(order_by)
+        return ResultsGenerator(self.table, self.query, self.db)
+
+
+    def limit(self, limit):
+        self.query.limit(limit)
+        return ResultsGenerator(self.table, self.query, self.db)
+
+
+    def offset(self, offset):
+        self.query.offset(offset)
+        return ResultsGenerator(self.table, self.query, self.db)
 
 
 
@@ -332,19 +351,24 @@ class Table(object):
 
         """
         # Need a list to replace single integers as expressions
-        a = list(a)
-        # Add any key/values as expressions
-        for key, value in kw.items():
-            a.append(self[key] == value)
-
+        logical_group = And()
         # Replace single integers with expressions
         pk_uses = 0
-        for idx, exp in enumerate(a):
+        for exp in a:
             if isinstance(exp, (Expression, Logical)):
-                continue
-            a[idx] = self[self.pks[pk_uses]] == exp
+                logical_group.append(exp)
+            logical_group.append(self[self.pks[pk_uses]] == exp)
             pk_uses += 1
-        query = Select(self.name, *a)
+        # Add any key/values as expressions
+        for key, value in kw.items():
+            logical_group.append(self[key] == value)
+
+        order_by = None
+        if self.order_by:
+            order_by = self.order_by
+        elif self.pks:
+            order_by = str(self.pks[0])+' ASC'
+        query = Select(self.name, logical_group).order_by(order_by)
         return ResultsGenerator(self, query, self.db)
 
 
@@ -446,7 +470,8 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = Insert(self._table.name, **self.remove_refs()).returning('*')
+            query = Insert(self._table.name, **json_dicts(self.remove_refs())
+                    ).returning('*')
             sql, values = query.build()
             self._curs.execute(sql, values)
             self._in_db = True
@@ -468,7 +493,7 @@ class Dict(dict):
                 if k in self._table.pks:
                     pk_pairs.append(self._table[k] == v)
             # Update without references, "wheres" are the primary values
-            query = Update(self._table.name, **self.remove_refs()
+            query = Update(self._table.name, **json_dicts(self.remove_refs())
                     ).where(pk_pairs).returning('*')
             sql, values = query.build()
             self._curs.execute(sql, values)
@@ -492,7 +517,10 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        query = Delete(self._table.name)
+        pk_values = And()
+        for key in self._table.pks:
+            pk_values.append(self._table[key]==self[key])
+        query = Delete(self._table.name).where(pk_values)
         sql, values = query.build()
         self._curs.execute(sql, values)
 
@@ -534,25 +562,29 @@ class Dict(dict):
         val = super(Dict, self).get(key)
         if ref and not val:
             my_column, table, their_column, many, substratum = ref.foreign_key()
+            if substratum and not isinstance(self._table[substratum], Column):
+                ref = self._table[substratum]
+                ign, ign, their_substratum, many, ign = ref.foreign_key()
             wheres = {their_column:self[my_column]}
             if many:
-                val = table.get_where(**wheres)
+                gen = table.get_where(**wheres)
             else:
                 try:
-                    val = table.get_one(**wheres)
+                    gen = table.get_one(**wheres)
                 except IndexError:
                     # No results returned, must not be set
-                    val = None
+                    gen = None
 
             if substratum and many:
-                val = [i[substratum] for i in val]
+                gen = [i[substratum] for i in gen]
             elif substratum:
-                val = val[substratum]
+                gen = gen[substratum]
 
             if not many:
                 # TODO Only caching one-to-one references, will need to cache
                 # one-to-many
-                super(Dict, self).__setitem__(key, val)
+                super(Dict, self).__setitem__(key, gen)
+            val = gen
         return val
 
 
