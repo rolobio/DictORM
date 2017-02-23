@@ -12,7 +12,6 @@ try: # pragma: no cover
     from dictorm.query import Or, And, Xor
     from dictorm.query import Column, Expression, Logical
     from dictorm.sqlite import Insert as SqliteInsert
-    from dictorm.sqlite import Expression as SqliteExpression
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
@@ -21,7 +20,6 @@ except ImportError: # pragma: no cover
     from .query import Or, And, Xor
     from .query import Column, Expression, Logical
     from .sqlite import Insert as SqliteInsert
-    from .sqlite import Expression as SqliteExpression
     from .sqlite import Column as SqliteColumn
     from .sqlite import Update as SqliteUpdate
 

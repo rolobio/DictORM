@@ -70,13 +70,13 @@ class TestSelect(unittest.TestCase):
 
 
     def test_logical_groups(self):
-        q = Select('some_table', Or(
+        q = Select('some_table', Xor(
             And(Person['name'] == 'Bob', Person['car_id'] == 2),
             Person['name'] == 'Alice'
             ))
 
         self.assertEqual(str(q),
-                "SELECT * FROM some_table WHERE (name=%s AND car_id=%s) OR name=%s")
+                "SELECT * FROM some_table WHERE (name=%s AND car_id=%s) XOR name=%s")
 
         q = Select('some_table', Or(
             And(Person['name'] >= 'Bob', Person['car_id'] == 2.3),
