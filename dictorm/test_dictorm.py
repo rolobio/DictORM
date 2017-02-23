@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, Select,
-    Or)
+    ResultsGenerator, Select)
 from pprint import pprint
 from psycopg2.extras import DictCursor
 import os
