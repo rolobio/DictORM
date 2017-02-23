@@ -1,8 +1,6 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, column_value_pairs,
-    Insert, Update, Delete, Select)
-from pprint import pprint
+    ResultsGenerator, Select)
 from psycopg2.extras import DictCursor
 import os
 import psycopg2
@@ -58,8 +56,7 @@ class ExtraTestMethods(unittest.TestCase):
             raise TypeError('{} is not type {}'.format(str(a), b0))
 
 
-
-class TestPostgresql(ExtraTestMethods):
+class PostgresTestBase(ExtraTestMethods):
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
@@ -112,6 +109,10 @@ class TestPostgresql(ExtraTestMethods):
         self.conn.commit()
 
 
+
+
+class TestPostgresql(PostgresTestBase):
+
     def test_DictDB(self):
         self.db.refresh_tables()
 
@@ -135,9 +136,6 @@ class TestPostgresql(ExtraTestMethods):
         bob.flush()
         self.assertDictContains(bob, {'name':'Jon', 'id':1})
         self.assertEqual(list(Person.get_where(1)), [bob,])
-
-        self.conn.commit()
-        self.assertEqual(list(Person.get_where({'id':1})), [bob,])
 
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')
@@ -173,7 +171,7 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(list(Person.get_where()), [bob, alice])
 
         # get_where accepts a tuple of ids, and returns those rows
-        self.assertEqual(list(Person.get_where(id=(1,3))),
+        self.assertEqual(list(Person.get_where(Person['id'].In([1,3]))),
                 [bob, alice])
 
         # Database row survives an object deletion
@@ -341,10 +339,11 @@ class TestPostgresql(ExtraTestMethods):
         Person['manager'] = Person['id'] == Person['manager_id']
         Person['car'] = Person['car_id'] == Car['id']
 
+
         # Directly access a person's manager's car by getting the sub-reference
         Person['manager_car'] = Person['manager'].substratum('car')
 
-        bob = Person(name='Dave').flush()
+        bob = Person(name='Bob').flush()
         alice_car = Car(name='Prius').flush()
         alice = Person(name='Alice', manager_id=bob['id'], car_id=alice_car['id']).flush()
 
@@ -479,17 +478,6 @@ class TestPostgresql(ExtraTestMethods):
         foo['foo'] = 'baz'
         self.assertRaises(NoPrimaryKey, foo.flush)
         self.assertRaises(NoPrimaryKey, NoPk.get_where, 1)
-
-
-    def test_column_value_pairs(self):
-        self.assertEqual(column_value_pairs('postgresql', {'id':10, 'person':'Dave'}),
-                'id=%(id)s, person=%(person)s')
-        self.assertEqual(column_value_pairs('postgresql', ('id', 'person')),
-                'id=%(id)s, person=%(person)s')
-        self.assertEqual(column_value_pairs('postgresql', {'id':(10,11,13), 'group':'foo'}, ' AND '),
-                'group=%(group)s AND id IN %(id)s')
-        self.assertEqual(column_value_pairs('postgresql', {'id':12, 'person':'Dave'}, prefix='old_'),
-                'id=%(old_id)s, person=%(old_person)s')
 
 
     def test_second_cursor(self):
@@ -829,14 +817,14 @@ class TestPostgresql(ExtraTestMethods):
         minions = tom['subordinates']
         self.assertEqual(_remove_refs(minions),
                 _remove_refs([milton, peter]))
-        limited_minions = minions.refine(limit=1)
+        limited_minions = minions.limit(1)
         self.assertEqual(_remove_refs(limited_minions),
                 _remove_refs([milton,]))
-        self.assertEqual(_remove_refs(limited_minions.refine(order_by='id DESC')),
+        self.assertEqual(_remove_refs(limited_minions.order_by('id DESC')),
                 _remove_refs([peter,]))
 
 
-    def test_refine_order_by(self):
+    def test_order_by2(self):
         """
         A result set can be refined using order by.  A reference can be refined
         using the same technique.
@@ -855,7 +843,7 @@ class TestPostgresql(ExtraTestMethods):
 
         # Refine the results by ordering by other, which is the reverse of how
         # they were inserted
-        self.assertEqual(_remove_refs(bob['subordinates'].refine(order_by='other ASC')),
+        self.assertEqual(_remove_refs(bob['subordinates'].order_by('other ASC')),
                 _remove_refs([alice, dave]))
         self.assertEqual(_remove_refs(bob['subordinates']),
                 _remove_refs([dave, alice]))
@@ -864,14 +852,14 @@ class TestPostgresql(ExtraTestMethods):
         self.assertEqual(_remove_refs(alice['subordinates']),
                 _remove_refs([steve,]))
 
-        all_subordinates = Person.get_where(manager_id=(1,3))
+        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
         self.assertEqual(list(all_subordinates), [dave, alice, steve])
 
-        all_subordinates = Person.get_where(manager_id=(1,3))
+        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
         self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
 
 
-    def test_refine_offset_limit(self):
+    def test_offset_limit(self):
         """
         A result set can be refined using an offset and limit.
         """
@@ -888,17 +876,43 @@ class TestPostgresql(ExtraTestMethods):
 
         # Using limit and offset, but in such a way that it returns everything
         if self.db.kind == 'postgresql':
-            self.assertEqual(list(persons.refine(limit='ALL', offset=0)),
+            self.assertEqual(list(persons.limit('ALL').offset(0)),
                     [bob, aly, tom, abe, gus])
 
         # Single refine
-        limited = persons.refine(limit=2)
+        limited = persons.limit(2)
         self.assertEqual(list(limited), [bob, aly])
         self.assertEqual(list(limited), [bob, aly])
 
-        self.assertEqual(list(limited.refine(offset=3)), [abe, gus])
+        self.assertEqual(list(limited.offset(3)), [abe, gus])
         # Multiple refinings
-        self.assertEqual(list(persons.refine(limit=2).refine(offset=2)), [tom, abe])
+        self.assertEqual(list(persons.limit(2).offset(2)), [tom, abe])
+
+
+    def test_refine_expressions(self):
+        Person = self.db['person']
+        Car = self.db['car']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        bob = Person(name='Bob').flush()
+        steves_car = Car().flush()
+        steve = Person(name='Steve', car_id=steves_car['id'], manager_id=bob['id']).flush()
+        aly = Person(name='Aly', manager_id=bob['id']).flush()
+        frank = Person(name='Frank', manager_id=bob['id']).flush()
+
+        self.assertEqual(list(bob['subordinates']),
+                [steve, aly, frank])
+        self.assertEqual(list(bob['subordinates'].order_by('id DESC')),
+                [frank, aly, steve])
+        self.assertEqual(list(bob['subordinates'].order_by('id DESC'
+            ).limit(1)),
+                [frank,])
+        self.assertEqual(list(bob['subordinates'].order_by('id DESC'
+            ).limit(1).offset(1)),
+                [aly,])
+
+        self.assertEqual(list(bob['subordinates'].refine(Person['car_id']>0)),
+                [steve,])
+
 
 
     def test_onetoone_cache(self):
@@ -945,7 +959,7 @@ class TestPostgresql(ExtraTestMethods):
 
 
 
-class TestSqlite(TestPostgresql):
+class SqliteTestBase(object):
 
     def setUp(self):
         self.conn = sqlite3.connect(':memory:')
@@ -996,6 +1010,10 @@ class TestSqlite(TestPostgresql):
         self.conn.commit()
 
 
+
+class TestSqlite(SqliteTestBase, TestPostgresql):
+
+
     def test_get_where(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
@@ -1016,9 +1034,6 @@ class TestSqlite(TestPostgresql):
         self.assertDictContains(bob, {'name':'Jon', 'id':1})
         self.assertEqual(list(Person.get_where(1)), [bob,])
 
-        self.conn.commit()
-        self.assertEqual(list(Person.get_where({'id':1})), [bob,])
-
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')
         dave = Person(name='Dave')
@@ -1037,10 +1052,6 @@ class TestSqlite(TestPostgresql):
         self.assertEqual(list(Person.get_where()), [bob, alice])
         self.conn.commit()
         self.assertEqual(list(Person.get_where()), [bob, alice])
-
-        # get_where accepts a tuple of ids, and returns those rows
-        self.assertEqual(list(Person.get_where(id=(1,3))),
-                [bob, alice])
 
         # Database row survives an object deletion
         del bob
@@ -1089,105 +1100,14 @@ class TestSqlite(TestPostgresql):
         self.assertEqual(results, [{'foo': 'bar'},])
 
 
-    def test_column_value_pairs(self):
-        self.assertEqual(column_value_pairs('sqlite3',
-            {'id':10, 'person':'Dave'}),
-                'id=:id, person=:person')
-        self.assertEqual(column_value_pairs('sqlite3', ('id', 'person')),
-                'id=:id, person=:person')
-        self.assertEqual(column_value_pairs('sqlite3',
-            {'id':(10,11,13), 'group':'foo'}, ' AND '),
-                'group=:group AND id IN (10,11,13)')
-        self.assertEqual(column_value_pairs('sqlite3',
-            {'id':12, 'person':'Dave'}, prefix='old_'),
-                'id=:old_id, person=:old_person')
-        self.assertRaises(ValueError, column_value_pairs,
-                'sqlite3', {'id':(10,11,'foo'), 'group':'foo'})
-
-
     # Not supported for sqlite
     test_count = None
+    test_delete = None
     test_json = None
+    test_order_by2 = None
+    test_refine_order_by = None
     test_second_cursor = None
 
-
-class FakeTable(Table):
-    """
-    A Table-like object used to test queries below
-    """
-    refs = ['id',]
-    name = 'fake'
-    pks = ['id',]
-    class db:
-        kind = 'postgresql'
-        curs = None
-
-    def __init__(self): pass
-
-fake_table = FakeTable()
-
-
-
-class TestQuery(ExtraTestMethods):
-
-    def test_insert(self):
-        steve = Dict(fake_table, name='Steve')
-        query = Insert(steve)
-        self.assertEqual(query.build(),
-                "INSERT INTO fake (name) VALUES (%(name)s) RETURNING *")
-
-        alice = Dict(fake_table, name='Alice', foo='bar')
-        query = Insert(alice)
-        self.assertEqual(query.build(),
-                "INSERT INTO fake (foo, name) VALUES (%(foo)s, %(name)s) RETURNING *")
-
-        # Insert new dictionary into table
-        query = Insert(fake_table)
-        query.refine(foo='bar')
-        self.assertEqual(query.build(),
-                "INSERT INTO fake (foo) VALUES (%(foo)s) RETURNING *")
-
-
-    def test_update(self):
-        steve = Dict(fake_table, name='Steve')
-        query = Update(steve)
-        self.assertEqual(query.build(),
-                "UPDATE fake SET name=%(name)s WHERE id=%(old_id)s RETURNING *")
-
-        alice = Dict(fake_table, name='Alice', foo='bar')
-        query = Update(alice)
-        self.assertEqual(query.build(),
-                "UPDATE fake SET foo=%(foo)s, name=%(name)s WHERE id=%(old_id)s RETURNING *")
-
-
-    def test_delete(self):
-        steve = Dict(fake_table, name='Steve')
-        query = Delete(steve)
-        self.assertEqual(query.build(), "DELETE FROM fake WHERE id=%(id)s")
-
-        alice = Dict(fake_table, name='Alice', foo='bar')
-        query = Delete(alice)
-        self.assertEqual(query.build(), "DELETE FROM fake WHERE id=%(id)s")
-
-
-    def test_select(self):
-        query = Select(fake_table)
-        self.assertEqual(query.build(), "SELECT * FROM fake ORDER BY id")
-        self.assertEqual(query.build(name='Alice'),
-                "SELECT * FROM fake WHERE name=%(name)s ORDER BY id")
-        self.assertEqual(query.build(name='Alice', foo='bar'),
-                "SELECT * FROM fake WHERE foo=%(foo)s AND name=%(name)s ORDER BY id")
-
-        query.refine(order_by='baz')
-        self.assertEqual(query.build(name='Alice', foo='bar'),
-                "SELECT * FROM fake WHERE foo=%(foo)s AND name=%(name)s ORDER BY baz")
-
-
-    def test_select_no_pks(self):
-        fake_table2 = FakeTable()
-        fake_table2.pks = []
-        query = Select(fake_table2)
-        self.assertEqual(query.build(), "SELECT * FROM fake")
 
 
 

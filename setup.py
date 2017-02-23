@@ -3,7 +3,7 @@ from dictorm import __version__, __doc__ as ddoc
 
 config = {
     'name':'dictorm',
-    'version':__version__,
+    'version':str(__version__),
     'author':'rolobio',
     'author_email':'rolobio+dictorm@rolobio.com',
     'description':ddoc,

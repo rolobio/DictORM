@@ -18,7 +18,7 @@ pip install dictorm
 ## Quick & Simple Example!
 ```python
 # Create a dictionary that contains all tables in the database
->>> from dictorm import DictDB, Dict
+>>> from dictorm import DictDB
 >>> db = DictDB(db_conn)
 # Get the Table object that was automatically found by DictDB
 >>> Person = db['person']
@@ -43,10 +43,7 @@ pip install dictorm
 
 # DictORM will NEVER commit or rollback changes, that is up to you.
 # Make sure to commit your changes:
-psycopg2_conn.commit()
-
-# If you're using sqlite3
-sqlite3_conn.commit()
+db_conn.commit()
 ```
 
 ## References will be represented as a sub-dictionary
@@ -65,7 +62,7 @@ sqlite3_conn.commit()
 {'id':1, 'name':'Dodge Stratus', 'plate':'123ABC'}
 
 >>> will['car_id'] = wills_car['id']
-# Update the database row, update the will object with his new car
+# Update the database row by updating the "will" object with his new car. Flush.
 >>> will.flush()
 >>> will
 {'name':'Will', 'id':1, 'car_id':1, 'car':{'id':1, 'name':'Dodge Stratus', 'plate':'123ABC'}}
@@ -316,4 +313,41 @@ bob
 # Reverse the order, limit to one row
 >>> list(minions.refine(order_by='id ASC', limit=1)
 [aly,]
+```
+
+### Advanced query'ing
+```python
+# DictORM supports many simple expressions.  It is by no means exhaustive,
+# but it supports the basic features.
+
+# Inserting Frank for these examples
+>>> frank = Person(name='Frank', manager_id=bob['id']).flush()
+>>> frank
+{'name':'Frank', 'id':4, 'manager_id':1, 'manager':bob}
+
+# Search using pythonic expressions
+>>> list(Person.get_where(Person['name'] == 'Steve'))
+[steve,]
+>>> Person.get_where(Person['id'] > 1)
+[steve, aly, frank]
+
+# Custom results ordering (reverse the previous results)
+>>> Person.get_where(Person['id'] > 1).order_by('id DESC')
+[frank, aly, steve]
+
+# Limit the results
+>>> Person.get_where(Person['id'] > 1).order_by('id DESC').limit(1)
+[frank,]
+
+# Offset the results
+>>> Person.get_where(Person['id'] > 1).order_by('id DESC').limit(1).offset(1)
+[aly,]
+
+# Refine a subordinate search
+>>> bob['subordinates'].refine(Person['name']=='Aly')
+[aly,]
+
+# Subordinate that has a car
+>>> bob['subordinates'].refine(Person['car_id']>0)
+[steve,]
 ```

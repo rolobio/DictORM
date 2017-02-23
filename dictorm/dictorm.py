@@ -5,10 +5,21 @@ Dictionaries.
 """
 from sys import modules
 from json import dumps
+
 try: # pragma: no cover
     from dictorm.__version__ import __version__
+    from dictorm.query import Select, Insert, Update, Delete, And
+    from dictorm.query import Column, Expression, Logical
+    from dictorm.sqlite import Insert as SqliteInsert
+    from dictorm.sqlite import Column as SqliteColumn
+    from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
     from .__version__ import __version__
+    from .query import Select, Insert, Update, Delete, And
+    from .query import Column, Expression, Logical
+    from .sqlite import Insert as SqliteInsert
+    from .sqlite import Column as SqliteColumn
+    from .sqlite import Update as SqliteUpdate
 
 db_package_imported = False
 try: # pragma: no cover
@@ -27,81 +38,8 @@ if not db_package_imported: # pragma: no cover
     raise ImportError('Failed to import psycopg2 or sqlite3.  These are the only supported Databases and you must import one of them')
 
 
-__all__ = ['DictDB', 'Table', 'Dict', 'NoPrimaryKey',
-    'UnexpectedRows', 'ResultsGenerator', 'column_value_pairs', '__version__',
-    'Query', 'Insert', 'Update', 'Delete', 'Select']
-
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
-
-def operator_kinds(o):
-    if o in (tuple, list):
-        return ' IN '
-    return '='
-
-
-def column_value_pairs(kind, d, join_str=', ', prefix=''):
-    """
-    Create a string of SQL that will instruct a Psycopg2 DictCursor to
-    interpolate the dictionary's keys into a SELECT or UPDATE SQL query.
-
-    If old is True, prefix all values with old_ .  This is used to change
-    primary key values.
-
-    Example 1:
-        >>> column_value_pairs({'id':10, 'person':'Dave'})
-        id=%(id)s, person=%(person)s
-
-    Example 2:
-        >>> column_value_pairs(('id', 'person'))
-        id=%(id)s, person=%(person)s
-
-    Example 3:
-        >>> column_value_pairs({'id':(10,11,13), 'group':'group'}, ' AND ')
-        group=%(group)s AND id IN %(id)s
-
-    Example 4:
-        >>> column_value_pairs({'id':12, 'person':'Dave'}, prefix='old_')
-        id=%(old_id)s, person=%(old_person)s
-    """
-    ret = ''
-    final_item = len(d)-1
-    for idx, key in enumerate(sorted(d)):
-        ret += str(key) + operator_kinds(type(d[key] if isinstance(d, dict) else type(key)))
-        if kind == 'sqlite3':
-            if isinstance(d, dict) and isinstance(d[key], (list, tuple)):
-                ret += '('+','.join([str(int(i)) for i in d[key]])+')'
-            else:
-                ret += ':' + prefix + key
-        elif kind == 'postgresql':
-            ret += '%('+ prefix + key +')s'
-        if idx != final_item:
-            ret += join_str
-    return ret
-
-
-def insert_column_value_pairs(kind, d):
-    """
-    Create a string of SQL that will instruct a Psycopg2 DictCursor to
-    interpolate the dictionary's keys into a INSERT SQL query.
-
-    Example:
-        >>> insert_column_value_pairs({'id':10, 'person':'Dave'})
-        (id, person) VALUES (%(id)s, %(person)s)
-    """
-    d = sorted(d)
-    if not d:
-        return 'DEFAULT VALUES'
-    elif kind == 'sqlite3':
-        return '({}) VALUES ({})'.format(
-                ', '.join(d),
-                ', '.join([':'+str(i) for i in d]),
-                )
-    else:
-        return '({}) VALUES ({})'.format(
-                ', '.join(d),
-                ', '.join(['%('+str(i)+')s' for i in d]),
-                )
 
 
 def json_dicts(d):
@@ -172,117 +110,6 @@ class DictDB(dict):
                 self[table['table_name']] = Table(table['table_name'], self)
 
 
-class Query(object):
-
-    def __init__(self, dict, kind, _table=None):
-        self.kind = kind
-        if _table != None:
-            self.dict = None
-            self.table = _table
-        else:
-            self.dict = dict
-            self.table = dict._table
-        self.query = None
-        self.parts = {}
-        self.built = False
-        self.wheres = {}
-        self.order_by = None
-        self.queries = {
-                'postgresql': {
-                    'insert':'INSERT INTO {table} {cvp} RETURNING *',
-                    'update':'UPDATE {table} SET {cvp} WHERE {pvp} RETURNING *',
-                    'delete':'DELETE FROM {table} WHERE {pvp}',
-                    'select':'SELECT * FROM {table}',
-                    },
-                'sqlite3':{
-                    'insert':'INSERT INTO {table} {cvp}',
-                    'update':'UPDATE {table} SET {cvp} WHERE {pvp}',
-                    'delete':'DELETE FROM {table} WHERE {pvp}',
-                    'select':'SELECT * FROM {table}',
-                    },
-                }
-
-
-    def build(self, **kw):
-        self.built = True
-        self.query = self.queries[self.table.db.kind][self.kind]
-        self.wheres.update(kw)
-        if self.kind == 'insert':
-            if self.dict:
-                self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
-                            self.dict.remove_refs())
-            else:
-                self.parts['cvp'] = insert_column_value_pairs(self.table.db.kind,
-                            self.wheres)
-        elif self.kind == 'update':
-            self.parts['cvp'] = column_value_pairs(self.table.db.kind,
-                self.dict.remove_refs())
-            self.parts['pvp'] = self.table._pk_value_pairs(prefix='old_')
-        elif self.kind == 'delete':
-            self.parts['pvp'] = self.table._pk_value_pairs()
-        elif self.kind == 'select':
-            self.parts['pvp'] = self.table._pk_value_pairs()
-            if self.wheres:
-                self.query += ' WHERE '
-                self.query += column_value_pairs(self.table.db.kind,
-                        self.wheres, ' AND ')
-            if 'order_by' in self.parts:
-                self.query += ' ORDER BY '+str(self.parts['order_by'])
-            elif self.order_by:
-                self.query += ' ORDER BY '+self.order_by
-            elif self.table.pks:
-                self.query += ' ORDER BY '+str(self.table.pks[0])
-
-            if 'limit' in self.parts:
-                self.query += ' LIMIT '+str(self.parts['limit'])
-
-            if 'offset' in self.parts:
-                self.query += ' OFFSET '+str(self.parts['offset'])
-
-        self.query = self.query.format(table=self.table.name, **self.parts)
-        return self.query
-
-
-    def refine(self, order_by=None, limit=None, offset=None, **kw):
-        if order_by:
-            self.parts['order_by'] = order_by
-        if offset:
-            self.parts['offset'] = int(offset)
-        if limit:
-            self.parts['limit'] = limit
-        self.wheres.update(kw)
-
-
-
-class Insert(Query):
-
-    def __init__(self, dict):
-        if isinstance(dict, Dict):
-            super(Insert, self).__init__(dict, 'insert')
-        else:
-            super(Insert, self).__init__({}, 'insert', _table=dict)
-
-
-
-class Update(Query):
-
-    def __init__(self, dict):
-        super(Update, self).__init__(dict, 'update')
-
-
-
-class Delete(Query):
-    def __init__(self, dict):
-        super(Delete, self).__init__(dict, 'delete')
-
-
-
-class Select(Query):
-
-    def __init__(self, table):
-        super(Select, self).__init__({}, 'select', _table=table)
-
-
 
 class ResultsGenerator:
     """
@@ -296,19 +123,24 @@ class ResultsGenerator:
     a count.
     """
 
-    def __init__(self, query):
+    def __init__(self, table, query, db):
+        self.table = table
         self.query = query
         self.cache = []
         self.completed = False
         self.refined = False
-        self.order_by = None
         self.executed = False
+        self.db_kind = db.kind
+        self.db = db
+
+
+    def _new_cursor(self):
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
-        if query.table.db.kind == 'sqlite3':
-            self.curs = query.table.db.conn.cursor()
-        elif query.table.db.kind == 'postgresql':
-            self.curs = query.table.db.conn.cursor(cursor_factory=DictCursor)
+        if self.db.kind == 'sqlite3':
+            self.curs = self.db.conn.cursor()
+        elif self.db.kind == 'postgresql':
+            self.curs = self.db.conn.cursor(cursor_factory=DictCursor)
 
 
     def __iter__(self):
@@ -325,7 +157,7 @@ class ResultsGenerator:
             self.completed = True
             raise StopIteration
         # Convert returned dictionary to a Dict
-        d = self.query.table(d)
+        d = self.table(d)
         d._in_db = True
         self.cache.append(d)
         return d
@@ -336,9 +168,10 @@ class ResultsGenerator:
         Execute the query only once
         """
         if not self.executed:
+            self._new_cursor()
             self.executed = True
-            query = self.query.build()
-            self.curs.execute(query, self.query.wheres)
+            sql, values = self.query.build()
+            self.curs.execute(sql, values)
 
 
     # for python 2.7
@@ -347,21 +180,34 @@ class ResultsGenerator:
 
     def __len__(self):
         self._execute_once()
-        if self.query.table.db.kind == 'sqlite3':
+        if self.db_kind == 'sqlite3':
             # sqlite3's cursor.rowcount doesn't support select statements
             return 0
         return self.curs.rowcount
 
 
-    def refine(self, **kw):
-        """
-        Get a new ResultsGenerator built from this generator's properties, but
-        now with the additional properties provided as arguments.
+    def refine(self, *a, **kw):
+        self.executed = False
+        for exp in a:
+            self.query.append(exp)
+        for k,v in kw.items():
+            self.query.append(self.table[k]==v)
+        return ResultsGenerator(self.table, self.query, self.db)
 
-        See Query.refine for supported refinements.
-        """
-        self.query.refine(**kw)
-        return ResultsGenerator(self.query)
+
+    def order_by(self, order_by):
+        self.query.order_by(order_by)
+        return ResultsGenerator(self.table, self.query, self.db)
+
+
+    def limit(self, limit):
+        self.query.limit(limit)
+        return ResultsGenerator(self.table, self.query, self.db)
+
+
+    def offset(self, offset):
+        self.query.offset(offset)
+        return ResultsGenerator(self.table, self.query, self.db)
 
 
 
@@ -468,10 +314,6 @@ class Table(object):
         return len(self.get_where())
 
 
-    def _pk_value_pairs(self, join_str=' AND ', prefix=''):
-        return column_value_pairs(self.db.kind, self.pks, join_str, prefix)
-
-
     def get_where(self, *a, **kw):
         """
         Get all rows as Dicts where column values are as specified.  This always
@@ -509,21 +351,29 @@ class Table(object):
         NoPrimaryKey()
 
         """
-        if a and len(a) == 1 and isinstance(a[0], dict):
-            # A single dictionary has been passed as an argument, use it as
-            # the keyword arguments.
-            kw = a[0]
-        elif a:
+        # Need a list to replace single integers as expressions
+        logical_group = And()
+        # Replace single integers with expressions
+        pk_uses = 0
+        for exp in a:
+            if isinstance(exp, (Expression, Logical)):
+                logical_group.append(exp)
+                continue
             if not self.pks:
-                raise NoPrimaryKey('No Primary Key(s) specified for '+str(self))
-            kw = dict(zip(self.pks, a))
+                raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
+            logical_group.append(self[self.pks[pk_uses]] == exp)
+            pk_uses += 1
+        # Add any key/values as expressions
+        for key, value in kw.items():
+            logical_group.append(self[key] == value)
 
-        # Build out the query using user-provideded data, and data gathered
-        # from the DB.
-        query = Select(self)
-        query.order_by = self.order_by
-        query.build(**kw)
-        return ResultsGenerator(query)
+        order_by = None
+        if self.order_by:
+            order_by = self.order_by
+        elif self.pks:
+            order_by = str(self.pks[0])+' ASC'
+        query = Select(self.name, logical_group).order_by(order_by)
+        return ResultsGenerator(self, query, self.db)
 
 
     def get_one(self, *a, **kw):
@@ -551,47 +401,19 @@ class Table(object):
 
 
     def __setitem__(self, ref_name, value):
-        if len(value) == 3:
-            # Set a substraum reference
-            my_column, substratum, their_refname = value
-            self.refs[ref_name] = (my_column, substratum, their_refname)
-        else:
-            # Set a reference
-            my_column, table, their_column, many = value
-            self.my_columns[my_column] = ref_name
-            self.refs[ref_name] = (
-                    self, my_column, table, their_column, many)
+        my_column = value.foreign_key()[0]
+        self.my_columns[my_column] = ref_name
+        self.refs[ref_name] = value
 
 
-    def __getitem__(self, key):
-        return Reference(self, key)
-
-
-
-class Reference(object):
-    """
-    This class facilitates creating relationships between Tables by using
-    == and >.
-
-    I would rather use "in" instead of ">", but "__contains__" overwrites what
-    is returned and only returns a True/False value. :(
-    """
-
-    def __init__(self, table, column):
-        self.table = table
-        self.column = column
-
-    def __repr__(self): # pragma: no cover
-        return 'Reference({}, {})'.format(self.table.name, self.column)
-
-    def __eq__(fk1, fk2):
-        return (fk1.column, fk2.table, fk2.column, False)
-
-    def __gt__(fk1, fk2):
-        return (fk1.column, fk2.table, fk2.column, True)
-
-    def substratum(self, column):
-        return (self.column, self.table[self.column], column)
+    def __getitem__(self, ref_name):
+        try:
+            return self.refs[ref_name]
+        except KeyError:
+            if self.db.kind == 'sqlite3':
+                return SqliteColumn(self, ref_name)
+            else:
+                return Column(self, ref_name)
 
 
 
@@ -647,45 +469,52 @@ class Dict(dict):
             for ref in [i for i in self.references().values() if i]:
                 ref.flush()
 
+        if self._table.db.kind == 'sqlite3':
+            insert = SqliteInsert
+            update = SqliteUpdate
+        else:
+            # Default to Postgresql insert
+            insert = Insert
+            update = Update
+
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = Insert(self)
-            d = json_dicts(self.remove_refs())
-            self._curs.execute(query.build(), d)
+            query = insert(self._table.name, **json_dicts(self.remove_refs())
+                    ).returning('*')
+            self._execute_query(query)
             self._in_db = True
-
-            if self._table.db.kind == 'sqlite3':
-                # Get the last inserted row
-                self._curs.execute('''SELECT * FROM {table} WHERE
-                        rowid = last_insert_rowid()'''.format(
-                    table=self._table.name))
+            d = self._curs.fetchone()
         else:
             # Update this dictionary's row
             if not self._table.pks:
                 raise NoPrimaryKey(
                         'Cannot update to {}, no primary keys defined.'.format(
                     self._table))
-            # Combine old values with new values, this is needed to change
-            # primary keys.
-            combined = self.remove_refs()
-            combined.update(dict([('old_'+k,v) for k,v in self._old.items()]))
-            combined = json_dicts(combined)
-            query = Update(self)
-            self._curs.execute(query.build(), combined)
+            # Pair all primary keys in an And so that the correct row is updated
+            pk_pairs = And()
+            for k,v in self._old.items():
+                if k in self._table.pks:
+                    pk_pairs.append(self._table[k] == v)
+            # Update without references, "wheres" are the primary values
+            query = update(self._table.name, **json_dicts(self.remove_refs())
+                    ).where(pk_pairs)
+            self._execute_query(query)
+            d = self
 
-            if self._table.db.kind == 'sqlite3':
-                # Get the row that was just updated using the primary keys
-                query = 'SELECT * FROM {table} WHERE {pvp}'.format(
-                        table=self._table.name,
-                        pvp=self._table._pk_value_pairs()
-                    )
-                self._curs.execute(query, combined)
-
-        d = self._curs.fetchone()
         super(Dict, self).__init__(d)
         self._old = self.remove_refs()
         return self
+
+
+    def _execute_query(self, query):
+        built = query.build()
+        if isinstance(built, list):
+            for sql, values in built:
+                self._curs.execute(sql, values)
+        else:
+            sql, values = built
+            self._curs.execute(sql, values)
 
 
     def delete(self):
@@ -693,8 +522,12 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        query = Delete(self)
-        self._curs.execute(query.build(), self)
+        pk_values = And()
+        for key in self._table.pks:
+            pk_values.append(self._table[key]==self[key])
+        query = Delete(self._table.name).where(pk_values)
+        sql, values = query.build()
+        self._curs.execute(sql, values)
 
 
     def remove_pks(self):
@@ -729,39 +562,33 @@ class Dict(dict):
         ref = self._table.refs.get(key)
         if not ref and key not in self:
             raise KeyError(str(key))
-        substratum = False
         # Only get the referenced row once, if it has a value, the reference's
         # column hasn't been changed.
         val = super(Dict, self).get(key)
         if ref and not val:
-            if len(ref) == 3:
-                substratum = True
-                # This reference is linking two references, get the value of the
-                # regular reference using usual means, then pull the
-                # sub-reference.
-                my_column, table, their_substratum = ref
-                ref = self._table.refs[my_column]
-
-            my_table, my_column, table, their_column, many = ref
+            my_column, table, their_column, many, substratum = ref.foreign_key()
             wheres = {their_column:self[my_column]}
             if many:
-                val = table.get_where(**wheres)
+                gen = table.get_where(**wheres)
             else:
                 try:
-                    val = table.get_one(**wheres)
+                    gen = table.get_one(**wheres)
                 except IndexError:
                     # No results returned, must not be set
-                    val = None
+                    # TODO Does not support refining of an empty reference,
+                    # which shouldn't error.
+                    gen = None
 
             if substratum and many:
-                val = [i[their_substratum] for i in val]
+                gen = [i[substratum] for i in gen]
             elif substratum:
-                val = val[their_substratum]
+                gen = gen[substratum]
 
             if not many:
                 # TODO Only caching one-to-one references, will need to cache
                 # one-to-many
-                super(Dict, self).__setitem__(key, val)
+                super(Dict, self).__setitem__(key, gen)
+            val = gen
         return val
 
 
