@@ -15,10 +15,20 @@ class Select(object):
         self._offset= None
 
 
+    def __repr__(self):
+        return 'Select({}, {}, ret:{}, order:{}, limit:{}, offset:{}'.format(
+                self.table,
+                repr(self.logicals_or_exp),
+                self.returning,
+                self._order_by,
+                self._limit,
+                self._offset)
+
+
     def __str__(self):
         sql = self.query
         formats = {'table':self.table,}
-        if self.logicals_or_exp:
+        if str(self.logicals_or_exp):
             sql += ' WHERE {exp}'
             formats['exp'] = str(self.logicals_or_exp)
         if self._order_by:
@@ -164,6 +174,8 @@ class Column(object):
     def __ne__(self, column): return Expression(self, column, '!=')
 
     def In(self, tup):
+        if isinstance(tup, list):
+            tup = tuple(tup)
         return Expression(self, tup, ' IN ')
 
 

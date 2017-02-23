@@ -173,7 +173,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(list(Person.get_where()), [bob, alice])
 
         # get_where accepts a tuple of ids, and returns those rows
-        self.assertEqual(list(Person.get_where(id=(1,3))),
+        self.assertEqual(list(Person.get_where(Person['id'].In([1,3]))),
                 [bob, alice])
 
         # Database row survives an object deletion
@@ -482,17 +482,6 @@ class TestPostgresql(PostgresTestBase):
         self.assertRaises(NoPrimaryKey, NoPk.get_where, 1)
 
 
-    def test_column_value_pairs(self):
-        self.assertEqual(column_value_pairs('postgresql', {'id':10, 'person':'Dave'}),
-                'id=%(id)s, person=%(person)s')
-        self.assertEqual(column_value_pairs('postgresql', ('id', 'person')),
-                'id=%(id)s, person=%(person)s')
-        self.assertEqual(column_value_pairs('postgresql', {'id':(10,11,13), 'group':'foo'}, ' AND '),
-                'group=%(group)s AND id IN %(id)s')
-        self.assertEqual(column_value_pairs('postgresql', {'id':12, 'person':'Dave'}, prefix='old_'),
-                'id=%(old_id)s, person=%(old_person)s')
-
-
     def test_second_cursor(self):
         """
         Dict's cursor should not interfere with another cursor.
@@ -504,7 +493,6 @@ class TestPostgresql(PostgresTestBase):
 
         curs2 = self.conn.cursor(cursor_factory=DictCursor)
         persons = Person.get_where()
-        print(persons.query)
         self.assertEqual(next(persons), bob)
 
         curs2.execute('SELECT * FROM person')

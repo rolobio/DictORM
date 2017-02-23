@@ -166,8 +166,9 @@ class ResultsGenerator:
         if not self.executed:
             self._new_cursor()
             self.executed = True
+            #print(repr(self.query), type(self.query))
             sql, values = self.query.build()
-            print(sql, values)
+            #print(sql, values)
             self.curs.execute(sql, values)
 
 
@@ -357,6 +358,9 @@ class Table(object):
         for exp in a:
             if isinstance(exp, (Expression, Logical)):
                 logical_group.append(exp)
+                continue
+            if not self.pks:
+                raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
             logical_group.append(self[self.pks[pk_uses]] == exp)
             pk_uses += 1
         # Add any key/values as expressions
