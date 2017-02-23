@@ -1106,9 +1106,9 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_count = None
     test_delete = None
     test_json = None
+    test_order_by2 = None
     test_refine_order_by = None
     test_second_cursor = None
-    test_order_by2 = None
 
 
 

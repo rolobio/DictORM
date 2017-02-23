@@ -1,11 +1,9 @@
 import unittest
 try:
-    from dictorm.test_dictorm import SqliteTestBase
-    from dictorm.sqlite import (Select, Insert, Update, Delete,
+    from dictorm.sqlite import (Select, Insert, Update,
             Or, Xor, And, Column)
 except ImportError:
-    from .test_dictorm import SqliteTestBase
-    from .sqlite import (Select, Insert, Update, Delete,
+    from .sqlite import (Select, Insert, Update,
             Or, Xor, And, Column)
 
 class PersonTable(object):

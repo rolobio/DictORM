@@ -1,10 +1,8 @@
 import unittest
 try:
-    from dictorm.test_dictorm import PostgresTestBase
     from dictorm.query import (Select, Insert, Update, Delete,
             Or, Xor, And, Column)
 except ImportError:
-    from .test_dictorm import PostgresTestBase
     from .query import (Select, Insert, Update, Delete,
             Or, Xor, And, Column)
 

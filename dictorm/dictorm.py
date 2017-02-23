@@ -413,7 +413,7 @@ class Table(object):
     def __getitem__(self, ref_name):
         try:
             return self.refs[ref_name]
-        except:
+        except KeyError:
             if self.db.kind == 'sqlite3':
                 return SqliteColumn(self, ref_name)
             else:
