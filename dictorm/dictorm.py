@@ -5,19 +5,25 @@ Dictionaries.
 """
 from sys import modules
 from json import dumps
-from dictorm.query import Select, Insert, Update, Delete
-from dictorm.query import Or, And, Xor
-from dictorm.query import Column, Expression, Logical
-
-from dictorm.sqlite import Insert as SqliteInsert
-from dictorm.sqlite import Expression as SqliteExpression
-from dictorm.sqlite import Column as SqliteColumn
-from dictorm.sqlite import Update as SqliteUpdate
 
 try: # pragma: no cover
     from dictorm.__version__ import __version__
+    from dictorm.query import Select, Insert, Update, Delete
+    from dictorm.query import Or, And, Xor
+    from dictorm.query import Column, Expression, Logical
+    from dictorm.sqlite import Insert as SqliteInsert
+    from dictorm.sqlite import Expression as SqliteExpression
+    from dictorm.sqlite import Column as SqliteColumn
+    from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
     from .__version__ import __version__
+    from .query import Select, Insert, Update, Delete
+    from .query import Or, And, Xor
+    from .query import Column, Expression, Logical
+    from .sqlite import Insert as SqliteInsert
+    from .sqlite import Expression as SqliteExpression
+    from .sqlite import Column as SqliteColumn
+    from .sqlite import Update as SqliteUpdate
 
 db_package_imported = False
 try: # pragma: no cover

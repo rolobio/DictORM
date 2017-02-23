@@ -1,7 +1,10 @@
 '''
 Provide Sqlite3 support by making simple changes to dictorm.query classes.
 '''
-from dictorm.query import *
+try:
+    from dictorm.query import *
+except ImportError:
+    from .query import *
 
 class Expression(Expression):
 
