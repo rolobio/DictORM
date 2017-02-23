@@ -15,7 +15,7 @@ class Select(object):
         self._offset= None
 
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return 'Select({}, {}, ret:{}, order:{}, limit:{}, offset:{}'.format(
                 self.table,
                 repr(self.logicals_or_exp),
@@ -69,10 +69,7 @@ class Select(object):
 
 
     def append(self, item):
-        try:
-            self.logicals_or_exp.append(item)
-        except AttributeError:
-            self.logicals_or_exp = And(self.logicals_or_exp, item)
+        self.logicals_or_exp.append(item)
 
 
 
@@ -179,7 +176,7 @@ class Column(object):
         self.table = table
         self.column = column
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return 'Column({}.{})'.format(self.table, self.column)
 
     def __eq__(self, column): return Expression(self, column, '=')
@@ -206,7 +203,7 @@ class Expression(object):
         self.kind = kind
         self._substratum = None
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return 'Expression({}{}{})'.format(self.column1,
                 self.kind, self.column2)
 
@@ -250,7 +247,7 @@ class Logical(object):
         self.extend = self.logicals_or_exp.extend
         self.append = self.logicals_or_exp.append
 
-    def __repr__(self):
+    def __repr__(self): # pragma: no cover
         return '{}({})'.format(self.kind, repr(self.logicals_or_exp))
 
     def __str__(self):
@@ -271,8 +268,6 @@ class Logical(object):
                 i.extend(list(exp))
             elif isinstance(exp, Expression):
                 i.append(exp.value())
-            else:
-                i.append(exp)
         return iter(i)
 
 

@@ -141,9 +141,6 @@ class ResultsGenerator:
     def _new_cursor(self):
         # This needs its own generator in case the usual cursor is used to
         # Update/Delete/Insert, overwriting the results of this query.
-        if 'curs' in dir(self):
-            del self.curs
-
         if self.db.kind == 'sqlite3':
             self.curs = self.db.conn.cursor()
         elif self.db.kind == 'postgresql':
@@ -319,10 +316,6 @@ class Table(object):
 
     def __len__(self):
         return len(self.get_where())
-
-
-    def _pk_value_pairs(self, join_str=' AND ', prefix=''):
-        return column_value_pairs(self.db.kind, self.pks, join_str, prefix)
 
 
     def get_where(self, *a, **kw):
