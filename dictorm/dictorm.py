@@ -187,8 +187,10 @@ class ResultsGenerator:
         return self.curs.rowcount
 
 
-    def refine(self, **kw):
+    def refine(self, *a, **kw):
         self.executed = False
+        for exp in a:
+            self.query.append(exp)
         for k,v in kw.items():
             self.query.append(self.table[k]==v)
         return ResultsGenerator(self.table, self.query, self.db)
@@ -582,6 +584,8 @@ class Dict(dict):
                     gen = table.get_one(**wheres)
                 except IndexError:
                     # No results returned, must not be set
+                    # TODO Does not support refining of an empty reference,
+                    # which shouldn't error.
                     gen = None
 
             if substratum and many:

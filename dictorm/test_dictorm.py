@@ -826,7 +826,7 @@ class TestPostgresql(PostgresTestBase):
                 _remove_refs([peter,]))
 
 
-    def test_refine_order_by(self):
+    def test_order_by(self):
         """
         A result set can be refined using order by.  A reference can be refined
         using the same technique.
@@ -861,7 +861,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
 
 
-    def test_refine_offset_limit(self):
+    def test_offset_limit(self):
         """
         A result set can be refined using an offset and limit.
         """
@@ -889,6 +889,32 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(list(limited.offset(3)), [abe, gus])
         # Multiple refinings
         self.assertEqual(list(persons.limit(2).offset(2)), [tom, abe])
+
+
+    def test_refine_expressions(self):
+        Person = self.db['person']
+        Car = self.db['car']
+        Person['subordinates'] = Person['id'] > Person['manager_id']
+        bob = Person(name='Bob').flush()
+        steves_car = Car().flush()
+        steve = Person(name='Steve', car_id=steves_car['id'], manager_id=bob['id']).flush()
+        aly = Person(name='Aly', manager_id=bob['id']).flush()
+        frank = Person(name='Frank', manager_id=bob['id']).flush()
+
+        self.assertEqual(list(bob['subordinates']),
+                [steve, aly, frank])
+        self.assertEqual(list(bob['subordinates'].order_by('id DESC')),
+                [frank, aly, steve])
+        self.assertEqual(list(bob['subordinates'].order_by('id DESC'
+            ).limit(1)),
+                [frank,])
+        self.assertEqual(list(bob['subordinates'].order_by('id DESC'
+            ).limit(1).offset(1)),
+                [aly,])
+
+        self.assertEqual(list(bob['subordinates'].refine(Person['car_id']>0)),
+                [steve,])
+
 
 
     def test_onetoone_cache(self):
