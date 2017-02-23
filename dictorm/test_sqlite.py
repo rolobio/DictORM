@@ -1,7 +1,12 @@
 import unittest
-from dictorm.test_dictorm import SqliteTestBase
-from dictorm.sqlite import (Select, Insert, Update, Delete,
-        Or, Xor, And, Column)
+try:
+    from dictorm.test_dictorm import SqliteTestBase
+    from dictorm.sqlite import (Select, Insert, Update, Delete,
+            Or, Xor, And, Column)
+except ImportError:
+    from .test_dictorm import SqliteTestBase
+    from .sqlite import (Select, Insert, Update, Delete,
+            Or, Xor, And, Column)
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''
