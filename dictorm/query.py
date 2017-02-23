@@ -6,9 +6,9 @@ class Select(object):
 
     query = 'SELECT * FROM {table}'
 
-    def __init__(self, table, logicals_or_exp=[], returning=None):
+    def __init__(self, table, logicals_or_exp=None, returning=None):
         self.table = table
-        self.logicals_or_exp = logicals_or_exp
+        self.logicals_or_exp = logicals_or_exp or []
         self.returning = returning
         self._order_by = None
         self._limit = None
