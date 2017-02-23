@@ -2,31 +2,26 @@
 Provide Sqlite3 support by making simple changes to dictorm.query classes.
 '''
 try: # pragma: no cover
-    from dictorm.query import *
+    from dictorm.query import And as PostgresqlAnd
+    from dictorm.query import Column as PostgresqlColumn
+    from dictorm.query import Expression as PostgresqlExpression
+    from dictorm.query import Insert as PostgresqlInsert
+    from dictorm.query import Select as PostgresqlSelect
+    from dictorm.query import Update as PostgresqlUpdate
 except ImportError: # pragma: no cover
-    from .query import *
+    from .query import And as PostgresqlAnd
+    from .query import Column as PostgresqlColumn
+    from .query import Expression as PostgresqlExpression
+    from .query import Insert as PostgresqlInsert
+    from .query import Select as PostgresqlSelect
+    from .query import Update as PostgresqlUpdate
 
-class Expression(Expression):
+class And(PostgresqlAnd): pass
+class Expression(PostgresqlExpression): interpolation_str = '?'
+class Select(PostgresqlSelect): pass
+class Update(PostgresqlUpdate): interpolation_str = '?'
 
-    interpolation_str = '?'
-
-
-class Insert(Insert):
-
-    interpolation_str = '?'
-
-    def returning(self, returning):
-        self.append_returning = returning
-        return self
-
-
-
-class Update(Update):
-
-    interpolation_str = '?'
-
-
-class Column(Column):
+class Column(PostgresqlColumn):
 
     # These aren't duplicates, they're using the newly defined Expression above
     def __eq__(self, column): return Expression(self, column, '=')
@@ -37,6 +32,16 @@ class Column(Column):
     def __ne__(self, column): return Expression(self, column, '!=')
 
     def In(self, tup): return Expression(self, tup, ' IN ')
+
+
+
+class Insert(PostgresqlInsert):
+
+    interpolation_str = '?'
+
+    def returning(self, returning):
+        self.append_returning = returning
+        return self
 
 
 

@@ -570,7 +570,7 @@ class Dict(dict):
             if substratum and not isinstance(self._table[substratum],
                     (Column, SqliteColumn)):
                 ref = self._table[substratum]
-                ign, ign, their_substratum, many, ign = ref.foreign_key()
+                _, _, their_substratum, many, _ = ref.foreign_key()
             wheres = {their_column:self[my_column]}
             if many:
                 gen = table.get_where(**wheres)
