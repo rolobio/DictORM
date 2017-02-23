@@ -26,14 +26,7 @@ class Update(Update):
     interpolation_str = '?'
 
 
-class Column(object):
-
-    def __init__(self, table, column):
-        self.table = table
-        self.column = column
-
-    def __repr__(self): # pragma: no cover
-        return 'Column({}.{})'.format(self.table, self.column)
+class Column(Column):
 
     # These aren't duplicates, they're using the newly defined Expression above
     def __eq__(self, column): return Expression(self, column, '=')
