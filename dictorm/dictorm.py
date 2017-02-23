@@ -567,10 +567,6 @@ class Dict(dict):
         val = super(Dict, self).get(key)
         if ref and not val:
             my_column, table, their_column, many, substratum = ref.foreign_key()
-            if substratum and not isinstance(self._table[substratum],
-                    (Column, SqliteColumn)):
-                ref = self._table[substratum]
-                _, _, their_substratum, many, _ = ref.foreign_key()
             wheres = {their_column:self[my_column]}
             if many:
                 gen = table.get_where(**wheres)
