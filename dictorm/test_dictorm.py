@@ -935,7 +935,7 @@ class TestPostgresql(PostgresTestBase):
 
 
 
-class TestSqlite(TestPostgresql):
+class SqliteTestBase(object):
 
     def setUp(self):
         self.conn = sqlite3.connect(':memory:')
@@ -986,6 +986,10 @@ class TestSqlite(TestPostgresql):
         self.conn.commit()
 
 
+
+class TestSqlite(SqliteTestBase, TestPostgresql):
+
+
     def test_get_where(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
@@ -1006,9 +1010,6 @@ class TestSqlite(TestPostgresql):
         self.assertDictContains(bob, {'name':'Jon', 'id':1})
         self.assertEqual(list(Person.get_where(1)), [bob,])
 
-        self.conn.commit()
-        self.assertEqual(list(Person.get_where({'id':1})), [bob,])
-
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')
         dave = Person(name='Dave')
@@ -1027,10 +1028,6 @@ class TestSqlite(TestPostgresql):
         self.assertEqual(list(Person.get_where()), [bob, alice])
         self.conn.commit()
         self.assertEqual(list(Person.get_where()), [bob, alice])
-
-        # get_where accepts a tuple of ids, and returns those rows
-        self.assertEqual(list(Person.get_where(id=(1,3))),
-                [bob, alice])
 
         # Database row survives an object deletion
         del bob
@@ -1079,25 +1076,11 @@ class TestSqlite(TestPostgresql):
         self.assertEqual(results, [{'foo': 'bar'},])
 
 
-    def test_column_value_pairs(self):
-        self.assertEqual(column_value_pairs('sqlite3',
-            {'id':10, 'person':'Dave'}),
-                'id=:id, person=:person')
-        self.assertEqual(column_value_pairs('sqlite3', ('id', 'person')),
-                'id=:id, person=:person')
-        self.assertEqual(column_value_pairs('sqlite3',
-            {'id':(10,11,13), 'group':'foo'}, ' AND '),
-                'group=:group AND id IN (10,11,13)')
-        self.assertEqual(column_value_pairs('sqlite3',
-            {'id':12, 'person':'Dave'}, prefix='old_'),
-                'id=:old_id, person=:old_person')
-        self.assertRaises(ValueError, column_value_pairs,
-                'sqlite3', {'id':(10,11,'foo'), 'group':'foo'})
-
-
     # Not supported for sqlite
     test_count = None
+    test_delete = None
     test_json = None
+    test_refine_order_by = None
     test_second_cursor = None
 
 

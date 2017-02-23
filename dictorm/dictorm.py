@@ -9,6 +9,11 @@ from dictorm.query import Select, Insert, Update, Delete
 from dictorm.query import Or, And, Xor
 from dictorm.query import Column, Expression, Logical
 
+from dictorm.sqlite import Insert as SqliteInsert
+from dictorm.sqlite import Expression as SqliteExpression
+from dictorm.sqlite import Column as SqliteColumn
+from dictorm.sqlite import Update as SqliteUpdate
+
 try: # pragma: no cover
     from dictorm.__version__ import __version__
 except ImportError: # pragma: no cover
@@ -166,9 +171,7 @@ class ResultsGenerator:
         if not self.executed:
             self._new_cursor()
             self.executed = True
-            #print(repr(self.query), type(self.query))
             sql, values = self.query.build()
-            #print(sql, values)
             self.curs.execute(sql, values)
 
 
@@ -391,11 +394,6 @@ class Table(object):
         return l[0]
 
 
-    def get_query(self, query):
-        query = StrQuery(self, query)
-        return ResultsGenerator(query)
-
-
     def count(self):
         """
         Get the count of rows in this table.
@@ -415,7 +413,10 @@ class Table(object):
         try:
             return self.refs[ref_name]
         except:
-            return Column(self, ref_name)
+            if self.db.kind == 'sqlite3':
+                return SqliteColumn(self, ref_name)
+            else:
+                return Column(self, ref_name)
 
 
 
@@ -471,20 +472,22 @@ class Dict(dict):
             for ref in [i for i in self.references().values() if i]:
                 ref.flush()
 
+        if self._table.db.kind == 'sqlite3':
+            insert = SqliteInsert
+            update = SqliteUpdate
+        else:
+            # Default to Postgresql insert
+            insert = Insert
+            update = Update
+
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = Insert(self._table.name, **json_dicts(self.remove_refs())
+            query = insert(self._table.name, **json_dicts(self.remove_refs())
                     ).returning('*')
-            sql, values = query.build()
-            self._curs.execute(sql, values)
+            self._execute_query(query)
             self._in_db = True
-
-            if self._table.db.kind == 'sqlite3':
-                # Get the last inserted row
-                self._curs.execute('''SELECT * FROM {table} WHERE
-                        rowid = last_insert_rowid()'''.format(
-                    table=self._table.name))
+            d = self._curs.fetchone()
         else:
             # Update this dictionary's row
             if not self._table.pks:
@@ -497,23 +500,24 @@ class Dict(dict):
                 if k in self._table.pks:
                     pk_pairs.append(self._table[k] == v)
             # Update without references, "wheres" are the primary values
-            query = Update(self._table.name, **json_dicts(self.remove_refs())
-                    ).where(pk_pairs).returning('*')
-            sql, values = query.build()
-            self._curs.execute(sql, values)
+            query = update(self._table.name, **json_dicts(self.remove_refs())
+                    ).where(pk_pairs)
+            self._execute_query(query)
+            d = self
 
-            if self._table.db.kind == 'sqlite3':
-                # Get the row that was just updated using the primary keys
-                query = 'SELECT * FROM {table} WHERE {pvp}'.format(
-                        table=self._table.name,
-                        pvp=self._table._pk_value_pairs()
-                    )
-                self._curs.execute(query, combined)
-
-        d = self._curs.fetchone()
         super(Dict, self).__init__(d)
         self._old = self.remove_refs()
         return self
+
+
+    def _execute_query(self, query):
+        built = query.build()
+        if isinstance(built, list):
+            for sql, values in built:
+                self._curs.execute(sql, values)
+        else:
+            sql, values = built
+            self._curs.execute(sql, values)
 
 
     def delete(self):
@@ -566,7 +570,8 @@ class Dict(dict):
         val = super(Dict, self).get(key)
         if ref and not val:
             my_column, table, their_column, many, substratum = ref.foreign_key()
-            if substratum and not isinstance(self._table[substratum], Column):
+            if substratum and not isinstance(self._table[substratum],
+                    (Column, SqliteColumn)):
                 ref = self._table[substratum]
                 ign, ign, their_substratum, many, ign = ref.foreign_key()
             wheres = {their_column:self[my_column]}

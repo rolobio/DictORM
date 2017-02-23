@@ -80,6 +80,9 @@ class Insert(object):
 
     query = 'INSERT INTO {table} {cvp}'
     cvp = '({}) VALUES ({})'
+    interpolation_str = '%s'
+    append_returning = None
+    last_row = 'SELECT {} FROM {} WHERE rowid = last_insert_rowid()'
 
     def __init__(self, table, **values):
         self.table = table
@@ -89,7 +92,7 @@ class Insert(object):
 
     def _build_cvp(self):
         return (', '.join([k for k,v in self.sorted_items()]),
-            ', '.join(['%s',]*len(self._values)))
+            ', '.join([self.interpolation_str,]*len(self._values)))
 
 
     def __str__(self):
@@ -111,7 +114,14 @@ class Insert(object):
 
 
     def build(self):
-        return (str(self), self.values())
+        sql, values = str(self), self.values()
+        if self.append_returning:
+            ret = [(sql, values),]
+            ret.append((self.last_row.format(
+                self.append_returning, self.table),
+                []))
+            return ret
+        return (sql, values)
 
 
     def returning(self, returning):
@@ -123,13 +133,16 @@ class Insert(object):
 class Update(Insert):
 
     query = 'UPDATE {table} SET {cvp}'
+    interpolation_str = '%s'
 
     def __init__(self, table, **values):
         self.logicals_or_exp = None
         super().__init__(table, **values)
 
+
     def _build_cvp(self):
-        return ', '.join(['{}=%s'.format(k) for k,v in self.sorted_items()])
+        return ', '.join(['{}={}'.format(k, self.interpolation_str) \
+                for k,v in self.sorted_items()])
 
     def __str__(self):
         sql = self.query
@@ -148,10 +161,10 @@ class Update(Insert):
             values.extend(list(self.logicals_or_exp))
         return values
 
-
     def where(self, logicals_or_exp):
         self.logicals_or_exp = logicals_or_exp
         return self
+
 
 
 class Delete(Update):
@@ -185,6 +198,8 @@ class Column(object):
 
 class Expression(object):
 
+    interpolation_str = '%s'
+
     def __init__(self, column1, column2, kind):
         self.column1 = column1
         self.column2 = column2
@@ -197,7 +212,7 @@ class Expression(object):
 
     def __str__(self):
         c1 = self.column1.column
-        return '{}{}%s'.format(c1, self.kind)
+        return '{}{}{}'.format(c1, self.kind, self.interpolation_str)
 
 
     def value(self):
