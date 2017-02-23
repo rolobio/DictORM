@@ -826,7 +826,7 @@ class TestPostgresql(PostgresTestBase):
                 _remove_refs([peter,]))
 
 
-    def test_order_by(self):
+    def test_order_by2(self):
         """
         A result set can be refined using order by.  A reference can be refined
         using the same technique.
@@ -1108,6 +1108,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_json = None
     test_refine_order_by = None
     test_second_cursor = None
+    test_order_by2 = None
 
 
 
