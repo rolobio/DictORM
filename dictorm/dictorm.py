@@ -210,16 +210,6 @@ class ResultsGenerator:
         return ResultsGenerator(self.table, self.query, self.db)
 
 
-    def Is(self, _is):
-        self.query.Is(_is)
-        return ResultsGenerator(self.table, self.query, self.db)
-
-
-    def IsNot(self, isnot):
-        self.query.IsNot(isnot)
-        return ResultsGenerator(self.table, self.query, self.db)
-
-
 
 class Table(object):
     """
