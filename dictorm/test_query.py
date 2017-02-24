@@ -116,6 +116,18 @@ class TestSelect(unittest.TestCase):
                     )
                 )
 
+        q = Select('other_table', Person['name'].Is('Bob'))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name IS %s',
+                ['Bob',])
+                )
+        q = Select('other_table', Person['name'].IsNot('Bob'))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name IS NOT %s',
+                ['Bob',])
+                )
+
+
     def test_order_by(self):
         q = Select('other_table', Person['name'] == 'Steve').order_by('id ASC')
         self.assertEqual(q.build(),
