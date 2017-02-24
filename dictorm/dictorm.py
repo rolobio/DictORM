@@ -3,18 +3,18 @@ What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update rows of a database as if they were Python
 Dictionaries.
 """
+__version__ = '3.0'
+
 from sys import modules
 from json import dumps
 
 try: # pragma: no cover
-    from dictorm.__version__ import __version__
     from dictorm.query import Select, Insert, Update, Delete, And
     from dictorm.query import Column, Expression, Logical
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
-    from .__version__ import __version__
     from .query import Select, Insert, Update, Delete, And
     from .query import Column, Expression, Logical
     from .sqlite import Insert as SqliteInsert
