@@ -350,4 +350,6 @@ bob
 # Subordinate that has a car
 >>> bob['subordinates'].refine(Person['car_id']>0)
 [steve,]
+>>> bob['subordinates'].refine(Person['car_id'].IsNot(None))
+[steve,]
 ```
