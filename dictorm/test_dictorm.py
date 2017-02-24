@@ -823,6 +823,13 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(_remove_refs(limited_minions.order_by('id DESC')),
                 _remove_refs([peter,]))
 
+        self.assertEqual(_remove_refs(Person.get_where(Person['id'].IsNot(None
+            )).order_by('id ASC')),
+                _remove_refs([milton, tom, peter]))
+        self.assertEqual(_remove_refs(Person.get_where(Person['id']>0).order_by(
+            'id ASC')),
+                _remove_refs([milton, tom, peter]))
+
 
     def test_order_by2(self):
         """

@@ -30,6 +30,8 @@ class Column(PostgresqlColumn):
     def __lt__(self, column): return Expression(self, column, '<')
     def __le__(self, column): return Expression(self, column, '<=')
     def __ne__(self, column): return Expression(self, column, '!=')
+    def Is(self, column):     return Expression(self, column, ' IS ')
+    def IsNot(self, column):  return Expression(self, column, ' IS NOT ')
 
     def In(self, tup): return Expression(self, tup, ' IN ')
 
