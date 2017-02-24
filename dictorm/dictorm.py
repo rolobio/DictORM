@@ -7,6 +7,7 @@ __version__ = '3.0'
 
 from sys import modules
 from json import dumps
+from copy import deepcopy
 
 try: # pragma: no cover
     from dictorm.query import Select, Insert, Update, Delete, And
@@ -187,27 +188,27 @@ class ResultsGenerator:
 
 
     def refine(self, *a, **kw):
-        self.executed = False
+        query = deepcopy(self.query)
         for exp in a:
-            self.query.append(exp)
+            query.append(exp)
         for k,v in kw.items():
-            self.query.append(self.table[k]==v)
-        return ResultsGenerator(self.table, self.query, self.db)
+            query.append(self.table[k]==v)
+        return ResultsGenerator(self.table, query, self.db)
 
 
     def order_by(self, order_by):
-        self.query.order_by(order_by)
-        return ResultsGenerator(self.table, self.query, self.db)
+        query = deepcopy(self.query).order_by(order_by)
+        return ResultsGenerator(self.table, query, self.db)
 
 
     def limit(self, limit):
-        self.query.limit(limit)
-        return ResultsGenerator(self.table, self.query, self.db)
+        query = deepcopy(self.query).limit(limit)
+        return ResultsGenerator(self.table, query, self.db)
 
 
     def offset(self, offset):
-        self.query.offset(offset)
-        return ResultsGenerator(self.table, self.query, self.db)
+        query = deepcopy(self.query).offset(offset)
+        return ResultsGenerator(self.table, query, self.db)
 
 
 

@@ -246,8 +246,6 @@ class Logical(object):
     def __init__(self, kind, *logicals_or_exp):
         self.kind = kind
         self.logicals_or_exp = list(logicals_or_exp)
-        self.extend = self.logicals_or_exp.extend
-        self.append = self.logicals_or_exp.append
 
     def __repr__(self): # pragma: no cover
         return '{}({})'.format(self.kind, repr(self.logicals_or_exp))
@@ -271,6 +269,10 @@ class Logical(object):
             elif isinstance(exp, Expression):
                 i.append(exp.value())
         return iter(i)
+
+
+    def extend(self, l): return self.logicals_or_exp.extend(l)
+    def append(self, i): return self.logicals_or_exp.append(i)
 
 
 

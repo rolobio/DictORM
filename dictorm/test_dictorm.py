@@ -822,6 +822,11 @@ class TestPostgresql(PostgresTestBase):
                 _remove_refs([milton,]))
         self.assertEqual(_remove_refs(limited_minions.order_by('id DESC')),
                 _remove_refs([peter,]))
+        # A modified ResultsGenerator creates a new query
+        self.assertEqual(_remove_refs(minions.refine(Person['name']=='Milton')),
+                _remove_refs([milton,]))
+        self.assertEqual(_remove_refs(minions.refine(Person['name']=='Peter')),
+                _remove_refs([peter,]))
 
         self.assertEqual(_remove_refs(Person.get_where(Person['id'].IsNot(None
             )).order_by('id ASC')),
