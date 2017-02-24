@@ -1,5 +1,5 @@
 from setuptools import setup
-from dictorm import __version__, __doc__ as ddoc
+from dictorm.dictorm import __version__, __doc__ as ddoc
 
 config = {
     'name':'dictorm',
