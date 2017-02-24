@@ -307,11 +307,11 @@ bob
 [bob, aly]
 
 # Limit the results to only one row
->>> list(minions.refine(limit=1))
+>>> list(minions.limit(1))
 [bob,]
 
 # Reverse the order, limit to one row
->>> list(minions.refine(order_by='id ASC', limit=1)
+>>> list(minions.order_by('id ASC').limit(1))
 [aly,]
 ```
 
