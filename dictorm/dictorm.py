@@ -276,7 +276,7 @@ class Table(object):
         self.refs = {}
         self._set_pks()
         self.order_by = None
-        self.my_columns = {}
+        self.ref_columns = {}
 
 
     def _set_pks(self):
@@ -403,7 +403,7 @@ class Table(object):
 
     def __setitem__(self, ref_name, value):
         my_column = value.foreign_key()[0]
-        self.my_columns[my_column] = ref_name
+        self.ref_columns[my_column] = ref_name
         self.refs[ref_name] = value
 
 
@@ -603,7 +603,7 @@ class Dict(dict):
         Set self[key] to value.  If key is a reference's matching foreign key,
         set the reference to None.
         """
-        ref = self._table.my_columns.get(key)
+        ref = self._table.ref_columns.get(key)
         if ref:
             super(Dict, self).__setitem__(ref, None)
         return super(Dict, self).__setitem__(key, value)
