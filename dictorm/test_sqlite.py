@@ -1,8 +1,5 @@
 import unittest
-try:
-    from dictorm.sqlite import Select, Insert, Update, And, Column
-except ImportError:
-    from .sqlite import Select, Insert, Update, And, Column
+from .sqlite import Select, Insert, Update, And, Column
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''

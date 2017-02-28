@@ -1,24 +1,14 @@
 '''
-Provide Sqlite3 support by making simple changes to dictorm.query classes.
+Provide Sqlite3 support by making simple changes to dictorm.pg classes.
 '''
-try: # pragma: no cover
-    from dictorm.query import And as PostgresqlAnd
-    from dictorm.query import Column as PostgresqlColumn
-    from dictorm.query import Expression as PostgresqlExpression
-    from dictorm.query import Insert as PostgresqlInsert
-    from dictorm.query import Select as PostgresqlSelect
-    from dictorm.query import Update as PostgresqlUpdate
-except ImportError: # pragma: no cover
-    from .query import And as PostgresqlAnd
-    from .query import Column as PostgresqlColumn
-    from .query import Expression as PostgresqlExpression
-    from .query import Insert as PostgresqlInsert
-    from .query import Select as PostgresqlSelect
-    from .query import Update as PostgresqlUpdate
+from .pg import And
+from .pg import Column as PostgresqlColumn
+from .pg import Expression as PostgresqlExpression
+from .pg import Insert as PostgresqlInsert
+from .pg import Select
+from .pg import Update as PostgresqlUpdate
 
-class And(PostgresqlAnd): pass
 class Expression(PostgresqlExpression): interpolation_str = '?'
-class Select(PostgresqlSelect): pass
 class Update(PostgresqlUpdate): interpolation_str = '?'
 
 class Column(PostgresqlColumn):
