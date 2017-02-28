@@ -26,8 +26,8 @@ else:
 
 def _remove_refs(o):
     if isinstance(o, Dict):
-        return o.remove_refs()
-    return [i.remove_refs() for i in o]
+        return o.no_refs()
+    return [i.no_refs() for i in o]
 
 
 def error(*a, **kw): raise Exception()
@@ -243,15 +243,15 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(bob, {'name':'Bob'})
         bob.flush()
         self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertDictContains(bob.remove_pks(), {'name':'Bob'})
+        self.assertDictContains(bob.no_pks(), {'name':'Bob'})
 
         aly = Person(name='Aly')
         self.assertEqual(aly, {'name':'Aly'})
         aly.flush()
         self.assertDictContains(aly, {'name':'Aly', 'id':2})
-        self.assertDictContains(aly.remove_pks(), {'name':'Aly'})
+        self.assertDictContains(aly.no_pks(), {'name':'Aly'})
 
-        bob.update(aly.remove_pks())
+        bob.update(aly.no_pks())
         bob.flush()
         aly.flush()
         self.assertDictContains(bob, {'name':'Aly', 'id':1})
@@ -301,7 +301,7 @@ class TestPostgresql(PostgresTestBase):
         bob_pd_hr['person_id'] = aly['id']
         aly_pd_hr = bob_pd_hr.flush()
         self.assertEqual(_remove_refs(aly['person_departments']), _remove_refs([aly_pd_sales, aly_pd_hr]))
-        self.assertEqual(_remove_refs(bob['person_departments']), [bob_pd_sales.remove_refs()])
+        self.assertEqual(_remove_refs(bob['person_departments']), [bob_pd_sales.no_refs()])
 
 
     def test_substratum_many(self):
@@ -347,7 +347,7 @@ class TestPostgresql(PostgresTestBase):
         alice_car = Car(name='Prius').flush()
         alice = Person(name='Alice', manager_id=bob['id'], car_id=alice_car['id']).flush()
 
-        self.assertEqual(bob['manager_car'].remove_refs(), alice_car.remove_refs())
+        self.assertEqual(bob['manager_car'].no_refs(), alice_car.no_refs())
 
 
     def test_onetomany(self):
@@ -430,9 +430,9 @@ class TestPostgresql(PostgresTestBase):
         stratus.flush()
         will.flush()
 
-        self.assertEqual(will.get('car').remove_refs(), stratus.remove_refs())
-        self.assertEqual(will['car'].remove_refs(), stratus.remove_refs())
-        self.assertEqual(stratus['person'].remove_refs(), will.remove_refs())
+        self.assertEqual(will.get('car').no_refs(), stratus.no_refs())
+        self.assertEqual(will['car'].no_refs(), stratus.no_refs())
+        self.assertEqual(stratus['person'].no_refs(), will.no_refs())
 
 
     def test_onetoself(self):
@@ -449,7 +449,7 @@ class TestPostgresql(PostgresTestBase):
 
         bob['manager_id'] = bob['id']
         bob.flush()
-        self.assertEqual(bob['manager'].remove_refs(), bob.remove_refs())
+        self.assertEqual(bob['manager'].no_refs(), bob.no_refs())
 
 
     def test_errors(self):
@@ -567,10 +567,10 @@ class TestPostgresql(PostgresTestBase):
 
         dave = Person(name='Dave', manager_id=alice['id']).flush()
         self.assertDictContains(dave, {'name':'Dave', 'manager_id':1, 'manager':None})
-        self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
+        self.assertEqual(dave['manager'].no_refs(), alice.no_refs())
         bob = Person(name='Bob', manager_id=alice['id']).flush()
         self.assertNotEqual(bob['manager'], None)
-        self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
+        self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
 
         # New reference, no flush required
         Person['subordinates'] = Person['id'] > Person['manager_id']
@@ -584,8 +584,8 @@ class TestPostgresql(PostgresTestBase):
         dave.flush()
         self.assertEqual(_remove_refs(alice['subordinates']),
                 _remove_refs([dave, bob]))
-        self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
-        self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
+        self.assertEqual(dave['manager'].no_refs(), alice.no_refs())
+        self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
 
         PD, Department = self.db['person_department'], self.db['department']
         PD['department'] = PD['department_id'] == Department['id']
@@ -601,8 +601,8 @@ class TestPostgresql(PostgresTestBase):
                 _remove_refs([hr_pd, sales_pd]))
         self.assertEqual(_remove_refs(alice['subordinates']),
                 _remove_refs([dave, bob]))
-        self.assertEqual(dave['manager'].remove_refs(), alice.remove_refs())
-        self.assertEqual(bob['manager'].remove_refs(), alice.remove_refs())
+        self.assertEqual(dave['manager'].no_refs(), alice.no_refs())
+        self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
 
         # You can iterate through subordinates using a for loop
         for sub in alice['subordinates']:
@@ -671,7 +671,7 @@ class TestPostgresql(PostgresTestBase):
         alice._table.get_where = original_get_where
         alice['manager_id'] = steve['id']
         alice.flush()
-        self.assertEqual(alice['manager'].remove_refs(), steve.remove_refs())
+        self.assertEqual(alice['manager'].no_refs(), steve.no_refs())
 
 
     def test_modify_subdict(self):
@@ -760,16 +760,16 @@ class TestPostgresql(PostgresTestBase):
         # Milton is in Sales
         milton_sales = PD(person_id=milton['id'], department_id=sales['id']).flush()
         self.assertEqual(milton_sales, PD.get_one())
-        self.assertEqual(milton_sales['person'].remove_refs(), milton.remove_refs())
-        self.assertEqual(milton_sales['department'].remove_refs(), sales.remove_refs())
+        self.assertEqual(milton_sales['person'].no_refs(), milton.no_refs())
+        self.assertEqual(milton_sales['department'].no_refs(), sales.no_refs())
         self.assertEqual(milton['departments'], [sales,])
-        self.assertEqual(_remove_refs(sales['persons']), [milton.remove_refs(),])
+        self.assertEqual(_remove_refs(sales['persons']), [milton.no_refs(),])
 
         # Milton has a stapler
         miltons_stapler = Possession(person_id=milton['id'],
                 description={'kind':'stapler', 'brand':'Swingline', 'color':'Red'}
                 ).flush()
-        self.assertEqual(miltons_stapler['person'].remove_refs(), milton.remove_refs())
+        self.assertEqual(miltons_stapler['person'].no_refs(), milton.no_refs())
         self.assertEqual(_remove_refs(milton['possessions']), _remove_refs([miltons_stapler,]))
 
         # Milton has a manager
@@ -781,19 +781,19 @@ class TestPostgresql(PostgresTestBase):
         # Tom takes milton's stapler
         miltons_stapler['person_id'] = tom['id']
         toms_stapler = miltons_stapler.flush()
-        self.assertEqual(toms_stapler['person'].remove_refs(), tom.remove_refs())
+        self.assertEqual(toms_stapler['person'].no_refs(), tom.no_refs())
         self.assertEqual(_remove_refs(tom['possessions']), _remove_refs([toms_stapler,]))
 
         # Peter is Tom's subordinate
         peter = Person(name='Peter', manager_id=tom['id']).flush()
         self.assertEqual(peter['manager'], tom)
-        self.assertIn(peter.remove_refs(), _remove_refs(tom['subordinates']))
-        self.assertIn(milton.remove_refs(), _remove_refs(tom['subordinates']))
+        self.assertIn(peter.no_refs(), _remove_refs(tom['subordinates']))
+        self.assertIn(milton.no_refs(), _remove_refs(tom['subordinates']))
 
         # Peter is also in sales
         PD(person_id=peter['id'], department_id=sales['id']).flush()
-        self.assertIn(peter.remove_refs(), _remove_refs(sales['persons']))
-        self.assertIn(milton.remove_refs(), _remove_refs(sales['persons']))
+        self.assertIn(peter.no_refs(), _remove_refs(sales['persons']))
+        self.assertIn(milton.no_refs(), _remove_refs(sales['persons']))
 
         # There are 3 people
         self.assertEqual(Person.count(), 3)
@@ -808,8 +808,8 @@ class TestPostgresql(PostgresTestBase):
         peter['car_id'] = miltons_car['id']
         peter.flush()
         self.assertEqual(peter['car'], miltons_car)
-        self.assertEqual(miltons_car['person'].remove_refs(), milton.remove_refs())
-        self.assertEqual(peter['car'].remove_refs(), miltons_car.remove_refs())
+        self.assertEqual(miltons_car['person'].no_refs(), milton.no_refs())
+        self.assertEqual(peter['car'].no_refs(), miltons_car.no_refs())
         car_owners = Person.get_where(car_id=miltons_car['id'])
         self.assertEqual(_remove_refs(car_owners), _remove_refs([milton, peter]))
 

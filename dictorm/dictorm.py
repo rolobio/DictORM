@@ -439,7 +439,7 @@ class Dict(dict):
     >>> d.update({'manager_id':4})
 
     Update using another Dict:
-    >>> d1.update(d2.remove_pks())
+    >>> d1.update(d2.no_pks())
 
     Make sure to send your changes to the database:
     >>> d.flush()
@@ -453,7 +453,7 @@ class Dict(dict):
         self._in_db = False
         self._curs = table.db.curs
         super(Dict, self).__init__(*a, **kw)
-        self._old = self.remove_refs()
+        self._old = self.no_refs()
 
 
     def flush(self):
@@ -481,7 +481,7 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = insert(self._table.name, **json_dicts(self.remove_refs())
+            query = insert(self._table.name, **json_dicts(self.no_refs())
                     ).returning('*')
             self._execute_query(query)
             self._in_db = True
@@ -498,13 +498,13 @@ class Dict(dict):
                 if k in self._table.pks:
                     pk_pairs.append(self._table[k] == v)
             # Update without references, "wheres" are the primary values
-            query = update(self._table.name, **json_dicts(self.remove_refs())
+            query = update(self._table.name, **json_dicts(self.no_refs())
                     ).where(pk_pairs)
             self._execute_query(query)
             d = self
 
         super(Dict, self).__init__(d)
-        self._old = self.remove_refs()
+        self._old = self.no_refs()
         return self
 
 
@@ -530,7 +530,7 @@ class Dict(dict):
         self._execute_query(query)
 
 
-    def remove_pks(self):
+    def no_pks(self):
         """
         Return a dictionary without the primary keys that are associated with
         this Dict in the Database.  This should be used when doing an update
@@ -539,12 +539,13 @@ class Dict(dict):
         return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
 
 
-    def remove_refs(self):
+    def no_refs(self):
         """
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.refs])
+
 
     def references(self):
         """
@@ -555,9 +556,9 @@ class Dict(dict):
 
     def __getitem__(self, key):
         """
-        Get the provided "key" from the dictionary.  If the key refers to a
-        referenced SINGLE row, get that row first.  Will only get a referenced
-        row once, until the referenced row's foreign key is changed.
+        Get the provided "key" from this Dict instance.  If the key refers to a
+        referenced row, get that row first.  Will only get a referenced row
+        once, until the referenced row's foreign key is changed.
         """
         ref = self._table.refs.get(key)
         if not ref and key not in self:
