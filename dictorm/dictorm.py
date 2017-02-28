@@ -527,8 +527,7 @@ class Dict(dict):
         for key in self._table.pks:
             pk_values.append(self._table[key]==self[key])
         query = Delete(self._table.name).where(pk_values)
-        sql, values = query.build()
-        self._curs.execute(sql, values)
+        self._execute_query(query)
 
 
     def remove_pks(self):
