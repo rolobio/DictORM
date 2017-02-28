@@ -492,14 +492,9 @@ class Dict(dict):
                 raise NoPrimaryKey(
                         'Cannot update to {}, no primary keys defined.'.format(
                     self._table))
-            # Pair all primary keys in an And so that the correct row is updated
-            pk_pairs = And()
-            for k,v in self._old.items():
-                if k in self._table.pks:
-                    pk_pairs.append(self._table[k] == v)
             # Update without references, "wheres" are the primary values
             query = update(self._table.name, **json_dicts(self.no_refs())
-                    ).where(pk_pairs)
+                    ).where(self.pk_and(self._old))
             self._execute_query(query)
             d = self
 
@@ -518,15 +513,22 @@ class Dict(dict):
             self._curs.execute(sql, values)
 
 
+    def pk_and(self, pk_dict=None):
+        """
+        Return an And() of all this Dict's primary key values. i.e.
+        And(id=1, other_primary=4)
+        """
+        pk_dict = pk_dict or self
+        return And(*[self._table[k]==v for k,v in pk_dict.items() if k in \
+                self._table.pks])
+
+
     def delete(self):
         """
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        pk_values = And()
-        for key in self._table.pks:
-            pk_values.append(self._table[key]==self[key])
-        query = Delete(self._table.name).where(pk_values)
+        query = Delete(self._table.name).where(self.pk_and())
         self._execute_query(query)
 
 
