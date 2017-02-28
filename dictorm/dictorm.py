@@ -55,11 +55,11 @@ def json_dicts(d):
 
 class DictDB(dict):
     """
-    Get all the tables from the provided psycopg2 connection.  Create a
-    Table for that table, and keep it in this instance using the table's
+    Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
+    Table for each table, and keep tehm in this DictDB using the table's
     name as a key.
 
-    >>> db =DictDB(your_db_connection)
+    >>> db = DictDB(your_db_connection)
     >>> db['table1']
     Table('table1')
 
@@ -215,7 +215,7 @@ class ResultsGenerator:
 class Table(object):
     """
     A representation of a DB table.  You will primarily retrieve rows
-    (Dicts) from the database using the Table.get_where method.
+    (Dicts) from the database using the get_where and get_one methods.
 
     Insert into this table:
 
