@@ -3,21 +3,21 @@ What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update rows of a database as if they were Python
 Dictionaries.
 """
-__version__ = '3.0.1'
+__version__ = '3.0.2'
 
 from sys import modules
 from json import dumps
 from copy import deepcopy
 
 try: # pragma: no cover
-    from dictorm.query import Select, Insert, Update, Delete, And
-    from dictorm.query import Column, Expression, Logical
+    from dictorm.pg import Select, Insert, Update, Delete, And
+    from dictorm.pg import Column, Expression, Logical
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
-    from .query import Select, Insert, Update, Delete, And
-    from .query import Column, Expression, Logical
+    from .pg import Select, Insert, Update, Delete, And
+    from .pg import Column, Expression, Logical
     from .sqlite import Insert as SqliteInsert
     from .sqlite import Column as SqliteColumn
     from .sqlite import Update as SqliteUpdate
@@ -55,11 +55,11 @@ def json_dicts(d):
 
 class DictDB(dict):
     """
-    Get all the tables from the provided psycopg2 connection.  Create a
-    Table for that table, and keep it in this instance using the table's
+    Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
+    Table for each table, and keep tehm in this DictDB using the table's
     name as a key.
 
-    >>> db =DictDB(your_db_connection)
+    >>> db = DictDB(your_db_connection)
     >>> db['table1']
     Table('table1')
 
@@ -215,7 +215,7 @@ class ResultsGenerator:
 class Table(object):
     """
     A representation of a DB table.  You will primarily retrieve rows
-    (Dicts) from the database using the Table.get_where method.
+    (Dicts) from the database using the get_where and get_one methods.
 
     Insert into this table:
 
@@ -276,7 +276,7 @@ class Table(object):
         self.refs = {}
         self._set_pks()
         self.order_by = None
-        self.my_columns = {}
+        self.ref_columns = {}
 
 
     def _set_pks(self):
@@ -403,7 +403,7 @@ class Table(object):
 
     def __setitem__(self, ref_name, value):
         my_column = value.foreign_key()[0]
-        self.my_columns[my_column] = ref_name
+        self.ref_columns[my_column] = ref_name
         self.refs[ref_name] = value
 
 
@@ -439,7 +439,7 @@ class Dict(dict):
     >>> d.update({'manager_id':4})
 
     Update using another Dict:
-    >>> d1.update(d2.remove_pks())
+    >>> d1.update(d2.no_pks())
 
     Make sure to send your changes to the database:
     >>> d.flush()
@@ -453,7 +453,7 @@ class Dict(dict):
         self._in_db = False
         self._curs = table.db.curs
         super(Dict, self).__init__(*a, **kw)
-        self._old = self.remove_refs()
+        self._old = self.no_refs()
 
 
     def flush(self):
@@ -481,7 +481,7 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = insert(self._table.name, **json_dicts(self.remove_refs())
+            query = insert(self._table.name, **json_dicts(self.no_refs())
                     ).returning('*')
             self._execute_query(query)
             self._in_db = True
@@ -492,19 +492,14 @@ class Dict(dict):
                 raise NoPrimaryKey(
                         'Cannot update to {}, no primary keys defined.'.format(
                     self._table))
-            # Pair all primary keys in an And so that the correct row is updated
-            pk_pairs = And()
-            for k,v in self._old.items():
-                if k in self._table.pks:
-                    pk_pairs.append(self._table[k] == v)
             # Update without references, "wheres" are the primary values
-            query = update(self._table.name, **json_dicts(self.remove_refs())
-                    ).where(pk_pairs)
+            query = update(self._table.name, **json_dicts(self.no_refs())
+                    ).where(self.pk_and(self._old))
             self._execute_query(query)
             d = self
 
         super(Dict, self).__init__(d)
-        self._old = self.remove_refs()
+        self._old = self.no_refs()
         return self
 
 
@@ -518,20 +513,26 @@ class Dict(dict):
             self._curs.execute(sql, values)
 
 
+    def pk_and(self, pk_dict=None):
+        """
+        Return an And() of all this Dict's primary key values. i.e.
+        And(id=1, other_primary=4)
+        """
+        pk_dict = pk_dict or self
+        return And(*[self._table[k]==v for k,v in pk_dict.items() if k in \
+                self._table.pks])
+
+
     def delete(self):
         """
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        pk_values = And()
-        for key in self._table.pks:
-            pk_values.append(self._table[key]==self[key])
-        query = Delete(self._table.name).where(pk_values)
-        sql, values = query.build()
-        self._curs.execute(sql, values)
+        query = Delete(self._table.name).where(self.pk_and())
+        self._execute_query(query)
 
 
-    def remove_pks(self):
+    def no_pks(self):
         """
         Return a dictionary without the primary keys that are associated with
         this Dict in the Database.  This should be used when doing an update
@@ -540,12 +541,13 @@ class Dict(dict):
         return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
 
 
-    def remove_refs(self):
+    def no_refs(self):
         """
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.refs])
+
 
     def references(self):
         """
@@ -556,9 +558,9 @@ class Dict(dict):
 
     def __getitem__(self, key):
         """
-        Get the provided "key" from the dictionary.  If the key refers to a
-        referenced SINGLE row, get that row first.  Will only get a referenced
-        row once, until the referenced row's foreign key is changed.
+        Get the provided "key" from this Dict instance.  If the key refers to a
+        referenced row, get that row first.  Will only get a referenced row
+        once, until the referenced row's foreign key is changed.
         """
         ref = self._table.refs.get(key)
         if not ref and key not in self:
@@ -604,7 +606,7 @@ class Dict(dict):
         Set self[key] to value.  If key is a reference's matching foreign key,
         set the reference to None.
         """
-        ref = self._table.my_columns.get(key)
+        ref = self._table.ref_columns.get(key)
         if ref:
             super(Dict, self).__setitem__(ref, None)
         return super(Dict, self).__setitem__(key, value)

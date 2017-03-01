@@ -1,10 +1,5 @@
 import unittest
-try:
-    from dictorm.query import (Select, Insert, Update, Delete,
-            Or, Xor, And, Column)
-except ImportError:
-    from .query import (Select, Insert, Update, Delete,
-            Or, Xor, And, Column)
+from .pg import Select, Insert, Update, Delete, Or, Xor, And, Column
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''

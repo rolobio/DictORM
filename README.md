@@ -353,3 +353,9 @@ bob
 >>> bob['subordinates'].refine(Person['car_id'].IsNot(None))
 [steve,]
 ```
+
+### Delete
+```python
+# Delete a single row
+>>> frank.delete()
+```
