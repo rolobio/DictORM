@@ -16,7 +16,7 @@ Person = PersonTable()
 
 class TestSqlite(unittest.TestCase):
 
-    def test_expressions(self):
+    def test_comparisons(self):
         self.assertEqual(str(Person['name'] == 3), 'name=?')
         self.assertEqual(str(Person['name'] > 3), 'name>?')
         self.assertEqual(str(Person['name'] >= 3), 'name>=?')

@@ -6,9 +6,9 @@ class Select(object):
 
     query = 'SELECT * FROM {table}'
 
-    def __init__(self, table, logicals_or_exp=None, returning=None):
+    def __init__(self, table, operators_or_comp=None, returning=None):
         self.table = table
-        self.logicals_or_exp = logicals_or_exp or []
+        self.operators_or_comp = operators_or_comp or []
         self.returning = returning
         self._order_by = None
         self._limit = None
@@ -18,7 +18,7 @@ class Select(object):
     def __repr__(self): # pragma: no cover
         return 'Select({}, {}, ret:{}, order:{}, limit:{}, offset:{}'.format(
                 self.table,
-                repr(self.logicals_or_exp),
+                repr(self.operators_or_comp),
                 self.returning,
                 self._order_by,
                 self._limit,
@@ -28,12 +28,12 @@ class Select(object):
     def __str__(self):
         sql = self.query
         formats = {'table':self.table,}
-        loe = self.logicals_or_exp
-        if (isinstance(loe, Logical) and loe.logicals_or_exp) or (
-                isinstance(loe, Expression)
+        loe = self.operators_or_comp
+        if (isinstance(loe, Operator) and loe.operators_or_comp) or (
+                isinstance(loe, Comparison)
                 ):
-            sql += ' WHERE {exp}'
-            formats['exp'] = str(loe)
+            sql += ' WHERE {comp}'
+            formats['comp'] = str(loe)
         if self._order_by:
             sql += ' ORDER BY '+str(self._order_by)
         if self.returning:
@@ -46,7 +46,7 @@ class Select(object):
 
 
     def values(self):
-        return list(self.logicals_or_exp or [])
+        return list(self.operators_or_comp or [])
 
 
     def build(self):
@@ -69,7 +69,7 @@ class Select(object):
 
 
     def append(self, item):
-        self.logicals_or_exp.append(item)
+        self.operators_or_comp.append(item)
 
 
 
@@ -133,7 +133,7 @@ class Update(Insert):
     interpolation_str = '%s'
 
     def __init__(self, table, **values):
-        self.logicals_or_exp = None
+        self.operators_or_comp = None
         super(Update, self).__init__(table, **values)
 
 
@@ -144,9 +144,9 @@ class Update(Insert):
     def __str__(self):
         sql = self.query
         formats = {'table':self.table, 'cvp':self._build_cvp()}
-        if self.logicals_or_exp:
-            sql += ' WHERE {exps}'
-            formats['exps'] = str(self.logicals_or_exp)
+        if self.operators_or_comp:
+            sql += ' WHERE {comps}'
+            formats['comps'] = str(self.operators_or_comp)
         if self._returning:
             sql += ' RETURNING '+str(self._returning)
         return sql.format(**formats)
@@ -154,12 +154,12 @@ class Update(Insert):
 
     def values(self):
         values = super(Update, self).values()
-        if self.logicals_or_exp:
-            values.extend(list(self.logicals_or_exp))
+        if self.operators_or_comp:
+            values.extend(list(self.operators_or_comp))
         return values
 
-    def where(self, logicals_or_exp):
-        self.logicals_or_exp = logicals_or_exp
+    def where(self, operators_or_comp):
+        self.operators_or_comp = operators_or_comp
         return self
 
 
@@ -172,47 +172,7 @@ class Delete(Update):
 class Null(): pass
 
 
-class Column(object):
-
-    def __init__(self, table, column):
-        self.table = table
-        self.column = column
-
-    def __repr__(self): # pragma: no cover
-        return 'Column({}.{})'.format(self.table, self.column)
-
-    def __eq__(self, column): return Expression(self, column, '=')
-    def __gt__(self, column): return Expression(self, column, '>')
-    def __ge__(self, column): return Expression(self, column, '>=')
-    def __lt__(self, column): return Expression(self, column, '<')
-    def __le__(self, column): return Expression(self, column, '<=')
-    def __ne__(self, column): return Expression(self, column, '!=')
-    def Is(self, column):     return Expression(self, column, ' IS ')
-    def IsNot(self, column):  return Expression(self, column, ' IS NOT ')
-
-    def IsDistinct(self, column):
-        return Expression(self, column, ' IS DISTINCT FROM ')
-
-
-    def IsNotDistinct(self, column):
-        return Expression(self, column, ' IS NOT DISTINCT FROM ')
-
-
-    def IsNull(self):
-        return Expression(self, Null(), ' IS NULL')
-
-
-    def IsNotNull(self):
-        return Expression(self, Null(), ' IS NOT NULL')
-
-    def In(self, tup):
-        if isinstance(tup, list):
-            tup = tuple(tup)
-        return Expression(self, tup, ' IN ')
-
-
-
-class Expression(object):
+class Comparison(object):
 
     interpolation_str = '%s'
 
@@ -224,8 +184,8 @@ class Expression(object):
 
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
-            return 'Expression({}{})'.format(self.column1, self.kind)
-        return 'Expression({}{}{})'.format(self.column1,
+            return 'Comparison({}{})'.format(self.column1, self.kind)
+        return 'Comparison({}{}{})'.format(self.column1,
                 self.kind, self.column2)
 
     def __str__(self):
@@ -261,58 +221,100 @@ class Expression(object):
     def _null_kind(self): return isinstance(self.column2, Null)
 
 
-    def Or(self, exp2): return Or(self, exp2)
-    def Xor(self, exp2): return Xor(self, exp2)
-    def And(self, exp2): return And(self, exp2)
+    def Or(self, comp2): return Or(self, comp2)
+    def Xor(self, comp2): return Xor(self, comp2)
+    def And(self, comp2): return And(self, comp2)
 
 
 
-class Logical(object):
+class Column(object):
 
-    def __init__(self, kind, *logicals_or_exp):
-        self.kind = kind
-        self.logicals_or_exp = list(logicals_or_exp)
+    comparison = Comparison
+
+    def __init__(self, table, column):
+        self.table = table
+        self.column = column
 
     def __repr__(self): # pragma: no cover
-        return '{}({})'.format(self.kind, repr(self.logicals_or_exp))
+        return 'Column({}.{})'.format(self.table, self.column)
+
+    def __eq__(self, column): return self.comparison(self, column, '=')
+    def __gt__(self, column): return self.comparison(self, column, '>')
+    def __ge__(self, column): return self.comparison(self, column, '>=')
+    def __lt__(self, column): return self.comparison(self, column, '<')
+    def __le__(self, column): return self.comparison(self, column, '<=')
+    def __ne__(self, column): return self.comparison(self, column, '!=')
+    def Is(self, column):     return self.comparison(self, column, ' IS ')
+    def IsNot(self, column):  return self.comparison(self, column, ' IS NOT ')
+
+    def IsDistinct(self, column):
+        return self.comparison(self, column, ' IS DISTINCT FROM ')
+
+
+    def IsNotDistinct(self, column):
+        return self.comparison(self, column, ' IS NOT DISTINCT FROM ')
+
+
+    def IsNull(self):
+        return self.comparison(self, Null(), ' IS NULL')
+
+
+    def IsNotNull(self):
+        return self.comparison(self, Null(), ' IS NOT NULL')
+
+    def In(self, tup):
+        if isinstance(tup, list):
+            tup = tuple(tup)
+        return self.comparison(self, tup, ' IN ')
+
+
+
+class Operator(object):
+
+    def __init__(self, kind, *operators_or_comp):
+        self.kind = kind
+        self.operators_or_comp = list(operators_or_comp)
+
+    def __repr__(self): # pragma: no cover
+        return '{}({})'.format(self.kind, repr(self.operators_or_comp))
 
     def __str__(self):
         kind = ' '+self.kind+' '
         s = []
-        for exp in self.logicals_or_exp:
-            if isinstance(exp, Logical):
-                s.append('('+str(exp)+')')
+        for comp in self.operators_or_comp:
+            if isinstance(comp, Operator):
+                s.append('('+str(comp)+')')
             else:
-                s.append(str(exp))
+                s.append(str(comp))
         return kind.join(s)
 
 
     def __iter__(self):
         i = []
-        for exp in self.logicals_or_exp:
-            if isinstance(exp, Logical):
-                i.extend(list(exp))
-            elif isinstance(exp, Expression) and not exp._null_kind():
-                i.append(exp.value())
+        for comp in self.operators_or_comp:
+            if isinstance(comp, Operator):
+                i.extend(list(comp))
+            elif isinstance(comp, Comparison) and not comp._null_kind():
+                i.append(comp.value())
         return iter(i)
 
 
-    def extend(self, l): return self.logicals_or_exp.extend(l)
-    def append(self, i): return self.logicals_or_exp.append(i)
+    def extend(self, l): return self.operators_or_comp.extend(l)
+    def append(self, i): return self.operators_or_comp.append(i)
 
 
 
-class Or(Logical):
-    def __init__(self, *logicals_or_exp):
-        super(Or, self).__init__('OR', *logicals_or_exp)
+class Or(Operator):
+    def __init__(self, *operators_or_comp):
+        super(Or, self).__init__('OR', *operators_or_comp)
 
-class Xor(Logical):
-    def __init__(self, *logicals_or_exp):
-        super(Xor, self).__init__('XOR', *logicals_or_exp)
+class Xor(Operator):
+    def __init__(self, *operators_or_comp):
+        super(Xor, self).__init__('XOR', *operators_or_comp)
 
-class And(Logical):
-    def __init__(self, *logicals_or_exp):
-        super(And, self).__init__('AND', *logicals_or_exp)
+class And(Operator):
+    def __init__(self, *operators_or_comp):
+        super(And, self).__init__('AND', *operators_or_comp)
 
 
 

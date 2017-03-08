@@ -901,7 +901,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(list(persons.limit(2).offset(2)), [tom, abe])
 
 
-    def test_refine_expressions(self):
+    def test_refine_comparisons(self):
         Person = self.db['person']
         Car = self.db['car']
         Person['subordinates'] = Person['id'] > Person['manager_id']
