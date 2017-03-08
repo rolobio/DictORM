@@ -11,13 +11,13 @@ from copy import deepcopy
 
 try: # pragma: no cover
     from dictorm.pg import Select, Insert, Update, Delete, And
-    from dictorm.pg import Column, Expression, Logical
+    from dictorm.pg import Column, Comparison, Operator
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
     from .pg import Select, Insert, Update, Delete, And
-    from .pg import Column, Expression, Logical
+    from .pg import Column, Comparison, Operator
     from .sqlite import Insert as SqliteInsert
     from .sqlite import Column as SqliteColumn
     from .sqlite import Update as SqliteUpdate
@@ -352,28 +352,28 @@ class Table(object):
         NoPrimaryKey()
 
         """
-        # Need a list to replace single integers as expressions
-        logical_group = And()
-        # Replace single integers with expressions
+        # Need a list to replace single integers as comparisons
+        operator_group = And()
+        # Replace single integers with comparisons
         pk_uses = 0
         for exp in a:
-            if isinstance(exp, (Expression, Logical)):
-                logical_group.append(exp)
+            if isinstance(exp, (Comparison, Operator)):
+                operator_group.append(exp)
                 continue
             if not self.pks:
                 raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
-            logical_group.append(self[self.pks[pk_uses]] == exp)
+            operator_group.append(self[self.pks[pk_uses]] == exp)
             pk_uses += 1
-        # Add any key/values as expressions
+        # Add any key/values as comparisons
         for key, value in kw.items():
-            logical_group.append(self[key] == value)
+            operator_group.append(self[key] == value)
 
         order_by = None
         if self.order_by:
             order_by = self.order_by
         elif self.pks:
             order_by = str(self.pks[0])+' ASC'
-        query = Select(self.name, logical_group).order_by(order_by)
+        query = Select(self.name, operator_group).order_by(order_by)
         return ResultsGenerator(self, query, self.db)
 
 

@@ -121,6 +121,27 @@ class TestSelect(unittest.TestCase):
                 ('SELECT * FROM other_table WHERE name IS NOT %s',
                 ['Bob',])
                 )
+        q = Select('other_table', Person['name'].IsNull())
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name IS NULL',
+                [])
+                )
+        q = Select('other_table', And(
+            Person['name'].IsNull(),
+            Person['foo'] == 'bar',
+            Person['baz'].Is('bake'),
+            Person['whatever'].IsDistinct('foo'),
+            Person['whatever'].IsNotDistinct('bar'),
+            ))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name IS NULL AND foo=%s AND baz IS %s AND whatever IS DISTINCT FROM %s AND whatever IS NOT DISTINCT FROM %s',
+                ['bar', 'bake', 'foo', 'bar'])
+                )
+        q = Select('other_table', Person['name'].IsNotNull())
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name IS NOT NULL',
+                [])
+                )
 
 
     def test_order_by(self):
