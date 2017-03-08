@@ -169,6 +169,8 @@ class Delete(Update):
     query = 'DELETE FROM {table}'
 
 
+class Null(): pass
+
 
 class Column(object):
 
@@ -187,6 +189,8 @@ class Column(object):
     def __ne__(self, column): return Expression(self, column, '!=')
     def Is(self, column):     return Expression(self, column, ' IS ')
     def IsNot(self, column):  return Expression(self, column, ' IS NOT ')
+    def IsNull(self):     return Expression(self, Null(), ' IS NULL')
+    def IsNotNull(self):  return Expression(self, Null(), ' IS NOT NULL')
 
     def In(self, tup):
         if isinstance(tup, list):
@@ -206,11 +210,15 @@ class Expression(object):
         self._substratum = None
 
     def __repr__(self): # pragma: no cover
+        if isinstance(self.column2, Null):
+            return 'Expression({}{})'.format(self.column1, self.kind)
         return 'Expression({}{}{})'.format(self.column1,
                 self.kind, self.column2)
 
     def __str__(self):
         c1 = self.column1.column
+        if self._null_kind():
+            return '{}{}'.format(c1, self.kind)
         return '{}{}{}'.format(c1, self.kind, self.interpolation_str)
 
 
@@ -219,6 +227,8 @@ class Expression(object):
 
 
     def __iter__(self):
+        if self._null_kind():
+            return iter([])
         return iter([self.column2,])
 
 
@@ -233,6 +243,9 @@ class Expression(object):
     def substratum(self, column):
         self._substratum = column
         return self
+
+
+    def _null_kind(self): return isinstance(self.column2, Null)
 
 
     def Or(self, exp2): return Or(self, exp2)
@@ -266,7 +279,7 @@ class Logical(object):
         for exp in self.logicals_or_exp:
             if isinstance(exp, Logical):
                 i.extend(list(exp))
-            elif isinstance(exp, Expression):
+            elif isinstance(exp, Expression) and not exp._null_kind():
                 i.append(exp.value())
         return iter(i)
 
