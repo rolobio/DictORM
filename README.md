@@ -380,7 +380,7 @@ bob
 "foo IS NULL"
 >>> Person['foo'].IsNotNull()
 "foo IS NOT NULL"
->>> Person['foo'].In(['bar', 'baz']) # Not supported for Sqlite3
+>>> Person['foo'].In(('bar', 'baz')) # Not supported for Sqlite3
 "foo IN ('bar', 'baz')"
 ```
 
