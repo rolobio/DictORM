@@ -189,8 +189,21 @@ class Column(object):
     def __ne__(self, column): return Expression(self, column, '!=')
     def Is(self, column):     return Expression(self, column, ' IS ')
     def IsNot(self, column):  return Expression(self, column, ' IS NOT ')
-    def IsNull(self):     return Expression(self, Null(), ' IS NULL')
-    def IsNotNull(self):  return Expression(self, Null(), ' IS NOT NULL')
+
+    def IsDistinct(self, column):
+        return Expression(self, column, ' IS DISTINCT FROM ')
+
+
+    def IsNotDistinct(self, column):
+        return Expression(self, column, ' IS NOT DISTINCT FROM ')
+
+
+    def IsNull(self):
+        return Expression(self, Null(), ' IS NULL')
+
+
+    def IsNotNull(self):
+        return Expression(self, Null(), ' IS NOT NULL')
 
     def In(self, tup):
         if isinstance(tup, list):

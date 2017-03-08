@@ -129,10 +129,11 @@ class TestSelect(unittest.TestCase):
         q = Select('other_table', And(
             Person['name'].IsNull(),
             Person['foo'] == 'bar',
-            Person['baz'].Is('bake')))
+            Person['baz'].Is('bake'),
+            Person['whatever'].IsDistinct('foo')))
         self.assertEqual(q.build(),
-                ('SELECT * FROM other_table WHERE name IS NULL AND foo=%s AND baz IS %s',
-                ['bar', 'bake'])
+                ('SELECT * FROM other_table WHERE name IS NULL AND foo=%s AND baz IS %s AND whatever IS DISTINCT FROM %s',
+                ['bar', 'bake', 'foo'])
                 )
         q = Select('other_table', Person['name'].IsNotNull())
         self.assertEqual(q.build(),
