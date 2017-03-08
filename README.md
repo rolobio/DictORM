@@ -53,8 +53,8 @@ db_conn.commit()
 >>> Car = db['car']
 >>> Person['car'] = Person['car_id'] == Car['id']
 # 'car'            : the key of the sub-dictionary you are defining
-# Person['car_id'] : the key that Person contains that references the 'car' table.
-# Car['id']        : the key of Car that references Person['car_id']
+# Person['car_id'] : the column of the "person" table that references car.id
+# Car['id']        : the foreign key of the "car" table, referenced by person.car_id
 
 >>> wills_car = Car(name='Dodge Stratus', plate='123ABC')
 >>> wills_car.flush()
