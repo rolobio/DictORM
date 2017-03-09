@@ -227,13 +227,8 @@ class Comparison(object):
     def And(self, comp2): return And(self, comp2)
 
 
+
 class Null(): pass
-
-
-
-class Many():
-
-    def __repr__(self): return ' MANY '
 
 
 
