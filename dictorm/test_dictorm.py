@@ -970,6 +970,35 @@ class TestPostgresql(PostgresTestBase):
             self.assertType(sub, Dict)
 
 
+    def test_empty_reference(self):
+        """
+        An empty reference should not hide that its empty, but shouldn't break either
+        """
+        Person = self.db['person']
+        Person['manager'] = Person['id'] == Person['manager_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        bob = Person(name='Bob').flush()
+
+        self.assertEqual(list(bob['subordinates']), [])
+        # Modify the reference results
+        self.assertEqual(list(bob['subordinates'].refine(Person['id']>1)), [])
+        self.assertEqual(list(bob['subordinates'].limit(1).offset(1)), [])
+        self.assertEqual(list(bob['subordinates'].order_by('id DESC')), [])
+
+        self.assertEqual(bob['manager'], None)
+        self.assertRaises(AttributeError, getattr, bob['manager'], 'limit')
+
+
+    def test_offset(self):
+        """
+        Postgres allows offset without limit, but not Sqlite
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        bob = Person(name='Bob').flush()
+        self.assertEqual(list(bob['subordinates'].offset(1)), [])
+
+
 
 class SqliteTestBase(object):
 
@@ -1119,6 +1148,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_order_by2 = None
     test_refine_order_by = None
     test_second_cursor = None
+    test_offset = None
 
 
 

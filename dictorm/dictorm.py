@@ -404,7 +404,7 @@ class Table(object):
     def __setitem__(self, ref_name, ref):
         if ref.column1.table != self:
             # Dict.__getitem__ expects the columns to be in a particular order,
-            # fix and order issues.
+            # fix any order issues.
             ref.column1, ref.column2 = ref.column2, ref.column1
         self.fks[ref.column1.column] = ref_name
         self.refs[ref_name] = ref
@@ -582,8 +582,6 @@ class Dict(dict):
                     gen = table.get_one(comparison)
                 except IndexError:
                     # No results returned, must not be set
-                    # TODO Does not support refining of an empty reference,
-                    # which shouldn't error.
                     gen = None
 
             if ref._substratum and ref.many:
