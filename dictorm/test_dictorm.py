@@ -275,7 +275,7 @@ class TestPostgresql(PostgresTestBase):
         PD.sort_by = 'person_id'
         PD['department'] = PD['department_id'] == Department['id']
         PD['person'] = PD['person_id'] == Person['id']
-        Person['person_departments'] = Person['id'] > PD['person_id']
+        Person['person_departments'] = Person['id'].many(PD['person_id'])
 
         bob = Person(name='Bob').flush()
         self.assertDictContains(bob, {'name':'Bob', 'id':1})
@@ -314,7 +314,7 @@ class TestPostgresql(PostgresTestBase):
         Department = self.db['department']
         PD = self.db['person_department']
         # Setup the initial references
-        Person['person_departments'] = Person['id'] > PD['person_id']
+        Person['person_departments'] = Person['id'].many(PD['person_id'])
         PD['department'] = PD['department_id'] == Department['id']
 
         # Directly access a person's departments by getting the sub-references
@@ -361,7 +361,7 @@ class TestPostgresql(PostgresTestBase):
         Person = self.db['person']
 
         Car = self.db['car']
-        Person['cars'] = Person['id'] > Car['person_id']
+        Person['cars'] = Person['id'].many(Car['person_id'])
 
         bob = Person(name='Bob').flush()
 
@@ -383,7 +383,7 @@ class TestPostgresql(PostgresTestBase):
         Station = self.db['station']
         Station.order_by = 'person_id'
         Station['person'] = Station['person_id'] == Person['id']
-        Person['stations'] = Person['id'] > Station['person_id']
+        Person['stations'] = Person['id'].many(Station['person_id'])
 
         desk1 = Station(person_id=bob['id']).flush()
         desk2 = Station(person_id=bob['id']).flush()
@@ -573,7 +573,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
 
         # New reference, no flush required
-        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
         self.assertEqual(_remove_refs(alice['subordinates']),
                 _remove_refs([dave, bob]))
 
@@ -589,7 +589,7 @@ class TestPostgresql(PostgresTestBase):
 
         PD, Department = self.db['person_department'], self.db['department']
         PD['department'] = PD['department_id'] == Department['id']
-        Person['person_departments'] = Person['id'] > PD['person_id']
+        Person['person_departments'] = Person['id'].many(PD['person_id'])
 
         hr = Department(name='HR').flush()
         sales = Department(name='Sales').flush()
@@ -616,7 +616,7 @@ class TestPostgresql(PostgresTestBase):
         Simple reference counting is supported.
         """
         Person = self.db['person']
-        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
         alice = Person(name='Alice').flush()
         dave = Person(name='Dave', manager_id=alice['id']).flush()
         bob = Person(name='Bob', manager_id=alice['id']).flush()
@@ -641,7 +641,7 @@ class TestPostgresql(PostgresTestBase):
         Iterating through an empty reference does not break.
         """
         Person = self.db['person']
-        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
         alice = Person(name='Alice').flush()
 
         self.assertEqual(len(alice['subordinates']), 0)
@@ -735,15 +735,15 @@ class TestPostgresql(PostgresTestBase):
         Possession = self.db['possession']
 
         Person['manager'] = Person['manager_id'] == Person['id']
-        Person['subordinates'] = Person['id'] > Person['manager_id']
-        Person['person_departments'] = Person['id'] > PD['person_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        Person['person_departments'] = Person['id'].many(PD['person_id'])
         Person['departments'] = Person['person_departments'].substratum('department')
         Person['car'] = Person['car_id'] == Car['id']
-        Person['possessions'] = Person['id'] > Possession['person_id']
+        Person['possessions'] = Person['id'].many(Possession['person_id'])
         Car['person'] = Car['person_id'] == Person['id']
-        PD['person'] = PD['person_id'] == Person['id']
+        PD['person'] = Person['id'] == PD['person_id']
         PD['department'] =  PD['department_id'] == Department['id']
-        Department['person_departments'] = Department['id'] > PD['department_id']
+        Department['person_departments'] = Department['id'].many(PD['department_id'])
         Department['persons'] = Department['person_departments'].substratum('person')
         Possession['person'] = Possession['person_id'] == Person['id']
 
@@ -752,7 +752,7 @@ class TestPostgresql(PostgresTestBase):
         miltons_car = Car(name='Ford', person_id=milton['id']).flush()
         milton['car_id'] = miltons_car['id']
         sales = Department(name='Sales').flush()
-        self.assertEqual(milton['car'], miltons_car)
+        self.assertEqual(milton['car'].no_refs(), miltons_car.no_refs())
         milton.flush()
         miltons_car.flush()
         self.assertEqual(milton['car'], miltons_car)
@@ -762,7 +762,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(milton_sales, PD.get_one())
         self.assertEqual(milton_sales['person'].no_refs(), milton.no_refs())
         self.assertEqual(milton_sales['department'].no_refs(), sales.no_refs())
-        self.assertEqual(milton['departments'], [sales,])
+        self.assertEqual(_remove_refs(milton['departments']), _remove_refs([sales,]))
         self.assertEqual(_remove_refs(sales['persons']), [milton.no_refs(),])
 
         # Milton has a stapler
@@ -842,7 +842,7 @@ class TestPostgresql(PostgresTestBase):
         using the same technique.
         """
         Person = self.db['person']
-        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
         Person['manager'] = Person['id'] == Person['manager_id']
         bob = Person(name='Bob').flush()
         # Insert the employees with IDs that are reverse of the entrydate
@@ -904,7 +904,7 @@ class TestPostgresql(PostgresTestBase):
     def test_refine_comparisons(self):
         Person = self.db['person']
         Car = self.db['car']
-        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
         bob = Person(name='Bob').flush()
         steves_car = Car().flush()
         steve = Person(name='Steve', car_id=steves_car['id'], manager_id=bob['id']).flush()
@@ -948,7 +948,7 @@ class TestPostgresql(PostgresTestBase):
         A result will not be gotten again, since it's results were cached.
         """
         Person = self.db['person']
-        Person['subordinates'] = Person['id'] > Person['manager_id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
         bob = Person(name='Bob').flush()
         bill = Person(name='Bill').flush()
         alice = Person(name='Alice').flush()
@@ -968,6 +968,32 @@ class TestPostgresql(PostgresTestBase):
         bob._table.get_where = error
         for sub in subordinates:
             self.assertType(sub, Dict)
+
+
+    def test_offset(self):
+        """
+        Postgres allows offset without limit, but not Sqlite
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        bob = Person(name='Bob').flush()
+        self.assertEqual(list(bob['subordinates'].offset(1)), [])
+
+
+    def test_reference_order(self):
+        """
+        A reference definition cares about order.
+        """
+        Person = self.db['person']
+        Person['manager'] = Person['manager_id'] == Person['id']
+        bob = Person(name='Bob').flush()
+        alice = Person(name='Alice', manager_id=bob['id']).flush()
+
+        self.assertEqual(alice['manager'].no_refs(), bob.no_refs())
+        Person['manager'] = Person['id'] == Person['manager_id']
+        # Get alice again to clear cache
+        alice = Person.get_one(id=2)
+        self.assertEqual(alice['manager'], None)
 
 
 
@@ -1119,6 +1145,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_order_by2 = None
     test_refine_order_by = None
     test_second_cursor = None
+    test_offset = None
 
 
 

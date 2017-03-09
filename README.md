@@ -56,6 +56,13 @@ db_conn.commit()
 # Person['car_id'] : the column of the "person" table that references car.id
 # Car['id']        : the foreign key of the "car" table, referenced by person.car_id
 
+# When defining a reference, it is important to order the columns correctly, the
+# foreign-key/foreign-table should be on the right:
+# Person['car'] = Person['car_id'] == Car['id']            # Correct
+# Person['car'] = Car['id'] == Person['car_id']            # Incorrect
+# Person['manager'] = Person['manager_id'] == Person['id'] # Correct
+# Person['manager'] = Person['id'] == Person['manager_id'] # Incorrect
+
 >>> wills_car = Car(name='Dodge Stratus', plate='123ABC')
 >>> wills_car.flush()
 >>> wills_car
@@ -212,7 +219,7 @@ True
 # Define that "subordinates" contains many rows by using ">".  Greater-Than
 # is used over "in" because __contains__ overwrites what is returned
 # with a True/False.  So ">" is used.
->>> Person['subordinates'] = Person['id'] > Person['manager_id']
+>>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
 >>> list(steve['subordinates'])
 [bob, aly]
 ```
@@ -245,7 +252,7 @@ CREATE TABLE person_department (
 # Reference many rows using ">".  I would rather use "in", but "__contains__"
 # overwrites any values returned and instead returns a True/False.  So, we use
 # ">" to specify that many rows can be returned.
->>> Person['person_departments'] = Person['id'] > PD['person_id']
+>>> Person['person_departments'] = Person['id'].many(PD['person_id'])
 
 # Create HR and Sales departments
 >>> hr = Department(name='HR').flush()

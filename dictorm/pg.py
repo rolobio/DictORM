@@ -1,3 +1,10 @@
+"""
+This module is used to build queries for Postgresql.  You shouldn't really need
+to import anything from this file because they can all be built using
+dictorm.Table.
+
+Sqlite queries are slightly different, but use these methods as their base.
+"""
 from psycopg2.extensions import cursor
 
 mogrify = cursor.mogrify
@@ -28,12 +35,12 @@ class Select(object):
     def __str__(self):
         sql = self.query
         formats = {'table':self.table,}
-        loe = self.operators_or_comp
-        if (isinstance(loe, Operator) and loe.operators_or_comp) or (
-                isinstance(loe, Comparison)
+        oc = self.operators_or_comp
+        if (isinstance(oc, Operator) and oc.operators_or_comp) or (
+                isinstance(oc, Comparison)
                 ):
             sql += ' WHERE {comp}'
-            formats['comp'] = str(loe)
+            formats['comp'] = str(oc)
         if self._order_by:
             sql += ' ORDER BY '+str(self._order_by)
         if self.returning:
@@ -169,12 +176,10 @@ class Delete(Update):
     query = 'DELETE FROM {table}'
 
 
-class Null(): pass
-
-
 class Comparison(object):
 
     interpolation_str = '%s'
+    many = False
 
     def __init__(self, column1, column2, kind):
         self.column1 = column1
@@ -184,9 +189,13 @@ class Comparison(object):
 
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
-            return 'Comparison({}{})'.format(self.column1, self.kind)
-        return 'Comparison({}{}{})'.format(self.column1,
-                self.kind, self.column2)
+            ret = 'Comparison({}{})'.format(self.column1, self.kind)
+        ret = 'Comparison({}{}{})'.format(self.column1,
+                str(self.kind), self.column2)
+        if self._substratum:
+            ret += '.substratum({})'.format(self._substratum)
+        return ret
+
 
     def __str__(self):
         c1 = self.column1.column
@@ -205,14 +214,6 @@ class Comparison(object):
         return iter([self.column2,])
 
 
-    def foreign_key(self):
-        return [self.column1.column,
-                self.column2.table,
-                self.column2.column,
-                False if self.kind == '=' else True,
-                self._substratum]
-
-
     def substratum(self, column):
         self._substratum = column
         return self
@@ -227,6 +228,10 @@ class Comparison(object):
 
 
 
+class Null(): pass
+
+
+
 class Column(object):
 
     comparison = Comparison
@@ -236,7 +241,12 @@ class Column(object):
         self.column = column
 
     def __repr__(self): # pragma: no cover
-        return 'Column({}.{})'.format(self.table, self.column)
+        return '{}.{}'.format(self.table.name, self.column)
+
+    def many(self, column):
+        c = self.comparison(self, column, '=')
+        c.many = True
+        return c
 
     def __eq__(self, column): return self.comparison(self, column, '=')
     def __gt__(self, column): return self.comparison(self, column, '>')
