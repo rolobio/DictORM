@@ -239,22 +239,22 @@ class Table(object):
     manager using the manager's id, and the employee's manager_id.
 
     >>> Person['manager'] = Person['manager_id'] == Person['id']
-    >>> Person['manager']
+    >>> bob['manager']
     Dict()
 
     Reference a manager's subordinates using their collective manager_id's:
 
     >>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
-    >>> list(Person['manager'])
+    >>> list(bob['manager'])
     [Dict(), Dict()]
 
     Table.get_where returns a generator object, this makes it so you
     won't have an entire table's object in memory at once, they are
     generated when gotten:
 
-    >>> Person['subordinates']
+    >>> bob['subordinates']
     ResultsGenerator()
-    >>> for sub in Person['subordinates']:
+    >>> for sub in bob['subordinates']:
     >>>     print(sub)
     Dict()
     Dict()
