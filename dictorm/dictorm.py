@@ -238,7 +238,7 @@ class Table(object):
     You can reference another table using setitem.  Link to an employee's
     manager using the manager's id, and the employee's manager_id.
 
-    >>> Person['manager'] = Person['manager_id'] == Person['id']
+    >>> Person['manager'] = Person['id'] == Person['manager_id']
     >>> Person['manager']
     Dict()
 
