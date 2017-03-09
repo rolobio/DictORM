@@ -212,7 +212,7 @@ True
 # Define that "subordinates" contains many rows by using ">".  Greater-Than
 # is used over "in" because __contains__ overwrites what is returned
 # with a True/False.  So ">" is used.
->>> Person['subordinates'] = Person['id'] > Person['manager_id']
+>>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
 >>> list(steve['subordinates'])
 [bob, aly]
 ```
@@ -245,7 +245,7 @@ CREATE TABLE person_department (
 # Reference many rows using ">".  I would rather use "in", but "__contains__"
 # overwrites any values returned and instead returns a True/False.  So, we use
 # ">" to specify that many rows can be returned.
->>> Person['person_departments'] = Person['id'] > PD['person_id']
+>>> Person['person_departments'] = Person['id'].many(PD['person_id'])
 
 # Create HR and Sales departments
 >>> hr = Department(name='HR').flush()

@@ -242,11 +242,9 @@ class Table(object):
     >>> Person['manager']
     Dict()
 
-    Reference a manager's subordinates using their collective manager_id's
-    (Use > instead of "in" because __contains__'s value is overwritten by
-    python):
+    Reference a manager's subordinates using their collective manager_id's:
 
-    >>> Person['subordinates'] = Person['id'] > Person['manager_id']
+    >>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
     >>> list(Person['manager'])
     [Dict(), Dict()]
 
