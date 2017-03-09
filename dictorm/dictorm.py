@@ -10,13 +10,13 @@ from json import dumps
 from copy import deepcopy
 
 try: # pragma: no cover
-    from dictorm.pg import Select, Insert, Update, Delete, And
+    from dictorm.pg import Select, Insert, Update, Delete, And, Many
     from dictorm.pg import Column, Comparison, Operator
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
-    from .pg import Select, Insert, Update, Delete, And
+    from .pg import Select, Insert, Update, Delete, And, Many
     from .pg import Column, Comparison, Operator
     from .sqlite import Insert as SqliteInsert
     from .sqlite import Column as SqliteColumn
@@ -276,7 +276,7 @@ class Table(object):
         self.refs = {}
         self._set_pks()
         self.order_by = None
-        self.ref_columns = {}
+        self.fks = {}
 
 
     def _set_pks(self):
@@ -401,10 +401,13 @@ class Table(object):
         return int(self.curs.fetchone()[0])
 
 
-    def __setitem__(self, ref_name, value):
-        my_column = value.foreign_key()[0]
-        self.ref_columns[my_column] = ref_name
-        self.refs[ref_name] = value
+    def __setitem__(self, ref_name, ref):
+        if ref.column1.table != self:
+            # Dict.__getitem__ expects the columns to be in a particular order,
+            # fix and order issues.
+            ref.column1, ref.column2 = ref.column2, ref.column1
+        self.fks[ref.column1.column] = ref_name
+        self.refs[ref_name] = ref
 
 
     def __getitem__(self, ref_name):
@@ -420,11 +423,11 @@ class Table(object):
 
 class Dict(dict):
     """
-    This behaves exactly like a dictionary, you may update your database row
-    (this Dict instance) using update or simply by setting an item.  After
-    you make changes, be sure to call Dict.flush on the instance of this
-    object to send your changes to the DB.  Your changes will not be commited
-    or rolled-back, you must do that.
+    This is a represenation of a database row that behaves exactly like a
+    dictionary, you may update your database row using update or simply by
+    setting an item.  After you make changes, be sure to call "flush" to send
+    your changes to the DB.  Your changes will not be commited or rolled-back,
+    you must do that.
 
     This relies heavily on primary keys and they should be specified.  Really,
     your tables should have a primary key of some sort.  If not, this will
@@ -569,25 +572,26 @@ class Dict(dict):
         # column hasn't been changed.
         val = super(Dict, self).get(key)
         if ref and not val:
-            my_column, table, their_column, many, substratum = ref.foreign_key()
-            wheres = {their_column:self[my_column]}
-            if many:
-                gen = table.get_where(**wheres)
+            table = ref.column2.table
+            comparison = table[ref.column2.column] == self[ref.column1.column]
+
+            if ref.many:
+                gen = table.get_where(comparison)
             else:
                 try:
-                    gen = table.get_one(**wheres)
+                    gen = table.get_one(comparison)
                 except IndexError:
                     # No results returned, must not be set
                     # TODO Does not support refining of an empty reference,
                     # which shouldn't error.
                     gen = None
 
-            if substratum and many:
-                gen = [i[substratum] for i in gen]
-            elif substratum:
-                gen = gen[substratum]
+            if ref._substratum and ref.many:
+                gen = [i[ref._substratum] for i in gen]
+            elif ref._substratum:
+                gen = gen[ref._substratum]
 
-            if not many:
+            if not ref.many:
                 # TODO Only caching one-to-one references, will need to cache
                 # one-to-many
                 super(Dict, self).__setitem__(key, gen)
@@ -606,7 +610,7 @@ class Dict(dict):
         Set self[key] to value.  If key is a reference's matching foreign key,
         set the reference to None.
         """
-        ref = self._table.ref_columns.get(key)
+        ref = self._table.fks.get(key)
         if ref:
             super(Dict, self).__setitem__(ref, None)
         return super(Dict, self).__setitem__(key, value)
