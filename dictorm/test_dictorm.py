@@ -999,6 +999,23 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(list(bob['subordinates'].offset(1)), [])
 
 
+    def test_reference_order(self):
+        """
+        A reference definition cares about order.
+        """
+        Person = self.db['person']
+        Person['manager'] = Person['manager_id'] == Person['id']
+        bob = Person(name='Bob').flush()
+        alice = Person(name='Alice', manager_id=bob['id']).flush()
+        steve = Person(name='Steve', manager_id=bob['id']).flush()
+
+        self.assertEqual(alice['manager'].no_refs(), bob.no_refs())
+        Person['manager'] = Person['id'] == Person['manager_id']
+        # Get alice again to clear cache
+        alice = Person.get_one(id=2)
+        self.assertEqual(alice['manager'], None)
+
+
 
 class SqliteTestBase(object):
 

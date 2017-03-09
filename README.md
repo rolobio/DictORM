@@ -56,6 +56,13 @@ db_conn.commit()
 # Person['car_id'] : the column of the "person" table that references car.id
 # Car['id']        : the foreign key of the "car" table, referenced by person.car_id
 
+# When defining a reference, it is important to order the columns correctly, the
+# foreign-key/foreign-table should be on the right:
+# Person['car'] = Person['car_id'] == Car['id']            # Correct
+# Person['car'] = Car['id'] == Person['car_id']            # Incorrect
+# Person['manager'] = Person['manager_id'] == Person['id'] # Correct
+# Person['manager'] = Person['id'] == Person['manager_id'] # Incorrect
+
 >>> wills_car = Car(name='Dodge Stratus', plate='123ABC')
 >>> wills_car.flush()
 >>> wills_car
