@@ -180,6 +180,33 @@ class TestSelect(unittest.TestCase):
                 )
 
 
+    def test_like(self):
+        q = Select('other_table', Person['name'].Like('Steve'))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name LIKE %s',
+                    ['Steve',]
+                    )
+                )
+        q = Select('other_table', Person['name'].Ilike('Steve'))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name ILIKE %s',
+                    ['Steve',]
+                    )
+                )
+        q = Select('other_table', Person['name'].Like('%Steve%'))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name LIKE %s',
+                    ['%Steve%',]
+                    )
+                )
+        q = Select('other_table', Person['name'].Ilike('%Steve%'))
+        self.assertEqual(q.build(),
+                ('SELECT * FROM other_table WHERE name ILIKE %s',
+                    ['%Steve%',]
+                    )
+                )
+
+
     def test_select_tuple(self):
         q = Select('cool_table', Person['id'].In((1,2)))
         self.assertEqual(q.build(),

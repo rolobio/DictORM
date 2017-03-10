@@ -1022,6 +1022,22 @@ class TestPostgresql(PostgresTestBase):
             self.assertDictContains(j, i)
 
 
+    def test_like(self):
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        self.assertEqual(_remove_refs(Person.get_where(Person['name'].Like('Bob'))),
+                _remove_refs([bob,]))
+        self.assertEqual(_remove_refs(Person.get_where(Person['name'].Like('%Bo%'))),
+                _remove_refs([bob,]))
+
+
+    def test_ilike(self):
+        Person = self.db['person']
+        alice = Person(name='Alice').flush()
+        self.assertEqual(_remove_refs(Person.get_where(Person['name'].Ilike('ali%'))),
+                _remove_refs([alice,]))
+
+
 
 class SqliteTestBase(object):
 
@@ -1184,11 +1200,12 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     # Not supported for sqlite
     test_count = None
     test_delete = None
+    test_ilike = None
     test_json = None
+    test_offset = None
     test_order_by2 = None
     test_refine_order_by = None
     test_second_cursor = None
-    test_offset = None
 
 
 

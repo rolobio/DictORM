@@ -272,10 +272,19 @@ class Column(object):
     def IsNotNull(self):
         return self.comparison(self, Null(), ' IS NOT NULL')
 
+
     def In(self, tup):
         if isinstance(tup, list):
             tup = tuple(tup)
         return self.comparison(self, tup, ' IN ')
+
+
+    def Like(self, column):
+        return self.comparison(self, column, ' LIKE ')
+
+
+    def Ilike(self, column):
+        return self.comparison(self, column, ' ILIKE ')
 
 
 
