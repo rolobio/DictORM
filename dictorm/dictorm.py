@@ -404,13 +404,25 @@ class Table(object):
         Get a list of columns of a table.
         """
         if self.db.kind == 'sqlite3':
+            key = 'name'
+        else:
+            key = 'column_name'
+        return [i[key] for i in self.columns_info()]
+
+
+    def columns_info(self):
+        """
+        Get a dictionary that contains information about all columns of this
+        table.
+        """
+        if self.db.kind == 'sqlite3':
             sql = "PRAGMA TABLE_INFO("+str(self.name)+")"
             self.curs.execute(sql)
-            return [i['name'] for i in self.curs.fetchall()]
+            return [dict(i) for i in self.curs.fetchall()]
         else:
-            sql = "SELECT column_name FROM information_schema.columns WHERE table_name=%s"
+            sql = "SELECT * FROM information_schema.columns WHERE table_name=%s"
             self.curs.execute(sql, [self.name,])
-            return [i[0] for i in self.curs.fetchall()]
+            return [dict(i) for i in self.curs.fetchall()]
 
 
     def __setitem__(self, ref_name, ref):
