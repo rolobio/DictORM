@@ -296,7 +296,7 @@ class Table(object):
 
 
     def __repr__(self): # pragma: no cover
-        return 'Table({}, {})'.format(self.name, self.pks)
+        return 'Table({0}, {1})'.format(self.name, self.pks)
 
 
     def __call__(self, *a, **kw):
@@ -505,7 +505,7 @@ class Dict(dict):
             # Update this dictionary's row
             if not self._table.pks:
                 raise NoPrimaryKey(
-                        'Cannot update to {}, no primary keys defined.'.format(
+                        'Cannot update to {0}, no primary keys defined.'.format(
                     self._table))
             # Update without references, "wheres" are the primary values
             query = update(self._table.name, **json_dicts(self.no_refs())

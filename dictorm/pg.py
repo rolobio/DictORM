@@ -23,7 +23,7 @@ class Select(object):
 
 
     def __repr__(self): # pragma: no cover
-        return 'Select({}, {}, ret:{}, order:{}, limit:{}, offset:{}'.format(
+        return 'Select({0}, {1}, ret:{2}, order:{3}, limit:{4}, offset:{5}'.format(
                 self.table,
                 repr(self.operators_or_comp),
                 self.returning,
@@ -83,10 +83,10 @@ class Select(object):
 class Insert(object):
 
     query = 'INSERT INTO {table} {cvp}'
-    cvp = '({}) VALUES ({})'
+    cvp = '({0}) VALUES ({1})'
     interpolation_str = '%s'
     append_returning = None
-    last_row = 'SELECT {} FROM {} WHERE rowid = last_insert_rowid()'
+    last_row = 'SELECT {0} FROM {1} WHERE rowid = last_insert_rowid()'
 
     def __init__(self, table, **values):
         self.table = table
@@ -145,7 +145,7 @@ class Update(Insert):
 
 
     def _build_cvp(self):
-        return ', '.join(['{}={}'.format(k, self.interpolation_str) \
+        return ', '.join(['{0}={1}'.format(k, self.interpolation_str) \
                 for k,v in self.sorted_items()])
 
     def __str__(self):
@@ -189,19 +189,19 @@ class Comparison(object):
 
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
-            ret = 'Comparison({}{})'.format(self.column1, self.kind)
-        ret = 'Comparison({}{}{})'.format(self.column1,
+            ret = 'Comparison({0}{1})'.format(self.column1, self.kind)
+        ret = 'Comparison({0}{1}{2})'.format(self.column1,
                 str(self.kind), self.column2)
         if self._substratum:
-            ret += '.substratum({})'.format(self._substratum)
+            ret += '.substratum({0})'.format(self._substratum)
         return ret
 
 
     def __str__(self):
         c1 = self.column1.column
         if self._null_kind():
-            return '{}{}'.format(c1, self.kind)
-        return '{}{}{}'.format(c1, self.kind, self.interpolation_str)
+            return '{0}{1}'.format(c1, self.kind)
+        return '{0}{1}{2}'.format(c1, self.kind, self.interpolation_str)
 
 
     def value(self):
@@ -241,7 +241,7 @@ class Column(object):
         self.column = column
 
     def __repr__(self): # pragma: no cover
-        return '{}.{}'.format(self.table.name, self.column)
+        return '{0}.{1}'.format(self.table.name, self.column)
 
     def many(self, column):
         c = self.comparison(self, column, '=')
@@ -286,7 +286,7 @@ class Operator(object):
         self.operators_or_comp = list(operators_or_comp)
 
     def __repr__(self): # pragma: no cover
-        return '{}({})'.format(self.kind, repr(self.operators_or_comp))
+        return '{0}({1})'.format(self.kind, repr(self.operators_or_comp))
 
     def __str__(self):
         kind = ' '+self.kind+' '
