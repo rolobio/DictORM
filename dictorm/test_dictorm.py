@@ -1025,7 +1025,6 @@ class TestPostgresql(PostgresTestBase):
     def test_like(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
-        alice = Person(name='Alice').flush()
         self.assertEqual(_remove_refs(Person.get_where(Person['name'].Like('Bob'))),
                 _remove_refs([bob,]))
         self.assertEqual(_remove_refs(Person.get_where(Person['name'].Like('%Bo%'))),
