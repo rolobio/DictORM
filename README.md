@@ -389,6 +389,10 @@ bob
 "foo IS NOT NULL"
 >>> Person['foo'].In(('bar', 'baz')) # Not supported for Sqlite3
 "foo IN ('bar', 'baz')"
+>>> Person['foo'].Like('bar')
+"foo LIKE 'bar'"
+>>> Person['foo'].Ilike('bar') # Not supported for Sqlite3
+"foo LIKE 'bar'"
 ```
 
 ### Delete
