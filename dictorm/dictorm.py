@@ -3,7 +3,7 @@ What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update rows of a database as if they were Python
 Dictionaries.
 """
-__version__ = '3.1.2'
+__version__ = '3.1.3'
 
 from sys import modules
 from json import dumps
@@ -606,7 +606,7 @@ class Dict(dict):
                     gen = table.get_one(comparison)
                 except IndexError:
                     # No results returned, must not be set
-                    gen = None
+                    return None
 
             if ref._substratum and ref.many:
                 gen = [i[ref._substratum] for i in gen]
