@@ -1005,6 +1005,23 @@ class TestPostgresql(PostgresTestBase):
                 ['id', 'name', 'other', 'manager_id', 'car_id'])
 
 
+    def test_column_info(self):
+        """
+        Table.columns is a method that gets a list of a table's columns
+        """
+        Person = self.db['person']
+        test_info = [
+                {'column_name':'id', 'data_type':'integer'},
+                {'column_name':'name', 'data_type':'text'},
+                {'column_name':'other', 'data_type':'integer'},
+                {'column_name':'manager_id', 'data_type':'integer'},
+                {'column_name':'car_id', 'data_type':'integer'},
+                ]
+        self.assertEqual(len(test_info), len(Person.columns_info()))
+        for i,j in zip(test_info, Person.columns_info()):
+            self.assertDictContains(j, i)
+
+
 
 class SqliteTestBase(object):
 
@@ -1145,6 +1162,23 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         results = list(NoPk.get_where(foo='bar'))
         self.assertEqual(len(results), 1)
         self.assertEqual(results, [{'foo': 'bar'},])
+
+
+    def test_column_info(self):
+        """
+        Table.columns is a method that gets a list of a table's columns
+        """
+        Person = self.db['person']
+        test_info = [
+                {'name':'id', 'type':'INTEGER'},
+                {'name':'name', 'type':'TEXT'},
+                {'name':'other', 'type':'INTEGER'},
+                {'name':'manager_id', 'type':'INTEGER'},
+                {'name':'car_id', 'type':'INTEGER'},
+                ]
+        self.assertEqual(len(test_info), len(Person.columns_info()))
+        for i,j in zip(test_info, [dict(i) for i in Person.columns_info()]):
+            self.assertDictContains(j, i)
 
 
     # Not supported for sqlite

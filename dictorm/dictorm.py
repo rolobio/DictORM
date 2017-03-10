@@ -413,6 +413,21 @@ class Table(object):
             return [i[0] for i in self.curs.fetchall()]
 
 
+    def columns_info(self):
+        """
+        Get a dictionary that contains information about all columns of this
+        table.
+        """
+        if self.db.kind == 'sqlite3':
+            sql = "PRAGMA TABLE_INFO("+str(self.name)+")"
+            self.curs.execute(sql)
+            return [dict(i) for i in self.curs.fetchall()]
+        else:
+            sql = "SELECT * FROM information_schema.columns WHERE table_name=%s"
+            self.curs.execute(sql, [self.name,])
+            return [dict(i) for i in self.curs.fetchall()]
+
+
     def __setitem__(self, ref_name, ref):
         if ref.column1.table != self:
             # Dict.__getitem__ expects the columns to be in a particular order,
