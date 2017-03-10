@@ -650,8 +650,8 @@ class TestPostgresql(PostgresTestBase):
         Person['manager'] = Person['id'] == Person['manager_id']
         Person['managers_manager'] = Person['manager'].substratum('manager')
         self.assertEqual(alice['manager'], None)
-
-        print(alice['managers_manager'])
+        # An empty substratum doesn't error
+        self.assertEqual(alice['managers_manager'], None)
 
 
 
