@@ -399,6 +399,20 @@ class Table(object):
         return int(self.curs.fetchone()[0])
 
 
+    def columns(self):
+        """
+        Get a list of columns of a table.
+        """
+        if self.db.kind == 'sqlite3':
+            sql = "PRAGMA TABLE_INFO("+str(self.name)+")"
+            self.curs.execute(sql)
+            return [i['name'] for i in self.curs.fetchall()]
+        else:
+            sql = "SELECT column_name FROM information_schema.columns WHERE table_name=%s"
+            self.curs.execute(sql, [self.name,])
+            return [i[0] for i in self.curs.fetchall()]
+
+
     def __setitem__(self, ref_name, ref):
         if ref.column1.table != self:
             # Dict.__getitem__ expects the columns to be in a particular order,

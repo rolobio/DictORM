@@ -996,6 +996,15 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(alice['manager'], None)
 
 
+    def test_columns(self):
+        """
+        Table.columns is a method that gets a list of a table's columns
+        """
+        Person = self.db['person']
+        self.assertEqual(Person.columns(),
+                ['id', 'name', 'other', 'manager_id', 'car_id'])
+
+
 
 class SqliteTestBase(object):
 
