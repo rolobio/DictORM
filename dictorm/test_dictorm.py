@@ -648,7 +648,11 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(len(iter(alice['subordinates'])), 0)
 
         Person['manager'] = Person['id'] == Person['manager_id']
+        Person['managers_manager'] = Person['manager'].substratum('manager')
         self.assertEqual(alice['manager'], None)
+        # An empty substratum doesn't error
+        self.assertEqual(alice['managers_manager'], None)
+
 
 
     def test_reexecute(self):
