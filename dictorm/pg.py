@@ -190,8 +190,8 @@ class Comparison(object):
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
             ret = 'Comparison({0}{1})'.format(self.column1, self.kind)
-        ret = 'Comparison({0}{1}{2})'.format(self.column1,
-                str(self.kind), self.column2)
+        ret = 'Comparison{0}({1}{2}{3})'.format('Many' if self.many else '',
+                self.column1, str(self.kind), self.column2)
         if self._substratum:
             ret += '.substratum({0})'.format(self._substratum)
         return ret
@@ -215,8 +215,10 @@ class Comparison(object):
 
 
     def substratum(self, column):
-        self._substratum = column
-        return self
+        comp = Comparison(self.column1, self.column2, self.kind)
+        comp._substratum = column
+        comp.many = self.many
+        return comp
 
 
     def _null_kind(self): return isinstance(self.column2, Null)
