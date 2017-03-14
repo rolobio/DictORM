@@ -33,22 +33,23 @@ class Select(object):
 
 
     def __str__(self):
-        sql = self.query
+        parts = []
         formats = {'table':self.table,}
         oc = self.operators_or_comp
         if (isinstance(oc, Operator) and oc.operators_or_comp) or (
                 isinstance(oc, Comparison)
                 ):
-            sql += ' WHERE {comp}'
+            parts.append(' WHERE {comp}')
             formats['comp'] = str(oc)
         if self._order_by:
-            sql += ' ORDER BY '+str(self._order_by)
+            parts.append(' ORDER BY {0}'.format(str(self._order_by)))
         if self.returning:
-            sql += ' RETURNING '+str(self.returning)
+            parts.append(' RETURNING {0}'.format(str(self.returning)))
         if self._limit:
-            sql += ' LIMIT '+str(self._limit)
+            parts.append(' LIMIT {0}'.format(str(self._limit)))
         if self._offset:
-            sql += ' OFFSET '+str(self._offset)
+            parts.append(' OFFSET {0}'.format(str(self._offset)))
+        sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
 
@@ -145,17 +146,18 @@ class Update(Insert):
 
 
     def _build_cvp(self):
-        return ', '.join(['{0}={1}'.format(k, self.interpolation_str) \
-                for k,v in self.sorted_items()])
+        return ', '.join(('{0}={1}'.format(k, self.interpolation_str) \
+                for k,v in self.sorted_items()))
 
     def __str__(self):
-        sql = self.query
+        parts = []
         formats = {'table':self.table, 'cvp':self._build_cvp()}
         if self.operators_or_comp:
-            sql += ' WHERE {comps}'
+            parts.append(' WHERE {comps}')
             formats['comps'] = str(self.operators_or_comp)
         if self._returning:
-            sql += ' RETURNING '+str(self._returning)
+            parts.append(' RETURNING '+str(self._returning))
+        sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
 
@@ -300,11 +302,11 @@ class Operator(object):
         return '{0}({1})'.format(self.kind, repr(self.operators_or_comp))
 
     def __str__(self):
-        kind = ' '+self.kind+' '
+        kind = ' {0} '.format(self.kind)
         s = []
         for comp in self.operators_or_comp:
             if isinstance(comp, Operator):
-                s.append('('+str(comp)+')')
+                s.append('({0})'.format(str(comp)))
             else:
                 s.append(str(comp))
         return kind.join(s)

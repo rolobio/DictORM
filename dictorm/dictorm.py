@@ -480,7 +480,7 @@ class Dict(dict):
         self._in_db = False
         self._curs = table.db.curs
         super(Dict, self).__init__(*a, **kw)
-        self._old = self.no_refs()
+        self._old_pk_and = None
 
 
     def flush(self):
@@ -508,6 +508,8 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
+            # TODO json_dicts is unnecessary most of the time, only run it
+            # when necessary
             query = insert(self._table.name, **json_dicts(self.no_refs())
                     ).returning('*')
             self._execute_query(query)
@@ -521,12 +523,12 @@ class Dict(dict):
                     self._table))
             # Update without references, "wheres" are the primary values
             query = update(self._table.name, **json_dicts(self.no_refs())
-                    ).where(self.pk_and(self._old))
+                    ).where(self._old_pk_and or self.pk_and())
             self._execute_query(query)
             d = self
 
         super(Dict, self).__init__(d)
-        self._old = self.no_refs()
+        self._old_pk_and = self.pk_and()
         return self
 
 
