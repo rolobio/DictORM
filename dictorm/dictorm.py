@@ -43,6 +43,7 @@ class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
 
 
+global json_dicts
 def json_dicts(d):
     """
     Convert all dictionaries contained in this object into JSON strings.
