@@ -10,7 +10,6 @@ from psycopg2.extensions import cursor
 mogrify = cursor.mogrify
 
 global sort_keys
-    print('setting')
 sort_keys = False
 def set_sort_keys(val):
     "Used only for testing"
