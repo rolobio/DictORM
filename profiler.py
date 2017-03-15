@@ -37,3 +37,11 @@ for person in Person.get_where():
     car = Car(make=rand_str(), model=rand_str()).flush()
     person['car_id'] = car['id']
     person.flush()
+
+conn.commit()
+
+for person in Person.get_where():
+    person.delete()
+
+for car in Car.get_where():
+    car.delete()
