@@ -93,10 +93,11 @@ class Insert(object):
         self.table = table
         self._values = values
         self._returning = None
+        self._ordered_keys = values.keys()
 
 
     def _build_cvp(self):
-        return (', '.join([k for k,v in self.sorted_items()]),
+        return (', '.join([k for k in self._ordered_keys]),
             ', '.join([self.interpolation_str,]*len(self._values)))
 
 
@@ -110,12 +111,8 @@ class Insert(object):
                 cvp=self.cvp.format(*self._build_cvp()))
 
 
-    def sorted_items(self):
-        return sorted(self._values.items())
-
-
     def values(self):
-        return [self._values[k] for k in sorted(self._values)]
+        return [self._values[k] for k in self._ordered_keys]
 
 
     def build(self):
@@ -147,7 +144,7 @@ class Update(Insert):
 
     def _build_cvp(self):
         return ', '.join(('{0}={1}'.format(k, self.interpolation_str) \
-                for k,v in self.sorted_items()))
+                for k in self._ordered_keys))
 
     def __str__(self):
         parts = []
