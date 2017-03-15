@@ -145,7 +145,6 @@ class ResultsGenerator:
         self.query = query
         self.cache = []
         self.completed = False
-        self.refined = False
         self.executed = False
         self.db_kind = db.kind
         self.db = db
@@ -216,6 +215,7 @@ class ResultsGenerator:
     def offset(self, offset):
         query = deepcopy(self.query).offset(offset)
         return ResultsGenerator(self.table, query, self.db)
+
 
 
 _json_column_types = ('json', 'jsonb')
@@ -398,10 +398,18 @@ class Table(object):
         If more than one row could be returned, this will raise an
         UnexpectedRows error.
         """
-        l = list(self.get_where(*a, **kw))
-        if len(l) > 1:
+        l = self.get_where(*a, **kw)
+        try:
+            i = next(l)
+        except StopIteration:
+            return None
+        try:
+            next(l)
             raise UnexpectedRows('More than one row selected.')
-        return l[0]
+        except StopIteration:
+            # Should only be one result
+            pass
+        return i
 
 
     def count(self):
@@ -613,10 +621,8 @@ class Dict(dict):
             if ref.many:
                 gen = table.get_where(comparison)
             else:
-                try:
-                    gen = table.get_one(comparison)
-                except IndexError:
-                    # No results returned, must not be set
+                gen = table.get_one(comparison)
+                if not gen:
                     return None
 
             if ref._substratum and ref.many:
