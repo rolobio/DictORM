@@ -33,12 +33,11 @@ Person, Car = db['person'], db['car']
 for idx in range(10000):
     Person(name=rand_str()).flush()
 
-for person in Person.get_where():
+for i in range(1, 10001):
+    person = Person.get_one(id=i)
     car = Car(make=rand_str(), model=rand_str()).flush()
     person['car_id'] = car['id']
     person.flush()
-
-conn.commit()
 
 for person in Person.get_where():
     person.delete()
