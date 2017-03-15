@@ -57,8 +57,7 @@ def json_dicts(d):
 def set_json_dicts(func):
     "Used only for testing"
     global json_dicts
-    original = json_dicts
-    json_dicts = func
+    original, json_dicts = json_dicts, func
     return original
 
 
