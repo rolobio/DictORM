@@ -9,6 +9,13 @@ from psycopg2.extensions import cursor
 
 mogrify = cursor.mogrify
 
+sort_keys = False
+def set_sort_keys(val):
+    "Used only for testing"
+    global sort_keys
+    sort_keys = val
+
+
 class Select(object):
 
     query = 'SELECT * FROM {table}'
@@ -94,6 +101,8 @@ class Insert(object):
         self._values = values
         self._returning = None
         self._ordered_keys = values.keys()
+        if sort_keys:
+            self._ordered_keys = sorted(self._ordered_keys)
 
 
     def _build_cvp(self):

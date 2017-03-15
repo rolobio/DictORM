@@ -1,5 +1,5 @@
 import unittest
-from .pg import Select, Insert, Update, Delete, Or, Xor, And, Column
+from .pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''
@@ -11,6 +11,7 @@ class PersonTable(object):
 
 
 Person = PersonTable()
+set_sort_keys(True)
 
 
 class TestSelect(unittest.TestCase):
