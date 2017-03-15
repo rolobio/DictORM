@@ -178,12 +178,12 @@ class TestPostgresql(PostgresTestBase):
         del bob
         del alice
         self.conn.commit()
-        self.assertEqual(len(list(Person.get_where())), 2)
+        self.assertEqual(Person.count(), 2)
 
         bob, alice = Person.get_where()
         bob.delete()
         alice.delete()
-        self.assertEqual(len(list(Person.get_where())), 0)
+        self.assertEqual(Person.count(), 0)
 
 
     def test_get_where_multiple_pks(self):
@@ -207,7 +207,7 @@ class TestPostgresql(PostgresTestBase):
 
         # Test deletion with multiple Primary Keys
         bob_sales.delete()
-        self.assertEqual(len(list(PD.get_where())), 0)
+        self.assertEqual(PD.count(), 0)
 
 
     def test_already_in_db(self):
@@ -519,7 +519,7 @@ class TestPostgresql(PostgresTestBase):
         NoPk = self.db['no_pk']
         NoPk(foo='bar').flush()
         NoPk(foo='baz').flush()
-        self.assertEqual(len(list(NoPk.get_where())), 2)
+        self.assertEqual(NoPk.count(), 2)
         self.assertNotIn('ORDER BY', NoPk.curs.query.decode())
         NoPk.order_by = 'foo desc'
         results = NoPk.get_where()
@@ -1168,12 +1168,12 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         del bob
         del alice
         self.conn.commit()
-        self.assertEqual(len(list(Person.get_where())), 2)
+        self.assertEqual(Person.count(), 2)
 
         bob, alice = Person.get_where()
         bob.delete()
         alice.delete()
-        self.assertEqual(len(list(Person.get_where())), 0)
+        self.assertEqual(Person.count(), 0)
 
 
 
@@ -1192,7 +1192,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         NoPk = self.db['no_pk']
         NoPk(foo='bar').flush()
         NoPk(foo='baz').flush()
-        self.assertEqual(len(list(NoPk.get_where())), 2)
+        self.assertEqual(NoPk.count(), 2)
         NoPk.order_by = 'foo desc'
         results = list(NoPk.get_where())
         self.assertEqual(len(results), 2)
