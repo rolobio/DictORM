@@ -82,18 +82,18 @@ class DictDB(dict):
         self.conn = db_conn
         if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
             self.kind = 'sqlite3'
+            self.insert = SqliteInsert
+            self.update = SqliteUpdate
+            self.column = SqliteColumn
         else:
             self.kind = 'postgresql'
+            self.insert = Insert
+            self.update = Update
+            self.column = Column
+        self.select = Select
+        self.delete = Delete
 
-        if self.kind == 'sqlite3':
-            # row_factory using builtin Row which acts like a dictionary
-            self.conn.row_factory = sqlite3.Row
-            self.curs = self.conn.cursor()
-        elif self.kind == 'postgresql':
-            # using builtin DictCursor which gets/inserts/updates using
-            # dictionaries
-            self.curs = self.conn.cursor(cursor_factory=DictCursor)
-
+        self.curs = self.get_cursor()
         self.refresh_tables()
         super(DictDB, self).__init__()
 
@@ -106,6 +106,13 @@ class DictDB(dict):
                     FROM information_schema.columns
                     WHERE table_schema='public' ''')
         return self.curs.fetchall()
+
+    def get_cursor(self):
+        if self.kind == 'sqlite3':
+            self.conn.row_factory = sqlite3.Row
+            return self.conn.cursor()
+        elif self.kind == 'postgresql':
+            return self.conn.cursor(cursor_factory=DictCursor)
 
 
     def refresh_tables(self):
@@ -141,15 +148,7 @@ class ResultsGenerator:
         self.executed = False
         self.db_kind = db.kind
         self.db = db
-
-
-    def _new_cursor(self):
-        # This needs its own generator in case the usual cursor is used to
-        # Update/Delete/Insert, overwriting the results of this query.
-        if self.db.kind == 'sqlite3':
-            self.curs = self.db.conn.cursor()
-        elif self.db.kind == 'postgresql':
-            self.curs = self.db.conn.cursor(cursor_factory=DictCursor)
+        self.curs = self.db.get_cursor()
 
 
     def __iter__(self):
@@ -177,7 +176,6 @@ class ResultsGenerator:
         Execute the query only once
         """
         if not self.executed:
-            self._new_cursor()
             self.executed = True
             sql, values = self.query.build()
             self.curs.execute(sql, values)
@@ -285,10 +283,8 @@ class Table(object):
         self.order_by = None
         self.fks = {}
         # Detect json column types for this table's columns
-        if db.kind == 'sqlite3':
-            data_types = [i['type'].lower() for i in self.columns_info()]
-        else:
-            data_types = [i['data_type'].lower() for i in self.columns_info()]
+        type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
+        data_types = [i[type_column_name].lower() for i in self.columns_info()]
         self.has_json = True if \
                 [i for i in _json_column_types if i in data_types]\
                 else False
@@ -455,10 +451,7 @@ class Table(object):
         try:
             return self.refs[ref_name]
         except KeyError:
-            if self.db.kind == 'sqlite3':
-                return SqliteColumn(self, ref_name)
-            else:
-                return Column(self, ref_name)
+            return self.db.column(self, ref_name)
 
 
 
@@ -514,14 +507,6 @@ class Dict(dict):
             for ref in [i for i in self.references().values() if i]:
                 ref.flush()
 
-        if self._table.db.kind == 'sqlite3':
-            insert = SqliteInsert
-            update = SqliteUpdate
-        else:
-            # Default to Postgresql insert
-            insert = Insert
-            update = Update
-
         # This will be sent to the DB, don't convert dicts to json unless
         # the table has json columns.
         items = self.no_refs()
@@ -533,7 +518,7 @@ class Dict(dict):
             # my values into the query
             # TODO json_dicts is unnecessary most of the time, only run it
             # when necessary
-            query = insert(self._table.name, **items).returning('*')
+            query = self._table.db.insert(self._table.name, **items).returning('*')
             self._execute_query(query)
             self._in_db = True
             d = self._curs.fetchone()
@@ -544,7 +529,7 @@ class Dict(dict):
                         'Cannot update to {0}, no primary keys defined.'.format(
                     self._table))
             # Update without references, "wheres" are the primary values
-            query = update(self._table.name, **items
+            query = self._table.db.update(self._table.name, **items
                     ).where(self._old_pk_and or self.pk_and())
             self._execute_query(query)
             d = self
@@ -579,7 +564,7 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        query = Delete(self._table.name).where(self.pk_and())
+        query = self._table.db.delete(self._table.name).where(self.pk_and())
         self._execute_query(query)
 
 
