@@ -53,6 +53,14 @@ def json_dicts(d):
     return d
 
 
+def set_json_dicts(func):
+    "Used only for testing"
+    global json_dicts
+    original = json_dicts
+    json_dicts = func
+    return original
+
+
 class DictDB(dict):
     """
     Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
@@ -211,6 +219,7 @@ class ResultsGenerator:
         return ResultsGenerator(self.table, query, self.db)
 
 
+_json_column_types = ('json', 'jsonb')
 
 class Table(object):
     """
@@ -275,6 +284,14 @@ class Table(object):
         self._set_pks()
         self.order_by = None
         self.fks = {}
+        # Detect json column types for this table's columns
+        if db.kind == 'sqlite3':
+            data_types = [i['type'].lower() for i in self.columns_info()]
+        else:
+            data_types = [i['data_type'].lower() for i in self.columns_info()]
+        self.has_json = True if \
+                [i for i in _json_column_types if i in data_types]\
+                else False
 
 
     def _set_pks(self):
@@ -505,13 +522,18 @@ class Dict(dict):
             insert = Insert
             update = Update
 
+        # This will be sent to the DB, don't convert dicts to json unless
+        # the table has json columns.
+        items = self.no_refs()
+        if self._table.has_json:
+            items = json_dicts(items)
+
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
             # TODO json_dicts is unnecessary most of the time, only run it
             # when necessary
-            query = insert(self._table.name, **json_dicts(self.no_refs())
-                    ).returning('*')
+            query = insert(self._table.name, **items).returning('*')
             self._execute_query(query)
             self._in_db = True
             d = self._curs.fetchone()
@@ -522,7 +544,7 @@ class Dict(dict):
                         'Cannot update to {0}, no primary keys defined.'.format(
                     self._table))
             # Update without references, "wheres" are the primary values
-            query = update(self._table.name, **json_dicts(self.no_refs())
+            query = update(self._table.name, **items
                     ).where(self._old_pk_and or self.pk_and())
             self._execute_query(query)
             d = self

@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, Select)
+    ResultsGenerator, Select, set_json_dicts)
 from psycopg2.extras import DictCursor
 import os
 import psycopg2
@@ -544,6 +544,17 @@ class TestPostgresql(PostgresTestBase):
         p['description'] = {'foo':'baz'}
         p.flush()
         self.assertEqual(Possession.get_one()['description'], {'foo':'baz'})
+
+        # Non-json row doesn't call json_dicts
+        original = set_json_dicts(error)
+        self.assertRaises(Exception, p.flush)
+        try:
+            Person = self.db['person']
+            bob = Person(name='Bob')
+            # Shouldn't raise Exception from "error" function
+            bob.flush()
+        finally:
+            set_json_dicts(original)
 
 
     def test_multiple_references(self):
