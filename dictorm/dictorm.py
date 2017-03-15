@@ -159,7 +159,7 @@ class ResultsGenerator:
 
 
     def __next__(self):
-        self._execute_once()
+        self.__execute_once()
         d = self.curs.fetchone()
         if not d:
             self.completed = True
@@ -171,7 +171,7 @@ class ResultsGenerator:
         return d
 
 
-    def _execute_once(self):
+    def __execute_once(self):
         """
         Execute the query only once
         """
@@ -186,7 +186,7 @@ class ResultsGenerator:
 
 
     def __len__(self):
-        self._execute_once()
+        self.__execute_once()
         if self.db_kind == 'sqlite3':
             # sqlite3's cursor.rowcount doesn't support select statements
             return 0
@@ -519,7 +519,7 @@ class Dict(dict):
             # TODO json_dicts is unnecessary most of the time, only run it
             # when necessary
             query = self._table.db.insert(self._table.name, **items).returning('*')
-            self._execute_query(query)
+            self.__execute_query(query)
             self._in_db = True
             d = self._curs.fetchone()
         else:
@@ -531,7 +531,7 @@ class Dict(dict):
             # Update without references, "wheres" are the primary values
             query = self._table.db.update(self._table.name, **items
                     ).where(self._old_pk_and or self.pk_and())
-            self._execute_query(query)
+            self.__execute_query(query)
             d = self
 
         super(Dict, self).__init__(d)
@@ -539,7 +539,7 @@ class Dict(dict):
         return self
 
 
-    def _execute_query(self, query):
+    def __execute_query(self, query):
         built = query.build()
         if isinstance(built, list):
             for sql, values in built:
@@ -564,8 +564,9 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        query = self._table.db.delete(self._table.name).where(self.pk_and())
-        self._execute_query(query)
+        query = self._table.db.delete(self._table.name).where(
+                self._old_pk_and or self.pk_and())
+        self.__execute_query(query)
 
 
     def no_pks(self):
