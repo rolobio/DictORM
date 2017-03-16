@@ -9,6 +9,14 @@ from psycopg2.extensions import cursor
 
 mogrify = cursor.mogrify
 
+global sort_keys
+sort_keys = False
+def set_sort_keys(val):
+    "Used only for testing"
+    global sort_keys
+    sort_keys = val
+
+
 class Select(object):
 
     query = 'SELECT * FROM {table}'
@@ -33,22 +41,23 @@ class Select(object):
 
 
     def __str__(self):
-        sql = self.query
+        parts = []
         formats = {'table':self.table,}
-        oc = self.operators_or_comp
-        if (isinstance(oc, Operator) and oc.operators_or_comp) or (
-                isinstance(oc, Comparison)
+        ooc = self.operators_or_comp
+        if (isinstance(ooc, Operator) and ooc.operators_or_comp) or (
+                isinstance(ooc, Comparison)
                 ):
-            sql += ' WHERE {comp}'
-            formats['comp'] = str(oc)
+            parts.append(' WHERE {comp}')
+            formats['comp'] = str(ooc)
         if self._order_by:
-            sql += ' ORDER BY '+str(self._order_by)
+            parts.append(' ORDER BY {0}'.format(str(self._order_by)))
         if self.returning:
-            sql += ' RETURNING '+str(self.returning)
+            parts.append(' RETURNING {0}'.format(str(self.returning)))
         if self._limit:
-            sql += ' LIMIT '+str(self._limit)
+            parts.append(' LIMIT {0}'.format(str(self._limit)))
         if self._offset:
-            sql += ' OFFSET '+str(self._offset)
+            parts.append(' OFFSET {0}'.format(str(self._offset)))
+        sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
 
@@ -75,8 +84,9 @@ class Select(object):
         return self
 
 
-    def append(self, item):
-        self.operators_or_comp.append(item)
+    def __add__(self, item):
+        self.operators_or_comp += item
+        return self
 
 
 
@@ -92,10 +102,13 @@ class Insert(object):
         self.table = table
         self._values = values
         self._returning = None
+        self._ordered_keys = values.keys()
+        if sort_keys:
+            self._ordered_keys = sorted(self._ordered_keys)
 
 
     def _build_cvp(self):
-        return (', '.join([k for k,v in self.sorted_items()]),
+        return (', '.join(self._ordered_keys),
             ', '.join([self.interpolation_str,]*len(self._values)))
 
 
@@ -109,12 +122,8 @@ class Insert(object):
                 cvp=self.cvp.format(*self._build_cvp()))
 
 
-    def sorted_items(self):
-        return sorted(self._values.items())
-
-
     def values(self):
-        return [self._values[k] for k in sorted(self._values)]
+        return [self._values[k] for k in self._ordered_keys]
 
 
     def build(self):
@@ -145,17 +154,18 @@ class Update(Insert):
 
 
     def _build_cvp(self):
-        return ', '.join(['{0}={1}'.format(k, self.interpolation_str) \
-                for k,v in self.sorted_items()])
+        return ', '.join(('{0}={1}'.format(k, self.interpolation_str) \
+                for k in self._ordered_keys))
 
     def __str__(self):
-        sql = self.query
+        parts = []
         formats = {'table':self.table, 'cvp':self._build_cvp()}
         if self.operators_or_comp:
-            sql += ' WHERE {comps}'
+            parts.append(' WHERE {comps}')
             formats['comps'] = str(self.operators_or_comp)
         if self._returning:
-            sql += ' RETURNING '+str(self._returning)
+            parts.append(' RETURNING '+str(self._returning))
+        sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
 
@@ -290,52 +300,56 @@ class Column(object):
 
 
 
+def wrap_ooc(ooc):
+    if isinstance(ooc, Comparison):
+        return '%s' % str(ooc)
+    return '(%s)' % str(ooc)
+
+
 class Operator(object):
 
-    def __init__(self, kind, *operators_or_comp):
+    def __init__(self, kind, operators_or_comp):
         self.kind = kind
-        self.operators_or_comp = list(operators_or_comp)
+        self.operators_or_comp = operators_or_comp
 
     def __repr__(self): # pragma: no cover
-        return '{0}({1})'.format(self.kind, repr(self.operators_or_comp))
+        return '{0}{1}'.format(self.kind, repr(self.operators_or_comp))
 
     def __str__(self):
-        kind = ' '+self.kind+' '
-        s = []
-        for comp in self.operators_or_comp:
-            if isinstance(comp, Operator):
-                s.append('('+str(comp)+')')
-            else:
-                s.append(str(comp))
-        return kind.join(s)
+        kind = ' {0} '.format(self.kind)
+        return kind.join(map(wrap_ooc, self.operators_or_comp))
 
 
     def __iter__(self):
         i = []
         for comp in self.operators_or_comp:
             if isinstance(comp, Operator):
-                i.extend(list(comp))
+                i.extend(comp)
             elif isinstance(comp, Comparison) and not comp._null_kind():
                 i.append(comp.value())
         return iter(i)
 
 
-    def extend(self, l): return self.operators_or_comp.extend(l)
-    def append(self, i): return self.operators_or_comp.append(i)
+    def __add__(self, i):
+        if isinstance(i, tuple):
+            self.operators_or_comp += i
+        else:
+            self.operators_or_comp += (i,)
+        return self
 
 
 
 class Or(Operator):
     def __init__(self, *operators_or_comp):
-        super(Or, self).__init__('OR', *operators_or_comp)
+        super(Or, self).__init__('OR', operators_or_comp)
 
 class Xor(Operator):
     def __init__(self, *operators_or_comp):
-        super(Xor, self).__init__('XOR', *operators_or_comp)
+        super(Xor, self).__init__('XOR', operators_or_comp)
 
 class And(Operator):
     def __init__(self, *operators_or_comp):
-        super(And, self).__init__('AND', *operators_or_comp)
+        super(And, self).__init__('AND', operators_or_comp)
 
 
 

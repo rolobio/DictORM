@@ -1,5 +1,5 @@
 import unittest
-from .pg import Select, Insert, Update, Delete, Or, Xor, And, Column
+from .pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''
@@ -11,6 +11,7 @@ class PersonTable(object):
 
 
 Person = PersonTable()
+set_sort_keys(True)
 
 
 class TestSelect(unittest.TestCase):
@@ -295,8 +296,8 @@ class TestUpdate(unittest.TestCase):
             [2, 'Bob', 3, 4]))
 
         wheres = And()
-        wheres.append(Person['id']==3)
-        wheres.append(Person['car_id']==4)
+        wheres += Person['id']==3
+        wheres += Person['car_id']==4
         q = Update('some_table', name='Bob', car_id=2).where(wheres).returning('*')
         self.assertEqual(q.build(), (
             'UPDATE some_table SET car_id=%s, name=%s WHERE id=%s AND car_id=%s RETURNING *',

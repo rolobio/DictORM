@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 from dictorm import (DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey,
-    ResultsGenerator, Select)
+    ResultsGenerator, Select, set_json_dicts)
 from psycopg2.extras import DictCursor
 import os
 import psycopg2
@@ -178,12 +178,12 @@ class TestPostgresql(PostgresTestBase):
         del bob
         del alice
         self.conn.commit()
-        self.assertEqual(len(list(Person.get_where())), 2)
+        self.assertEqual(Person.count(), 2)
 
         bob, alice = Person.get_where()
         bob.delete()
         alice.delete()
-        self.assertEqual(len(list(Person.get_where())), 0)
+        self.assertEqual(Person.count(), 0)
 
 
     def test_get_where_multiple_pks(self):
@@ -207,7 +207,7 @@ class TestPostgresql(PostgresTestBase):
 
         # Test deletion with multiple Primary Keys
         bob_sales.delete()
-        self.assertEqual(len(list(PD.get_where())), 0)
+        self.assertEqual(PD.count(), 0)
 
 
     def test_already_in_db(self):
@@ -519,7 +519,7 @@ class TestPostgresql(PostgresTestBase):
         NoPk = self.db['no_pk']
         NoPk(foo='bar').flush()
         NoPk(foo='baz').flush()
-        self.assertEqual(len(list(NoPk.get_where())), 2)
+        self.assertEqual(NoPk.count(), 2)
         self.assertNotIn('ORDER BY', NoPk.curs.query.decode())
         NoPk.order_by = 'foo desc'
         results = NoPk.get_where()
@@ -544,6 +544,17 @@ class TestPostgresql(PostgresTestBase):
         p['description'] = {'foo':'baz'}
         p.flush()
         self.assertEqual(Possession.get_one()['description'], {'foo':'baz'})
+
+        # Non-json row doesn't call json_dicts
+        original = set_json_dicts(error)
+        self.assertRaises(Exception, p.flush)
+        try:
+            Person = self.db['person']
+            bob = Person(name='Bob')
+            # Shouldn't raise Exception from "error" function
+            bob.flush()
+        finally:
+            set_json_dicts(original)
 
 
     def test_multiple_references(self):
@@ -1157,12 +1168,12 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         del bob
         del alice
         self.conn.commit()
-        self.assertEqual(len(list(Person.get_where())), 2)
+        self.assertEqual(Person.count(), 2)
 
         bob, alice = Person.get_where()
         bob.delete()
         alice.delete()
-        self.assertEqual(len(list(Person.get_where())), 0)
+        self.assertEqual(Person.count(), 0)
 
 
 
@@ -1181,7 +1192,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         NoPk = self.db['no_pk']
         NoPk(foo='bar').flush()
         NoPk(foo='baz').flush()
-        self.assertEqual(len(list(NoPk.get_where())), 2)
+        self.assertEqual(NoPk.count(), 2)
         NoPk.order_by = 'foo desc'
         results = list(NoPk.get_where())
         self.assertEqual(len(results), 2)

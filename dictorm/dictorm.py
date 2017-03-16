@@ -3,7 +3,7 @@ What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update rows of a database as if they were Python
 Dictionaries.
 """
-__version__ = '3.1.4'
+__version__ = '3.2'
 
 from sys import modules
 from json import dumps
@@ -43,6 +43,7 @@ class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
 
 
+global json_dicts
 def json_dicts(d):
     """
     Convert all dictionaries contained in this object into JSON strings.
@@ -51,6 +52,13 @@ def json_dicts(d):
         if isinstance(value, dict):
             d[key] = dumps(value)
     return d
+
+
+def set_json_dicts(func):
+    "Used only for testing"
+    global json_dicts
+    original, json_dicts = json_dicts, func
+    return original
 
 
 class DictDB(dict):
@@ -74,18 +82,18 @@ class DictDB(dict):
         self.conn = db_conn
         if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
             self.kind = 'sqlite3'
+            self.insert = SqliteInsert
+            self.update = SqliteUpdate
+            self.column = SqliteColumn
         else:
             self.kind = 'postgresql'
+            self.insert = Insert
+            self.update = Update
+            self.column = Column
+        self.select = Select
+        self.delete = Delete
 
-        if self.kind == 'sqlite3':
-            # row_factory using builtin Row which acts like a dictionary
-            self.conn.row_factory = sqlite3.Row
-            self.curs = self.conn.cursor()
-        elif self.kind == 'postgresql':
-            # using builtin DictCursor which gets/inserts/updates using
-            # dictionaries
-            self.curs = self.conn.cursor(cursor_factory=DictCursor)
-
+        self.curs = self.get_cursor()
         self.refresh_tables()
         super(DictDB, self).__init__()
 
@@ -98,6 +106,13 @@ class DictDB(dict):
                     FROM information_schema.columns
                     WHERE table_schema='public' ''')
         return self.curs.fetchall()
+
+    def get_cursor(self):
+        if self.kind == 'sqlite3':
+            self.conn.row_factory = sqlite3.Row
+            return self.conn.cursor()
+        elif self.kind == 'postgresql':
+            return self.conn.cursor(cursor_factory=DictCursor)
 
 
     def refresh_tables(self):
@@ -129,19 +144,10 @@ class ResultsGenerator:
         self.query = query
         self.cache = []
         self.completed = False
-        self.refined = False
         self.executed = False
         self.db_kind = db.kind
         self.db = db
-
-
-    def _new_cursor(self):
-        # This needs its own generator in case the usual cursor is used to
-        # Update/Delete/Insert, overwriting the results of this query.
-        if self.db.kind == 'sqlite3':
-            self.curs = self.db.conn.cursor()
-        elif self.db.kind == 'postgresql':
-            self.curs = self.db.conn.cursor(cursor_factory=DictCursor)
+        self.curs = self.db.get_cursor()
 
 
     def __iter__(self):
@@ -152,7 +158,7 @@ class ResultsGenerator:
 
 
     def __next__(self):
-        self._execute_once()
+        self.__execute_once()
         d = self.curs.fetchone()
         if not d:
             self.completed = True
@@ -164,12 +170,11 @@ class ResultsGenerator:
         return d
 
 
-    def _execute_once(self):
+    def __execute_once(self):
         """
         Execute the query only once
         """
         if not self.executed:
-            self._new_cursor()
             self.executed = True
             sql, values = self.query.build()
             self.curs.execute(sql, values)
@@ -180,7 +185,7 @@ class ResultsGenerator:
 
 
     def __len__(self):
-        self._execute_once()
+        self.__execute_once()
         if self.db_kind == 'sqlite3':
             # sqlite3's cursor.rowcount doesn't support select statements
             return 0
@@ -190,9 +195,9 @@ class ResultsGenerator:
     def refine(self, *a, **kw):
         query = deepcopy(self.query)
         for exp in a:
-            query.append(exp)
+            query += exp
         for k,v in kw.items():
-            query.append(self.table[k]==v)
+            query += self.table[k]==v
         return ResultsGenerator(self.table, query, self.db)
 
 
@@ -211,6 +216,8 @@ class ResultsGenerator:
         return ResultsGenerator(self.table, query, self.db)
 
 
+
+_json_column_types = ('json', 'jsonb')
 
 class Table(object):
     """
@@ -275,6 +282,12 @@ class Table(object):
         self._set_pks()
         self.order_by = None
         self.fks = {}
+        # Detect json column types for this table's columns
+        type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
+        data_types = [i[type_column_name].lower() for i in self.columns_info()]
+        self.has_json = True if \
+                [i for i in _json_column_types if i in data_types]\
+                else False
 
 
     def _set_pks(self):
@@ -356,15 +369,15 @@ class Table(object):
         pk_uses = 0
         for exp in a:
             if isinstance(exp, (Comparison, Operator)):
-                operator_group.append(exp)
+                operator_group += (exp,)
                 continue
             if not self.pks:
                 raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
-            operator_group.append(self[self.pks[pk_uses]] == exp)
+            operator_group += (self[self.pks[pk_uses]] == exp,)
             pk_uses += 1
         # Add any key/values as comparisons
         for key, value in kw.items():
-            operator_group.append(self[key] == value)
+            operator_group += (self[key] == value,)
 
         order_by = None
         if self.order_by:
@@ -384,10 +397,18 @@ class Table(object):
         If more than one row could be returned, this will raise an
         UnexpectedRows error.
         """
-        l = list(self.get_where(*a, **kw))
-        if len(l) > 1:
+        l = self.get_where(*a, **kw)
+        try:
+            i = next(l)
+        except StopIteration:
+            return None
+        try:
+            next(l)
             raise UnexpectedRows('More than one row selected.')
-        return l[0]
+        except StopIteration:
+            # Should only be one result
+            pass
+        return i
 
 
     def count(self):
@@ -438,10 +459,7 @@ class Table(object):
         try:
             return self.refs[ref_name]
         except KeyError:
-            if self.db.kind == 'sqlite3':
-                return SqliteColumn(self, ref_name)
-            else:
-                return Column(self, ref_name)
+            return self.db.column(self, ref_name)
 
 
 
@@ -480,7 +498,7 @@ class Dict(dict):
         self._in_db = False
         self._curs = table.db.curs
         super(Dict, self).__init__(*a, **kw)
-        self._old = self.no_refs()
+        self._old_pk_and = None
 
 
     def flush(self):
@@ -497,20 +515,19 @@ class Dict(dict):
             for ref in [i for i in self.references().values() if i]:
                 ref.flush()
 
-        if self._table.db.kind == 'sqlite3':
-            insert = SqliteInsert
-            update = SqliteUpdate
-        else:
-            # Default to Postgresql insert
-            insert = Insert
-            update = Update
+        # This will be sent to the DB, don't convert dicts to json unless
+        # the table has json columns.
+        items = self.no_refs()
+        if self._table.has_json:
+            items = json_dicts(items)
 
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = insert(self._table.name, **json_dicts(self.no_refs())
-                    ).returning('*')
-            self._execute_query(query)
+            # TODO json_dicts is unnecessary most of the time, only run it
+            # when necessary
+            query = self._table.db.insert(self._table.name, **items).returning('*')
+            self.__execute_query(query)
             self._in_db = True
             d = self._curs.fetchone()
         else:
@@ -520,17 +537,17 @@ class Dict(dict):
                         'Cannot update to {0}, no primary keys defined.'.format(
                     self._table))
             # Update without references, "wheres" are the primary values
-            query = update(self._table.name, **json_dicts(self.no_refs())
-                    ).where(self.pk_and(self._old))
-            self._execute_query(query)
+            query = self._table.db.update(self._table.name, **items
+                    ).where(self._old_pk_and or self.pk_and())
+            self.__execute_query(query)
             d = self
 
         super(Dict, self).__init__(d)
-        self._old = self.no_refs()
+        self._old_pk_and = self.pk_and()
         return self
 
 
-    def _execute_query(self, query):
+    def __execute_query(self, query):
         built = query.build()
         if isinstance(built, list):
             for sql, values in built:
@@ -540,13 +557,12 @@ class Dict(dict):
             self._curs.execute(sql, values)
 
 
-    def pk_and(self, pk_dict=None):
+    def pk_and(self):
         """
         Return an And() of all this Dict's primary key values. i.e.
         And(id=1, other_primary=4)
         """
-        pk_dict = pk_dict or self
-        return And(*[self._table[k]==v for k,v in pk_dict.items() if k in \
+        return And(*[self._table[k]==v for k,v in self.items() if k in \
                 self._table.pks])
 
 
@@ -555,8 +571,9 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary
         keys to be specified.
         """
-        query = Delete(self._table.name).where(self.pk_and())
-        self._execute_query(query)
+        query = self._table.db.delete(self._table.name).where(
+                self._old_pk_and or self.pk_and())
+        self.__execute_query(query)
 
 
     def no_pks(self):
@@ -602,10 +619,8 @@ class Dict(dict):
             if ref.many:
                 gen = table.get_where(comparison)
             else:
-                try:
-                    gen = table.get_one(comparison)
-                except IndexError:
-                    # No results returned, must not be set
+                gen = table.get_one(comparison)
+                if not gen:
                     return None
 
             if ref._substratum and ref.many:
