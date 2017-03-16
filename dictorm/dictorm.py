@@ -195,9 +195,9 @@ class ResultsGenerator:
     def refine(self, *a, **kw):
         query = deepcopy(self.query)
         for exp in a:
-            query.append(exp)
+            query += exp
         for k,v in kw.items():
-            query.append(self.table[k]==v)
+            query += self.table[k]==v
         return ResultsGenerator(self.table, query, self.db)
 
 
@@ -369,15 +369,15 @@ class Table(object):
         pk_uses = 0
         for exp in a:
             if isinstance(exp, (Comparison, Operator)):
-                operator_group.append(exp)
+                operator_group += (exp,)
                 continue
             if not self.pks:
                 raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
-            operator_group.append(self[self.pks[pk_uses]] == exp)
+            operator_group += (self[self.pks[pk_uses]] == exp,)
             pk_uses += 1
         # Add any key/values as comparisons
         for key, value in kw.items():
-            operator_group.append(self[key] == value)
+            operator_group += (self[key] == value,)
 
         order_by = None
         if self.order_by:
@@ -557,13 +557,12 @@ class Dict(dict):
             self._curs.execute(sql, values)
 
 
-    def pk_and(self, pk_dict=None):
+    def pk_and(self):
         """
         Return an And() of all this Dict's primary key values. i.e.
         And(id=1, other_primary=4)
         """
-        pk_dict = pk_dict or self
-        return And(*[self._table[k]==v for k,v in pk_dict.items() if k in \
+        return And(*[self._table[k]==v for k,v in self.items() if k in \
                 self._table.pks])
 
 

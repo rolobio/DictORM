@@ -43,12 +43,12 @@ class Select(object):
     def __str__(self):
         parts = []
         formats = {'table':self.table,}
-        oc = self.operators_or_comp
-        if (isinstance(oc, Operator) and oc.operators_or_comp) or (
-                isinstance(oc, Comparison)
+        ooc = self.operators_or_comp
+        if (isinstance(ooc, Operator) and ooc.operators_or_comp) or (
+                isinstance(ooc, Comparison)
                 ):
             parts.append(' WHERE {comp}')
-            formats['comp'] = str(oc)
+            formats['comp'] = str(ooc)
         if self._order_by:
             parts.append(' ORDER BY {0}'.format(str(self._order_by)))
         if self.returning:
@@ -84,8 +84,9 @@ class Select(object):
         return self
 
 
-    def append(self, item):
-        self.operators_or_comp.append(item)
+    def __add__(self, item):
+        self.operators_or_comp += item
+        return self
 
 
 
@@ -107,7 +108,7 @@ class Insert(object):
 
 
     def _build_cvp(self):
-        return (', '.join([k for k in self._ordered_keys]),
+        return (', '.join(self._ordered_keys),
             ', '.join([self.interpolation_str,]*len(self._values)))
 
 
@@ -299,52 +300,56 @@ class Column(object):
 
 
 
+def wrap_ooc(ooc):
+    if isinstance(ooc, Comparison):
+        return '%s' % str(ooc)
+    return '(%s)' % str(ooc)
+
+
 class Operator(object):
 
-    def __init__(self, kind, *operators_or_comp):
+    def __init__(self, kind, operators_or_comp):
         self.kind = kind
-        self.operators_or_comp = list(operators_or_comp)
+        self.operators_or_comp = operators_or_comp
 
     def __repr__(self): # pragma: no cover
         return '{0}({1})'.format(self.kind, repr(self.operators_or_comp))
 
     def __str__(self):
         kind = ' {0} '.format(self.kind)
-        s = []
-        for comp in self.operators_or_comp:
-            if isinstance(comp, Operator):
-                s.append('({0})'.format(str(comp)))
-            else:
-                s.append(str(comp))
-        return kind.join(s)
+        return kind.join(map(wrap_ooc, self.operators_or_comp))
 
 
     def __iter__(self):
         i = []
         for comp in self.operators_or_comp:
             if isinstance(comp, Operator):
-                i.extend(list(comp))
+                i += (comp,)
             elif isinstance(comp, Comparison) and not comp._null_kind():
-                i.append(comp.value())
+                i += (comp.value(),)
         return iter(i)
 
 
-    def extend(self, l): return self.operators_or_comp.extend(l)
-    def append(self, i): return self.operators_or_comp.append(i)
+    def __add__(self, i):
+        if isinstance(i, tuple):
+            self.operators_or_comp += i
+        else:
+            self.operators_or_comp += (i,)
+        return self
 
 
 
 class Or(Operator):
     def __init__(self, *operators_or_comp):
-        super(Or, self).__init__('OR', *operators_or_comp)
+        super(Or, self).__init__('OR', operators_or_comp)
 
 class Xor(Operator):
     def __init__(self, *operators_or_comp):
-        super(Xor, self).__init__('XOR', *operators_or_comp)
+        super(Xor, self).__init__('XOR', operators_or_comp)
 
 class And(Operator):
     def __init__(self, *operators_or_comp):
-        super(And, self).__init__('AND', *operators_or_comp)
+        super(And, self).__init__('AND', operators_or_comp)
 
 
 
