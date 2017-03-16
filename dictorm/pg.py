@@ -324,9 +324,9 @@ class Operator(object):
         i = []
         for comp in self.operators_or_comp:
             if isinstance(comp, Operator):
-                i += (comp,)
+                i.extend(comp)
             elif isinstance(comp, Comparison) and not comp._null_kind():
-                i += (comp.value(),)
+                i.append(comp.value())
         return iter(i)
 
 
