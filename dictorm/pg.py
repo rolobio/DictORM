@@ -313,7 +313,7 @@ class Operator(object):
         self.operators_or_comp = operators_or_comp
 
     def __repr__(self): # pragma: no cover
-        return '{0}({1})'.format(self.kind, repr(self.operators_or_comp))
+        return '{0}{1}'.format(self.kind, repr(self.operators_or_comp))
 
     def __str__(self):
         kind = ' {0} '.format(self.kind)
