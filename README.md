@@ -228,7 +228,7 @@ True
 ```sql
 CREATE TABLE department (
     id SERIAL PRIMARY KEY,
-    name
+    name TEXT
 );
 CREATE TABLE person_department (
     person_id INTEGER REFERENCES person(id),
