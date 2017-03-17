@@ -618,21 +618,14 @@ class Dict(dict):
 
             if ref.many:
                 gen = table.get_where(comparison)
+                if ref._substratum:
+                    gen = [i[ref._substratum] for i in gen]
+                return gen
             else:
-                gen = table.get_one(comparison)
-                if not gen:
-                    return None
-
-            if ref._substratum and ref.many:
-                gen = [i[ref._substratum] for i in gen]
-            elif ref._substratum:
-                gen = gen[ref._substratum]
-
-            if not ref.many:
-                # TODO Only caching one-to-one references, will need to cache
-                # one-to-many
-                super(Dict, self).__setitem__(key, gen)
-            val = gen
+                val = table.get_one(comparison)
+                if ref._substratum and val:
+                    return val[ref._substratum]
+                super(Dict, self).__setitem__(key, val)
         return val
 
 
