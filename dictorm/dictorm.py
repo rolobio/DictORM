@@ -623,7 +623,7 @@ class Dict(dict):
                 return gen
             else:
                 val = table.get_one(comparison)
-                if ref._substratum:
+                if ref._substratum and val:
                     return val[ref._substratum]
                 super(Dict, self).__setitem__(key, val)
         return val
