@@ -43,8 +43,8 @@ class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
 
 
-global json_dicts
-def json_dicts(d):
+global _json_dicts
+def _json_dicts(d):
     """
     Convert all dictionaries contained in this object into JSON strings.
     """
@@ -56,16 +56,16 @@ def json_dicts(d):
 
 def set_json_dicts(func):
     "Used only for testing"
-    global json_dicts
-    original, json_dicts = json_dicts, func
+    global _json_dicts
+    original, _json_dicts = _json_dicts, func
     return original
 
 
 class DictDB(dict):
     """
     Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
-    Table for each table, and keep tehm in this DictDB using the table's
-    name as a key.
+    Table instance for each table, and keep them in this DictDB using the
+    table's name as a key.
 
     >>> db = DictDB(your_db_connection)
     >>> db['table1']
@@ -98,7 +98,7 @@ class DictDB(dict):
         super(DictDB, self).__init__()
 
 
-    def _list_tables(self):
+    def __list_tables(self):
         if self.kind == 'sqlite3':
             self.curs.execute('SELECT name FROM sqlite_master WHERE type = "table"')
         else:
@@ -107,7 +107,12 @@ class DictDB(dict):
                     WHERE table_schema='public' ''')
         return self.curs.fetchall()
 
+
     def get_cursor(self):
+        """
+        Returns a cursor from the provided database connection that DictORM
+        objects expect.
+        """
         if self.kind == 'sqlite3':
             self.conn.row_factory = sqlite3.Row
             return self.conn.cursor()
@@ -116,10 +121,13 @@ class DictDB(dict):
 
 
     def refresh_tables(self):
+        """
+        Create all Table instances from all tables found in the database.
+        """
         if self.keys():
             # Reset this DictDB because it contains old tables
             super(DictDB, self).__init__()
-        for table in self._list_tables():
+        for table in self.__list_tables():
             if self.kind == 'sqlite3':
                 self[table['name']] = Table(table['name'], self)
             else:
@@ -129,14 +137,10 @@ class DictDB(dict):
 
 class ResultsGenerator:
     """
-    This class replicates a Generator, it mearly adds the ability to get the
-    len() of the generator (the rowcount of the last query run).  This method
-    should only be returned by Table.get_where and Table.get_one.  It will
-    cache the values gotten by "next" and once all rows have been fetched,
-    it will continue to return that cache.
-
-    Really, just use this class as if it were a generator unless you want
-    a count.
+    This class replicates a Generator, the query will not be executed and no
+    results will be fetched until "__next__" is called.  Results are cached
+    and will not be gotten again.  To get new results if they have been changed,
+    create a new ResultsGenerator instance, or flush your Dict.
     """
 
     def __init__(self, table, query, db):
@@ -171,9 +175,6 @@ class ResultsGenerator:
 
 
     def __execute_once(self):
-        """
-        Execute the query only once
-        """
         if not self.executed:
             self.executed = True
             sql, values = self.query.build()
@@ -193,6 +194,18 @@ class ResultsGenerator:
 
 
     def refine(self, *a, **kw):
+        """
+        Create a new ResultsGenerator with a refined query.  Arguments provided
+        are expected to be Operators/Comparisons.  Keyword Arguments are
+        converted into == Comparisons.
+
+        Arguments:
+            .refine(Person['name']=='steve', Person['foo']=='bar')
+
+        Keyword Arguments:
+            .refine(name='steve', foo='bar') # Same refinement as the above
+                                             # example
+        """
         query = deepcopy(self.query)
         for exp in a:
             query += exp
@@ -202,16 +215,39 @@ class ResultsGenerator:
 
 
     def order_by(self, order_by):
+        """
+        Create a new ResultsGenerator with a modified ORDER BY clause.  Expects
+        a raw SQL string.
+
+        Examples:
+            .order_by('id ASC')
+            .order_by('entrydate DESC')
+        """
         query = deepcopy(self.query).order_by(order_by)
         return ResultsGenerator(self.table, query, self.db)
 
 
     def limit(self, limit):
+        """
+        Create a new ResultsGenerator with a modified LIMIT clause.  Expects
+        a raw SQL string.
+
+        Examples:
+            .limit(10)
+            .limit('ALL')
+        """
         query = deepcopy(self.query).limit(limit)
         return ResultsGenerator(self.table, query, self.db)
 
 
     def offset(self, offset):
+        """
+        Create a new ResultsGenerator with a modified OFFSET clause.  Expects
+        a raw SQL string.
+
+        Example:
+            .offset(10)
+        """
         query = deepcopy(self.query).offset(offset)
         return ResultsGenerator(self.table, query, self.db)
 
@@ -241,6 +277,8 @@ class Table(object):
     Dict()
     >>> table.get_one(manager_id=14)
     Dict()
+    >>> table.get_one(id=500) # id does not exist
+    None
 
     You can reference another table using setitem.  Link to an employee's
     manager using the manager's id, and the employee's manager_id.
@@ -249,7 +287,12 @@ class Table(object):
     >>> bob['manager']
     Dict()
 
-    Reference a manager's subordinates using their collective manager_id's:
+    The foreign key should be on the right side of the Comparison.
+    >>> Person['manager'] = Person['manager_id'] == Person['id'] # right
+    >>> Person['manager'] = Person['id'] == Person['manager_id'] # wrong
+
+    Reference a manager's subordinates using their collective manager_id's.
+    Again, the foreign key is on the right.
 
     >>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
     >>> list(bob['manager'])
@@ -279,7 +322,7 @@ class Table(object):
         self.curs = db.curs
         self.pks = []
         self.refs = {}
-        self._set_pks()
+        self._refresh_pks()
         self.order_by = None
         self.fks = {}
         # Detect json column types for this table's columns
@@ -290,7 +333,7 @@ class Table(object):
                 else False
 
 
-    def _set_pks(self):
+    def _refresh_pks(self):
         """
         Get a list of Primary Keys set for this table in the DB.
         """
@@ -329,12 +372,11 @@ class Table(object):
     def get_where(self, *a, **kw):
         """
         Get all rows as Dicts where column values are as specified.  This always
-        returns a generator-like object ResultsGenerator.  You can get the
-        length of that generator see ResultsGenerator.count.
+        returns a generator-like object ResultsGenerator.
 
         If you provide only arguments, they will be paired in their respective
         order to the primary keys defined for this table.  If the primary keys
-        of this table was (id,) only:
+        of this table was ('id',) only:
 
             get_where(4) is equal to get_where(id=4)
 
@@ -342,7 +384,7 @@ class Table(object):
                             only one primary key.
 
         Primary keys are defined automatically during the init of the Table,
-        but you can overwrite that by simply changing the value:
+        but you can overwrite that by changing .pks:
 
         >>> your_table.pks = ['id', 'some_column', 'whatever_you_want']
 
@@ -373,7 +415,10 @@ class Table(object):
                 continue
             if not self.pks:
                 raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
-            operator_group += (self[self.pks[pk_uses]] == exp,)
+            try:
+                operator_group += (self[self.pks[pk_uses]] == exp,)
+            except IndexError:
+                raise NoPrimaryKey('Not enough Primary Keys(s) defined for '+str(self))
             pk_uses += 1
         # Add any key/values as comparisons
         for key, value in kw.items():
@@ -447,6 +492,15 @@ class Table(object):
 
 
     def __setitem__(self, ref_name, ref):
+        """
+        Create reference that will be gotten by all Dicts created from this
+        table.
+
+        Example:
+            Person['manager'] = Person['manager_id'] == Person['id']
+
+        For more examples see Table's doc.
+        """
         if ref.column1.table != self:
             # Dict.__getitem__ expects the columns to be in a particular order,
             # fix any order issues.
@@ -456,6 +510,10 @@ class Table(object):
 
 
     def __getitem__(self, ref_name):
+        """
+        Get a reference if it has already been created.  Otherwise, return a
+        Column object which is used to create a reference.
+        """
         try:
             return self.refs[ref_name]
         except KeyError:
@@ -466,14 +524,14 @@ class Table(object):
 class Dict(dict):
     """
     This is a represenation of a database row that behaves exactly like a
-    dictionary, you may update your database row using update or simply by
+    dictionary.  You may update this dictionary using update or simply by
     setting an item.  After you make changes, be sure to call "flush" to send
     your changes to the DB.  Your changes will not be commited or rolled-back,
     you must do that.
 
-    This relies heavily on primary keys and they should be specified.  Really,
-    your tables should have a primary key of some sort.  If not, this will
-    pretty much be a read-only object.
+    This requires primary keys and they should be specified.  Really, your
+    tables should have a primary key of some sort.  If not, this will pretty
+    much be a read-only object.
 
     You can change the primary key of an instance.
 
@@ -519,13 +577,11 @@ class Dict(dict):
         # the table has json columns.
         items = self.no_refs()
         if self._table.has_json:
-            items = json_dicts(items)
+            items = _json_dicts(items)
 
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            # TODO json_dicts is unnecessary most of the time, only run it
-            # when necessary
             query = self._table.db.insert(self._table.name, **items).returning('*')
             self.__execute_query(query)
             self._in_db = True
@@ -547,6 +603,16 @@ class Dict(dict):
         return self
 
 
+    def delete(self):
+        """
+        Delete this row from it's table in the database.  Requires primary
+        keys to be specified.
+        """
+        query = self._table.db.delete(self._table.name).where(
+                self._old_pk_and or self.pk_and())
+        self.__execute_query(query)
+
+
     def __execute_query(self, query):
         built = query.build()
         if isinstance(built, list):
@@ -559,21 +625,11 @@ class Dict(dict):
 
     def pk_and(self):
         """
-        Return an And() of all this Dict's primary key values. i.e.
+        Return an And() of all this Dict's primary key and values. i.e.
         And(id=1, other_primary=4)
         """
         return And(*[self._table[k]==v for k,v in self.items() if k in \
                 self._table.pks])
-
-
-    def delete(self):
-        """
-        Delete this row from it's table in the database.  Requires primary
-        keys to be specified.
-        """
-        query = self._table.db.delete(self._table.name).where(
-                self._old_pk_and or self.pk_and())
-        self.__execute_query(query)
 
 
     def no_pks(self):
@@ -646,6 +702,7 @@ class Dict(dict):
         return super(Dict, self).__setitem__(key, value)
 
 
+    # Copy docs for methods that recreate dict() functionality
     __getitem__.__doc__ += dict.__getitem__.__doc__
     get.__doc__ = dict.get.__doc__
 
