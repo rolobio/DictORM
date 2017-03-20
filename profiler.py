@@ -1,6 +1,5 @@
 #! /usr/bin/env python
-from dictorm.test_dictorm import test_db_login
-import dictorm
+from dictorm import DictDB
 import sqlite3
 import random
 from string import ascii_letters
@@ -24,7 +23,7 @@ curs = conn.cursor()
 # Clear out anything in the test DB, create test tables
 curs.executescript(test_tables_sql)
 
-db = dictorm.DictDB(conn)
+db = DictDB(conn)
 
 def rand_str():
     return ''.join(random.sample(ascii_letters, random.randint(5, 10)))
