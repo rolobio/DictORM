@@ -41,11 +41,14 @@ def error(*a, **kw): raise Exception()
 
 class ExtraTestMethods(unittest.TestCase):
 
-    def assertDictContains(self, d1, d2):
+    @classmethod
+    def assertDictContains(cls, d1, d2):
         if not set(d2.items()).issubset(set(d1.items())):
             raise TypeError('{0} does not contain {1}'.format(d1, d2))
 
-    def assertRaisesAny(self, exps, func, a=None, kw=None):
+
+    @classmethod
+    def assertRaisesAny(cls, exps, func, a=None, kw=None):
         a = a or []
         kw = kw or {}
         try:
@@ -54,7 +57,8 @@ class ExtraTestMethods(unittest.TestCase):
             if isinstance(e, exps): return
         raise Exception('Did not raise one of the exceptions provided!')
 
-    def assertType(self, a, b):
+    @classmethod
+    def assertType(cls, a, b):
         if not isinstance(a, b):
             raise TypeError('{0} is not type {1}'.format(str(a), b0))
 
