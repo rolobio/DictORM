@@ -1,6 +1,6 @@
 #! /usr/bin/env python
-from dictorm import DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey
-from dictorm import ResultsGenerator, Select, set_json_dicts
+from ..dictorm import DictDB, Dict, UnexpectedRows, NoPrimaryKey
+from ..dictorm import ResultsGenerator, set_json_dicts
 from psycopg2.extras import DictCursor
 import os
 import psycopg2

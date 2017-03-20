@@ -9,7 +9,7 @@ before_script:
     - psql -c 'create database dictorm;' -U postgres
 script:
     # Run tests verbosely
-    - "green -vv --run-coverage ."
+    - "green -vv --run-coverage dictorm"
     # Test installation
     - "python setup.py install"
     #  Verify that dictorm can be imported
