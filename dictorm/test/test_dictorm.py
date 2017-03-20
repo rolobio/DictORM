@@ -57,6 +57,7 @@ class ExtraTestMethods(unittest.TestCase):
             if isinstance(e, exps): return
         raise Exception('Did not raise one of the exceptions provided!')
 
+
     @classmethod
     def assertType(cls, a, b):
         if not isinstance(a, b):
@@ -123,7 +124,6 @@ class PostgresTestBase(ExtraTestMethods):
                 GRANT ALL ON SCHEMA public TO postgres;
                 GRANT ALL ON SCHEMA public TO public;''')
         self.conn.commit()
-
 
 
 
@@ -680,7 +680,6 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(alice['managers_manager'], None)
 
 
-
     def test_reexecute(self):
         """
         References are only gotten once, until they are changed.
@@ -951,7 +950,6 @@ class TestPostgresql(PostgresTestBase):
                 [steve,])
 
 
-
     @unittest.expectedFailure
     def test_onetoone_cache(self):
         """
@@ -982,7 +980,6 @@ class TestPostgresql(PostgresTestBase):
 
         self.assertEqualNoRefs(bob['manager'], bill)
         self.assertEqualNoRefs(bob['manager_car'], bill_car)
-
 
 
     def test_results_cache(self):
@@ -1187,7 +1184,6 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         self.assertEqual(Person.count(), 0)
 
 
-
     def test_order_by(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
@@ -1248,7 +1244,6 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_order_by2 = None
     test_refine_order_by = None
     test_second_cursor = None
-
 
 
 
