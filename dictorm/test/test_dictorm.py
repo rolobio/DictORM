@@ -24,10 +24,16 @@ else:
             'port':'5432',
             }
 
-def _remove_refs(o):
+def _no_refs(o):
     if isinstance(o, Dict):
         return o.no_refs()
-    return [i.no_refs() for i in o]
+    l = []
+    for i in o:
+        if isinstance(i, Dict):
+            l.append(i.no_refs())
+        else:
+            l.append(i)
+    return l
 
 
 def error(*a, **kw): raise Exception()
@@ -35,13 +41,11 @@ def error(*a, **kw): raise Exception()
 
 class ExtraTestMethods(unittest.TestCase):
 
-    @classmethod
-    def assertDictContains(cls, d1, d2):
+    def assertDictContains(self, d1, d2):
         if not set(d2.items()).issubset(set(d1.items())):
             raise TypeError('{0} does not contain {1}'.format(d1, d2))
 
-    @classmethod
-    def assertRaisesAny(cls, exps, func, a=None, kw=None):
+    def assertRaisesAny(self, exps, func, a=None, kw=None):
         a = a or []
         kw = kw or {}
         try:
@@ -50,10 +54,18 @@ class ExtraTestMethods(unittest.TestCase):
             if isinstance(e, exps): return
         raise Exception('Did not raise one of the exceptions provided!')
 
-    @classmethod
-    def assertType(cls, a, b):
+    def assertType(self, a, b):
         if not isinstance(a, b):
             raise TypeError('{0} is not type {1}'.format(str(a), b0))
+
+
+    def assertEqualNoRefs(self, a, b):
+        return self.assertEqual(_no_refs(a), _no_refs(b))
+
+
+    def assertInNoRefs(self, a, b):
+        return self.assertIn(_no_refs(a), _no_refs(b))
+
 
 
 class PostgresTestBase(ExtraTestMethods):
@@ -300,8 +312,8 @@ class TestPostgresql(PostgresTestBase):
         # Move bob's hr to aly
         bob_pd_hr['person_id'] = aly['id']
         aly_pd_hr = bob_pd_hr.flush()
-        self.assertEqual(_remove_refs(aly['person_departments']), _remove_refs([aly_pd_sales, aly_pd_hr]))
-        self.assertEqual(_remove_refs(bob['person_departments']), [bob_pd_sales.no_refs()])
+        self.assertEqualNoRefs(aly['person_departments'], [aly_pd_sales, aly_pd_hr])
+        self.assertEqualNoRefs(bob['person_departments'], [bob_pd_sales,])
 
 
     def test_substratum_many(self):
@@ -345,8 +357,8 @@ class TestPostgresql(PostgresTestBase):
         alice = Person(name='Alice', car_id=alice_car['id']).flush()
         bob = Person(name='Bob', manager_id=alice['id']).flush()
 
-        self.assertEqual(bob['manager_car'].no_refs(), alice_car.no_refs())
-        self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
+        self.assertEqualNoRefs(bob['manager_car'], alice_car)
+        self.assertEqualNoRefs(bob['manager'], alice)
 
 
     def test_onetomany(self):
@@ -429,9 +441,9 @@ class TestPostgresql(PostgresTestBase):
         stratus.flush()
         will.flush()
 
-        self.assertEqual(will.get('car').no_refs(), stratus.no_refs())
-        self.assertEqual(will['car'].no_refs(), stratus.no_refs())
-        self.assertEqual(stratus['person'].no_refs(), will.no_refs())
+        self.assertEqualNoRefs(will.get('car'), stratus)
+        self.assertEqualNoRefs(will['car'], stratus)
+        self.assertEqualNoRefs(stratus['person'], will)
 
 
     def test_onetoself(self):
@@ -448,7 +460,7 @@ class TestPostgresql(PostgresTestBase):
 
         bob['manager_id'] = bob['id']
         bob.flush()
-        self.assertEqual(bob['manager'].no_refs(), bob.no_refs())
+        self.assertEqualNoRefs(bob['manager'], bob)
 
 
     def test_errors(self):
@@ -579,25 +591,25 @@ class TestPostgresql(PostgresTestBase):
 
         dave = Person(name='Dave', manager_id=alice['id']).flush()
         self.assertDictContains(dave, {'name':'Dave', 'manager_id':1, 'manager':None})
-        self.assertEqual(dave['manager'].no_refs(), alice.no_refs())
+        self.assertEqualNoRefs(dave['manager'], alice)
         bob = Person(name='Bob', manager_id=alice['id']).flush()
         self.assertNotEqual(bob['manager'], None)
-        self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
+        self.assertEqualNoRefs(bob['manager'], alice)
 
         # New reference, no flush required
         Person['subordinates'] = Person['id'].many(Person['manager_id'])
-        self.assertEqual(_remove_refs(alice['subordinates']),
-                _remove_refs([dave, bob]))
+        self.assertEqualNoRefs(alice['subordinates'],
+                [dave, bob])
 
         # Changes survive a commit/flush
         self.conn.commit()
         bob.flush()
         alice.flush()
         dave.flush()
-        self.assertEqual(_remove_refs(alice['subordinates']),
-                _remove_refs([dave, bob]))
-        self.assertEqual(dave['manager'].no_refs(), alice.no_refs())
-        self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
+        self.assertEqualNoRefs(alice['subordinates'],
+                [dave, bob])
+        self.assertEqualNoRefs(dave['manager'], alice)
+        self.assertEqualNoRefs(bob['manager'], alice)
 
         PD, Department = self.db['person_department'], self.db['department']
         PD['department'] = PD['department_id'] == Department['id']
@@ -609,12 +621,12 @@ class TestPostgresql(PostgresTestBase):
         sales_pd = PD(department_id=sales['id'], person_id=dave['id']).flush()
 
         # All references are available on demand
-        self.assertEqual(_remove_refs(dave['person_departments']),
-                _remove_refs([hr_pd, sales_pd]))
-        self.assertEqual(_remove_refs(alice['subordinates']),
-                _remove_refs([dave, bob]))
-        self.assertEqual(dave['manager'].no_refs(), alice.no_refs())
-        self.assertEqual(bob['manager'].no_refs(), alice.no_refs())
+        self.assertEqualNoRefs(dave['person_departments'],
+                [hr_pd, sales_pd])
+        self.assertEqualNoRefs(alice['subordinates'],
+                [dave, bob])
+        self.assertEqualNoRefs(dave['manager'], alice)
+        self.assertEqualNoRefs(bob['manager'], alice)
 
         # You can iterate through subordinates using a for loop
         for sub in alice['subordinates']:
@@ -637,15 +649,13 @@ class TestPostgresql(PostgresTestBase):
         # get len() without running a larger query
         self.assertEqual(len(alice['subordinates']), 2)
         # you can still get the same old results even after running a len()
-        self.assertEqual(_remove_refs(alice['subordinates']),
-                _remove_refs([dave, bob]))
+        self.assertEqualNoRefs(alice['subordinates'], [dave, bob])
         # the generator can be converted to a list
-        self.assertEqual(_remove_refs(list(alice['subordinates'])),
-                _remove_refs([dave, bob]))
+        self.assertEqualNoRefs(list(alice['subordinates']), [dave, bob])
 
         subs = alice['subordinates']
         self.assertEqual(len(subs), 2)
-        self.assertEqual(_remove_refs(subs), _remove_refs([dave, bob]))
+        self.assertEqualNoRefs(subs, [dave, bob])
 
 
     def test_empty_reference(self):
@@ -687,7 +697,7 @@ class TestPostgresql(PostgresTestBase):
         alice._table.get_where = original_get_where
         alice['manager_id'] = steve['id']
         alice.flush()
-        self.assertEqual(alice['manager'].no_refs(), steve.no_refs())
+        self.assertEqualNoRefs(alice['manager'], steve)
 
 
     def test_modify_subdict(self):
@@ -768,25 +778,25 @@ class TestPostgresql(PostgresTestBase):
         miltons_car = Car(name='Ford', person_id=milton['id']).flush()
         milton['car_id'] = miltons_car['id']
         sales = Department(name='Sales').flush()
-        self.assertEqual(milton['car'].no_refs(), miltons_car.no_refs())
+        self.assertEqualNoRefs(milton['car'], miltons_car)
         milton.flush()
         miltons_car.flush()
         self.assertEqual(milton['car'], miltons_car)
 
         # Milton is in Sales
         milton_sales = PD(person_id=milton['id'], department_id=sales['id']).flush()
-        self.assertEqual(milton_sales, PD.get_one())
-        self.assertEqual(milton_sales['person'].no_refs(), milton.no_refs())
-        self.assertEqual(milton_sales['department'].no_refs(), sales.no_refs())
-        self.assertEqual(_remove_refs(milton['departments']), _remove_refs([sales,]))
-        self.assertEqual(_remove_refs(sales['persons']), [milton.no_refs(),])
+        self.assertEqualNoRefs(milton_sales, PD.get_one())
+        self.assertEqualNoRefs(milton_sales['person'], milton)
+        self.assertEqualNoRefs(milton_sales['department'], sales)
+        self.assertEqualNoRefs(milton['departments'], [sales,])
+        self.assertEqualNoRefs(sales['persons'], [milton,])
 
         # Milton has a stapler
         miltons_stapler = Possession(person_id=milton['id'],
                 description={'kind':'stapler', 'brand':'Swingline', 'color':'Red'}
                 ).flush()
-        self.assertEqual(miltons_stapler['person'].no_refs(), milton.no_refs())
-        self.assertEqual(_remove_refs(milton['possessions']), _remove_refs([miltons_stapler,]))
+        self.assertEqualNoRefs(miltons_stapler['person'], milton)
+        self.assertEqualNoRefs(milton['possessions'], [miltons_stapler,])
 
         # Milton has a manager
         tom = Person(name='Tom').flush()
@@ -797,19 +807,19 @@ class TestPostgresql(PostgresTestBase):
         # Tom takes milton's stapler
         miltons_stapler['person_id'] = tom['id']
         toms_stapler = miltons_stapler.flush()
-        self.assertEqual(toms_stapler['person'].no_refs(), tom.no_refs())
-        self.assertEqual(_remove_refs(tom['possessions']), _remove_refs([toms_stapler,]))
+        self.assertEqualNoRefs(toms_stapler['person'], tom)
+        self.assertEqualNoRefs(tom['possessions'], [toms_stapler,])
 
         # Peter is Tom's subordinate
         peter = Person(name='Peter', manager_id=tom['id']).flush()
         self.assertEqual(peter['manager'], tom)
-        self.assertIn(peter.no_refs(), _remove_refs(tom['subordinates']))
-        self.assertIn(milton.no_refs(), _remove_refs(tom['subordinates']))
+        self.assertInNoRefs(peter, tom['subordinates'])
+        self.assertInNoRefs(milton, tom['subordinates'])
 
         # Peter is also in sales
         PD(person_id=peter['id'], department_id=sales['id']).flush()
-        self.assertIn(peter.no_refs(), _remove_refs(sales['persons']))
-        self.assertIn(milton.no_refs(), _remove_refs(sales['persons']))
+        self.assertInNoRefs(peter, sales['persons'])
+        self.assertInNoRefs(milton, sales['persons'])
 
         # There are 3 people
         self.assertEqual(Person.count(), 3)
@@ -824,32 +834,28 @@ class TestPostgresql(PostgresTestBase):
         peter['car_id'] = miltons_car['id']
         peter.flush()
         self.assertEqual(peter['car'], miltons_car)
-        self.assertEqual(miltons_car['person'].no_refs(), milton.no_refs())
-        self.assertEqual(peter['car'].no_refs(), miltons_car.no_refs())
+        self.assertEqualNoRefs(miltons_car['person'], milton)
+        self.assertEqualNoRefs(peter['car'], miltons_car)
         car_owners = Person.get_where(car_id=miltons_car['id'])
-        self.assertEqual(_remove_refs(car_owners), _remove_refs([milton, peter]))
+        self.assertEqualNoRefs(car_owners, [milton, peter])
 
         # You can reuse a ResultsGenerator
         minions = tom['subordinates']
-        self.assertEqual(_remove_refs(minions),
-                _remove_refs([milton, peter]))
+        self.assertEqualNoRefs(minions, [milton, peter])
         limited_minions = minions.limit(1)
-        self.assertEqual(_remove_refs(limited_minions),
-                _remove_refs([milton,]))
-        self.assertEqual(_remove_refs(limited_minions.order_by('id DESC')),
-                _remove_refs([peter,]))
+        self.assertEqualNoRefs(limited_minions, [milton,])
+        self.assertEqualNoRefs(limited_minions.order_by('id DESC'), [peter,])
         # A modified ResultsGenerator creates a new query
-        self.assertEqual(_remove_refs(minions.refine(Person['name']=='Milton')),
-                _remove_refs([milton,]))
-        self.assertEqual(_remove_refs(minions.refine(Person['name']=='Peter')),
-                _remove_refs([peter,]))
+        self.assertEqualNoRefs(minions.refine(Person['name']=='Milton'),
+                [milton,])
+        self.assertEqualNoRefs(minions.refine(Person['name']=='Peter'), [peter,])
 
-        self.assertEqual(_remove_refs(Person.get_where(Person['id'].IsNot(None
-            )).order_by('id ASC')),
-                _remove_refs([milton, tom, peter]))
-        self.assertEqual(_remove_refs(Person.get_where(Person['id']>0).order_by(
-            'id ASC')),
-                _remove_refs([milton, tom, peter]))
+        self.assertEqualNoRefs(Person.get_where(Person['id'].IsNot(None
+            )).order_by('id ASC'),
+                [milton, tom, peter])
+        self.assertEqualNoRefs(Person.get_where(Person['id']>0).order_by(
+            'id ASC'),
+                [milton, tom, peter])
 
 
     def test_order_by2(self):
@@ -866,19 +872,18 @@ class TestPostgresql(PostgresTestBase):
         dave = Person(name='Dave', manager_id=bob['id'], id=2, other=3).flush()
         # Ordered by their ID by default
         result = Person.get_where()
-        self.assertEqual(_remove_refs(Person.get_where()),
-                _remove_refs([bob, dave, alice]))
+        self.assertEqualNoRefs(Person.get_where(),
+                [bob, dave, alice])
 
         # Refine the results by ordering by other, which is the reverse of how
         # they were inserted
-        self.assertEqual(_remove_refs(bob['subordinates'].order_by('other ASC')),
-                _remove_refs([alice, dave]))
-        self.assertEqual(_remove_refs(bob['subordinates']),
-                _remove_refs([dave, alice]))
+        self.assertEqualNoRefs(bob['subordinates'].order_by('other ASC'),
+                [alice, dave])
+        self.assertEqualNoRefs(bob['subordinates'],
+                [dave, alice])
 
         steve = Person(name='Steve', manager_id=alice['id'], id=4).flush()
-        self.assertEqual(_remove_refs(alice['subordinates']),
-                _remove_refs([steve,]))
+        self.assertEqualNoRefs(alice['subordinates'], [steve,])
 
         all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
         self.assertEqual(list(all_subordinates), [dave, alice, steve])
@@ -971,8 +976,8 @@ class TestPostgresql(PostgresTestBase):
         bill_car = Car(name='Prius').flush()
         bill['car_id'] = bill_car['id']
 
-        self.assertEqual(bob['manager'].no_refs(), bill.no_refs())
-        self.assertEqual(bob['manager_car'].no_refs(), bill_car.no_refs())
+        self.assertEqualNoRefs(bob['manager'], bill)
+        self.assertEqualNoRefs(bob['manager_car'], bill_car)
 
 
 
@@ -1022,7 +1027,7 @@ class TestPostgresql(PostgresTestBase):
         bob = Person(name='Bob').flush()
         alice = Person(name='Alice', manager_id=bob['id']).flush()
 
-        self.assertEqual(alice['manager'].no_refs(), bob.no_refs())
+        self.assertEqualNoRefs(alice['manager'], bob)
         Person['manager'] = Person['id'] == Person['manager_id']
         # Get alice again to clear cache
         alice = Person.get_one(id=2)
@@ -1058,17 +1063,17 @@ class TestPostgresql(PostgresTestBase):
     def test_like(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
-        self.assertEqual(_remove_refs(Person.get_where(Person['name'].Like('Bob'))),
-                _remove_refs([bob,]))
-        self.assertEqual(_remove_refs(Person.get_where(Person['name'].Like('%Bo%'))),
-                _remove_refs([bob,]))
+        self.assertEqualNoRefs(Person.get_where(Person['name'].Like('Bob')),
+                [bob,])
+        self.assertEqualNoRefs(Person.get_where(Person['name'].Like('%Bo%')),
+                [bob,])
 
 
     def test_ilike(self):
         Person = self.db['person']
         alice = Person(name='Alice').flush()
-        self.assertEqual(_remove_refs(Person.get_where(Person['name'].Ilike('ali%'))),
-                _remove_refs([alice,]))
+        self.assertEqualNoRefs(Person.get_where(Person['name'].Ilike('ali%')),
+                [alice,])
 
 
 
