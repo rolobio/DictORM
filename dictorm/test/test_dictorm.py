@@ -187,8 +187,9 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(list(Person.get_where()), [bob, alice])
 
         # get_where accepts a tuple of ids, and returns those rows
-        self.assertEqual(list(Person.get_where(Person['id'].In([1,3]))),
-                [bob, alice])
+        if self.db.kind != 'sqlite3':
+            self.assertEqual(list(Person.get_where(Person['id'].In([1,3]))),
+                    [bob, alice])
 
         # Database row survives an object deletion
         del bob
@@ -1237,12 +1238,10 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
 
     # Not supported for sqlite
     test_count = None
-    test_delete = None
     test_ilike = None
     test_json = None
     test_offset = None
     test_order_by2 = None
-    test_refine_order_by = None
     test_second_cursor = None
 
 
