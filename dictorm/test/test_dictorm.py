@@ -828,7 +828,7 @@ class TestPostgresql(PostgresTestBase):
         # There are 3 people
         self.assertEqual(Person.count(), 3)
         if self.db.kind == 'postgresql':
-            self.assertEqual(len(Person), 3)
+            self.assertEqual(Person.count(), 3)
             self.assertEqual(len(Person.get_where()), 3)
 
         # There are two salesmen

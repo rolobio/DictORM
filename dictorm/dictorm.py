@@ -365,10 +365,6 @@ class Table(object):
         return d
 
 
-    def __len__(self):
-        return len(self.get_where())
-
-
     def get_where(self, *a, **kw):
         """
         Get all rows as Dicts where column values are as specified.  This always
@@ -514,10 +510,9 @@ class Table(object):
         Get a reference if it has already been created.  Otherwise, return a
         Column object which is used to create a reference.
         """
-        try:
+        if ref_name in self.refs:
             return self.refs[ref_name]
-        except KeyError:
-            return self.db.column(self, ref_name)
+        return self.db.column(self, ref_name)
 
 
 
