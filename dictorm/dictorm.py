@@ -96,6 +96,7 @@ class DictDB(dict):
         self.curs = self.get_cursor()
         self.refresh_tables()
         super(DictDB, self).__init__()
+        self._table_cls = Table
 
 
     def __list_tables(self):
@@ -129,9 +130,10 @@ class DictDB(dict):
             super(DictDB, self).__init__()
         for table in self.__list_tables():
             if self.kind == 'sqlite3':
-                self[table['name']] = Table(table['name'], self)
+                self[table['name']] = self._table_cls(table['name'], self)
             else:
-                self[table['table_name']] = Table(table['table_name'], self)
+                self[table['table_name']] = self._table_cls(table['table_name'],
+                        self)
 
 
 
