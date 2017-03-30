@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from ..dictorm import DictDB, Dict, UnexpectedRows, NoPrimaryKey
+from ..dictorm import DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey
 from ..dictorm import ResultsGenerator, set_json_dicts
 from psycopg2.extras import DictCursor
 import os
@@ -1076,6 +1076,13 @@ class TestPostgresql(PostgresTestBase):
         alice = Person(name='Alice').flush()
         self.assertEqualNoRefs(Person.get_where(Person['name'].Ilike('ali%')),
                 [alice,])
+
+
+    def test_table_cls(self):
+        class NewTable(Table): pass
+        self.db._table_cls = NewTable
+        self.db.refresh_tables()
+        self.assertIsInstance(self.db['person'], NewTable)
 
 
 
