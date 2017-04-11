@@ -571,8 +571,9 @@ class Dict(dict):
         All references will be flushed as well.
         """
         if self._table.refs:
-            for ref in [i for i in self.references().values() if i]:
-                ref.flush()
+            for k,v in self.items():
+                if isinstance(v, Dict):
+                    v.flush()
 
         # This will be sent to the DB, don't convert dicts to json unless
         # the table has json columns.
@@ -648,6 +649,7 @@ class Dict(dict):
         should never be sent in the query to the Database.
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.refs])
+
 
     def references(self):
         """

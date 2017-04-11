@@ -356,14 +356,23 @@ class TestPostgresql(PostgresTestBase):
         # Setup the initial references
         Person['manager'] = Person['manager_id'] == Person['id']
         Person['car'] = Person['car_id'] == Car['id']
-
+        Person['manager_name'] = Person['manager'].substratum('name')
         Person['manager_car'] = Person['manager'].substratum('car')
+
         alice_car = Car(name='Prius').flush()
         alice = Person(name='Alice', car_id=alice_car['id']).flush()
         bob = Person(name='Bob', manager_id=alice['id']).flush()
+        alice['manager_id'] = bob['id']
+        alice.flush()
 
         self.assertEqualNoRefs(bob['manager_car'], alice_car)
         self.assertEqualNoRefs(bob['manager'], alice)
+
+        # Overwriting a substratum doesn't break a flush
+        self.assertEqual(bob['manager_name'], 'Alice')
+        bob['manager_name'] = 'foo'
+        bob.flush()
+        self.assertEqual(bob['manager_name'], 'foo')
 
 
     def test_onetomany(self):
