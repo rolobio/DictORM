@@ -1080,7 +1080,7 @@ class TestPostgresql(PostgresTestBase):
 
     def test_table_cls(self):
         class NewTable(Table): pass
-        self.db._table_cls = NewTable
+        self.db.table_factory = lambda: NewTable
         self.db.refresh_tables()
         self.assertIsInstance(self.db['person'], NewTable)
 
