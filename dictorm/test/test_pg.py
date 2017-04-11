@@ -1,5 +1,5 @@
 import unittest
-from ..pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
+from dictorm.pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''
