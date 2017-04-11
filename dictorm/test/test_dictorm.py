@@ -399,6 +399,8 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(list(bob.get('cars')), [toyota, honda, ford])
         self.assertEqual(list(bob['cars']), [toyota, honda, ford])
 
+        self.assertEqual(list(bob.references().keys()), ['cars',])
+
 
     def test_onetomany_alter_primary_key(self):
         Person = self.db['person']
@@ -458,6 +460,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqualNoRefs(will.get('car'), stratus)
         self.assertEqualNoRefs(will['car'], stratus)
         self.assertEqualNoRefs(stratus['person'], will)
+        self.assertEqual(list(will.references().keys()), ['car',])
 
 
     def test_onetoself(self):
@@ -475,6 +478,7 @@ class TestPostgresql(PostgresTestBase):
         bob['manager_id'] = bob['id']
         bob.flush()
         self.assertEqualNoRefs(bob['manager'], bob)
+        self.assertEqual(list(bob.references().keys()), ['manager',])
 
 
     def test_errors(self):
