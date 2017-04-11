@@ -98,7 +98,8 @@ class DictDB(dict):
         super(DictDB, self).__init__()
 
 
-    def table_factory(self):
+    @classmethod
+    def table_factory(cls):
         return Table
 
 
