@@ -3,7 +3,7 @@ What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update rows of a database as if they were Python
 Dictionaries.
 """
-__version__ = '3.3'
+__version__ = '3.3.1'
 
 from sys import modules
 from json import dumps
@@ -354,9 +354,10 @@ class Table(object):
         self._refresh_pks()
         self.order_by = None
         self.fks = {}
+        self.cached_columns_info = None
         # Detect json column types for this table's columns
         type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
-        data_types = [i[type_column_name].lower() for i in self.columns_info()]
+        data_types = [i[type_column_name].lower() for i in self.columns_info]
         self.has_json = True if \
                 [i for i in _json_column_types if i in data_types]\
                 else False
@@ -493,6 +494,7 @@ class Table(object):
         return int(self.curs.fetchone()[0])
 
 
+    @property
     def columns(self):
         """
         Get a list of columns of a table.
@@ -501,22 +503,27 @@ class Table(object):
             key = 'name'
         else:
             key = 'column_name'
-        return [i[key] for i in self.columns_info()]
+        return [i[key] for i in self.columns_info]
 
 
+    @property
     def columns_info(self):
         """
         Get a dictionary that contains information about all columns of this
         table.
         """
+        if self.cached_columns_info:
+            return self.cached_columns_info
+
         if self.db.kind == 'sqlite3':
             sql = "PRAGMA TABLE_INFO("+str(self.name)+")"
             self.curs.execute(sql)
-            return [dict(i) for i in self.curs.fetchall()]
+            self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
         else:
             sql = "SELECT * FROM information_schema.columns WHERE table_name=%s"
             self.curs.execute(sql, [self.name,])
-            return [dict(i) for i in self.curs.fetchall()]
+            self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
+        return self.cached_columns_info
 
 
     def __setitem__(self, ref_name, ref):
