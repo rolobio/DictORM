@@ -1098,6 +1098,24 @@ class TestPostgresql(PostgresTestBase):
         self.assertIsInstance(self.db['person'], NewTable)
 
 
+    def test_indexing(self):
+        Person = self.db['person']
+        result = Person.get_where()
+        self.assertRaises(IndexError, result.__getitem__, 0)
+
+        bob = Person(name='Bob').flush()
+        alice = Person(name='Alice').flush()
+        steve = Person(name='Steve').flush()
+
+        result = Person.get_where()
+        self.assertEqual(result[0], bob)
+        self.assertEqual(result[0], bob)
+        self.assertEqual(result[2], steve)
+        self.assertEqual(result[-1], steve)
+        self.assertEqual(result[-1], steve)
+        self.assertEqual(result[1:], [alice, steve])
+
+
 
 class SqliteTestBase(object):
 
