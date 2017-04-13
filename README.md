@@ -110,8 +110,8 @@ or Sqlite3
 
 Finally, use DictORM:
 ```python
-# DictDB queries the database for all tables and allows them to be gotten
-# as if DictDB was a dictionary.
+# DictDB queries the database for all tables and allows them to be gotten as
+# if DictDB was a dictionary.
 >>> db = DictDB(conn)
 
 # Get a Table object for table 'person'
@@ -151,9 +151,9 @@ Dave
 # Get a row from the database, you may specify which columns must contain what
 # value.
 >>> bob = Person.get_one(id=1)
-# Or, if the table has primary key(s), you may forgo specifying a column
-# name. PyPyTable.get_one will pair the arguments you provide with the
-# primary keys in their respective orders:
+# Or, if the table has primary key(s), you may forgo specifying a column name.
+# PyPyTable.get_one will pair the arguments you provide with the primary keys in
+# their respective orders:
 >>> bob = Person.get_one(1)
 >>> bob
 {'name':'Bob', 'id':1}
@@ -172,8 +172,8 @@ ResultsGenerator()
 
 ### Update a Dict without overwriting Primary Keys
 ```python
-# A Dict behaves like a Python dictionary and can be updated/set.  Update
-# bob dict with steve dict, but don't overwrite bob's primary keys.
+# A Dict behaves like a Python dictionary and can be updated/set.  Update bob
+# dict with steve dict, but don't overwrite bob's primary keys.
 >>> steve = Person(name='Steve').flush()
 >>> steve
 {'name':'Steve', 'id':2}
@@ -216,9 +216,9 @@ True
 >>> aly['manager'] == steve
 True
 
-# Define that "subordinates" contains many rows by using ">".  Greater-Than
-# is used over "in" because __contains__ overwrites what is returned
-# with a True/False.  So ">" is used.
+# Define that "subordinates" contains many rows by using ">".  Greater-Than is
+# used over "in" because __contains__ overwrites what is returned with a
+# True/False.  So ">" is used.
 >>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
 >>> list(steve['subordinates'])
 [bob, aly]
@@ -324,8 +324,8 @@ bob
 
 ### Advanced query'ing
 ```python
-# DictORM supports many simple expressions.  It is by no means exhaustive,
-# but it supports the basic features.
+# DictORM supports many simple expressions.  It is by no means exhaustive, but
+# it supports the basic features.
 
 # Inserting Frank for these examples
 >>> frank = Person(name='Frank', manager_id=bob['id']).flush()

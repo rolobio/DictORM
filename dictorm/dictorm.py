@@ -36,7 +36,8 @@ except ImportError: # pragma: no cover
     pass
 
 if not db_package_imported: # pragma: no cover
-    raise ImportError('Failed to import psycopg2 or sqlite3.  These are the only supported Databases and you must import one of them')
+    raise ImportError('Failed to import psycopg2 or sqlite3.  These are the'
+            'only supported Databases and you must import one of them')
 
 
 class NoPrimaryKey(Exception): pass
@@ -105,7 +106,8 @@ class DictDB(dict):
 
     def __list_tables(self):
         if self.kind == 'sqlite3':
-            self.curs.execute('SELECT name FROM sqlite_master WHERE type = "table"')
+            self.curs.execute('SELECT name FROM sqlite_master WHERE type ='
+                    '"table"')
         else:
             self.curs.execute('''SELECT DISTINCT table_name
                     FROM information_schema.columns
@@ -132,20 +134,20 @@ class DictDB(dict):
         if self.keys():
             # Reset this DictDB because it contains old tables
             super(DictDB, self).__init__()
+        table_cls = self.table_factory()
         for table in self.__list_tables():
             if self.kind == 'sqlite3':
-                self[table['name']] = self.table_factory()(table['name'], self)
+                self[table['name']] = table_cls(table['name'], self)
             else:
-                self[table['table_name']] = self.table_factory()(table['table_name'],
-                        self)
+                self[table['table_name']] = table_cls(table['table_name'], self)
 
 
 
 class ResultsGenerator:
     """
     This class replicates a Generator, the query will not be executed and no
-    results will be fetched until "__next__" is called.  Results are cached
-    and will not be gotten again.  To get new results if they have been changed,
+    results will be fetched until "__next__" is called.  Results are cached and
+    will not be gotten again.  To get new results if they have been changed,
     create a new ResultsGenerator instance, or flush your Dict.
     """
 
@@ -257,8 +259,8 @@ class ResultsGenerator:
 
     def limit(self, limit):
         """
-        Create a new ResultsGenerator with a modified LIMIT clause.  Expects
-        a raw SQL string.
+        Create a new ResultsGenerator with a modified LIMIT clause.  Expects a
+        raw SQL string.
 
         Examples:
             .limit(10)
@@ -270,8 +272,8 @@ class ResultsGenerator:
 
     def offset(self, offset):
         """
-        Create a new ResultsGenerator with a modified OFFSET clause.  Expects
-        a raw SQL string.
+        Create a new ResultsGenerator with a modified OFFSET clause.  Expects a
+        raw SQL string.
 
         Example:
             .offset(10)
@@ -285,8 +287,8 @@ _json_column_types = ('json', 'jsonb')
 
 class Table(object):
     """
-    A representation of a DB table.  You will primarily retrieve rows
-    (Dicts) from the database using the get_where and get_one methods.
+    A representation of a DB table.  You will primarily retrieve rows (Dicts)
+    from the database using the get_where and get_one methods.
 
     Insert into this table:
 
@@ -298,8 +300,8 @@ class Table(object):
     >>> list(table.get_where(outdated=True))
     [Dict(), Dict(), Dict(), Dict()]
 
-    Get a single row (will raise an UnexpectedRow error if more than one
-    row could have been returned):
+    Get a single row (will raise an UnexpectedRow error if more than one row
+    could have been returned):
 
     >>> table.get_one(id=12)
     Dict()
@@ -326,9 +328,8 @@ class Table(object):
     >>> list(bob['manager'])
     [Dict(), Dict()]
 
-    Table.get_where returns a generator object, this makes it so you
-    won't have an entire table's object in memory at once, they are
-    generated when gotten:
+    Table.get_where returns a generator object, this makes it so you won't have
+    an entire table's object in memory at once, they are generated when gotten:
 
     >>> bob['subordinates']
     ResultsGenerator()
@@ -407,8 +408,8 @@ class Table(object):
             get_where(4, 5) would raise a NoPrimaryKey error because there is
                             only one primary key.
 
-        Primary keys are defined automatically during the init of the Table,
-        but you can overwrite that by changing .pks:
+        Primary keys are defined automatically during the init of the Table, but
+        you can overwrite that by changing .pks:
 
         >>> your_table.pks = ['id', 'some_column', 'whatever_you_want']
 
@@ -419,8 +420,8 @@ class Table(object):
 
             get_where(4, 5) is equal to get_where(id=4, group=5)
 
-        You cannot use this method without primary keys, unless you specify
-        the column you are matching.
+        You cannot use this method without primary keys, unless you specify the
+        column you are matching.
 
         >>> get_where(some_column=83)
         ResultsGenerator()
@@ -442,7 +443,8 @@ class Table(object):
             try:
                 operator_group += (self[self.pks[pk_uses]] == exp,)
             except IndexError:
-                raise NoPrimaryKey('Not enough Primary Keys(s) defined for '+str(self))
+                raise NoPrimaryKey('Not enough Primary Keys(s) defined for '+
+                        str(self))
             pk_uses += 1
         # Add any key/values as comparisons
         for key, value in kw.items():
@@ -459,9 +461,8 @@ class Table(object):
 
     def get_one(self, *a, **kw):
         """
-        Get a single row as a Dict from the Database that matches the
-        arguments provided to this method.  See Table.get_where for more
-        details.
+        Get a single row as a Dict from the Database that matches the arguments
+        provided to this method.  See Table.get_where for more details.
 
         If more than one row could be returned, this will raise an
         UnexpectedRows error.
@@ -584,10 +585,10 @@ class Dict(dict):
 
     def flush(self):
         """
-        Insert this dictionary into it's table if its no yet in the Database,
-        or Update it's row if it is already in the database.  This method
-        relies heavily on the primary keys of the row's respective table.  If
-        no primary keys are specified, this method will not function!
+        Insert this dictionary into it's table if its no yet in the Database, or
+        Update it's row if it is already in the database.  This method relies
+        heavily on the primary keys of the row's respective table.  If no
+        primary keys are specified, this method will not function!
 
         All original column/values will bet inserted/updated by this method.
         All references will be flushed as well.
@@ -606,7 +607,8 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = self._table.db.insert(self._table.name, **items).returning('*')
+            query = self._table.db.insert(self._table.name, **items
+                    ).returning('*')
             self.__execute_query(query)
             self._in_db = True
             d = self._curs.fetchone()
@@ -629,8 +631,8 @@ class Dict(dict):
 
     def delete(self):
         """
-        Delete this row from it's table in the database.  Requires primary
-        keys to be specified.
+        Delete this row from it's table in the database.  Requires primary keys
+        to be specified.
         """
         query = self._table.db.delete(self._table.name).where(
                 self._old_pk_and or self.pk_and())
@@ -659,8 +661,8 @@ class Dict(dict):
     def no_pks(self):
         """
         Return a dictionary without the primary keys that are associated with
-        this Dict in the Database.  This should be used when doing an update
-        of another Dict.
+        this Dict in the Database.  This should be used when doing an update of
+        another Dict.
         """
         return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
 
@@ -670,7 +672,8 @@ class Dict(dict):
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
-        return dict([(k,v) for k,v in self.items() if k not in self._table.refs])
+        return dict([(k,v) for k,v in self.items() if k not in self._table.refs]
+                )
 
 
     def references(self):
