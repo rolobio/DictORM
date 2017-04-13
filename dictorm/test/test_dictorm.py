@@ -1054,7 +1054,7 @@ class TestPostgresql(PostgresTestBase):
         Table.columns is a method that gets a list of a table's columns
         """
         Person = self.db['person']
-        self.assertEqual(Person.columns(),
+        self.assertEqual(Person.columns,
                 ['id', 'name', 'other', 'manager_id', 'car_id'])
 
 
@@ -1070,8 +1070,8 @@ class TestPostgresql(PostgresTestBase):
                 {'column_name':'manager_id', 'data_type':'integer'},
                 {'column_name':'car_id', 'data_type':'integer'},
                 ]
-        self.assertEqual(len(test_info), len(Person.columns_info()))
-        for i,j in zip(test_info, Person.columns_info()):
+        self.assertEqual(len(test_info), len(Person.columns_info))
+        for i,j in zip(test_info, Person.columns_info):
             self.assertDictContains(j, i)
 
 
@@ -1114,6 +1114,27 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(result[-1], steve)
         self.assertEqual(result[-1], steve)
         self.assertEqual(result[1:], [alice, steve])
+
+
+    def test_columns_property(self):
+        """
+        Table.columns and Table.columns_info are properties, and should only get
+        their values once.
+
+        Not supported under Sqlite3
+        """
+        Person = self.db['person']
+        original_execute = self.curs.execute
+
+        col_vals = ['id', 'name', 'other', 'manager_id', 'car_id']
+        self.assertEqual(Person.columns, col_vals)
+
+        try:
+            Person.curs.execute = error
+            # Error shouldn't be raised
+            self.assertEqual(Person.columns, col_vals)
+        finally:
+            Person.curs.execute = original_execute
 
 
 
@@ -1269,8 +1290,8 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
                 {'name':'manager_id', 'type':'INTEGER'},
                 {'name':'car_id', 'type':'INTEGER'},
                 ]
-        self.assertEqual(len(test_info), len(Person.columns_info()))
-        for i,j in zip(test_info, [dict(i) for i in Person.columns_info()]):
+        self.assertEqual(len(test_info), len(Person.columns_info))
+        for i,j in zip(test_info, [dict(i) for i in Person.columns_info]):
             self.assertDictContains(j, i)
 
 
@@ -1281,6 +1302,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_offset = None
     test_order_by2 = None
     test_second_cursor = None
+    test_columns_property = None
 
 
 
