@@ -195,8 +195,30 @@ class ResultsGenerator:
         self.__execute_once()
         if self.db_kind == 'sqlite3':
             # sqlite3's cursor.rowcount doesn't support select statements
+            # returns a 0 because this method is called when a ResultsGenerator
+            # is converted into a list()
             return 0
         return self.curs.rowcount
+
+
+    def __getitem__(self, i):
+        if isinstance(i, int) and i >= 0:
+            try:
+                return self.cache[i]
+            except IndexError:
+                # Haven't gotten that far yet, get the rest
+                pass
+            while i >= 0 and i <= len(self.cache):
+                try:
+                    return next(self)
+                except StopIteration:
+                    raise IndexError('No row of that index')
+
+        if not self.completed:
+            # Get all rows
+            list(self)
+        return self.cache[i]
+
 
 
     def refine(self, *a, **kw):
