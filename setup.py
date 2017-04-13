@@ -15,7 +15,7 @@ config = {
         ],
     'long_description':ddoc,
     'classifiers':[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Topic :: Utilities",
         ],
     'test_suite':'dictorm.test_dictorm',
