@@ -430,25 +430,28 @@ class Table(object):
         NoPrimaryKey()
 
         """
-        # Need a list to replace single integers as comparisons
+        # All args/kwargs are combined in an SQL And comparison
         operator_group = And()
-        # Replace single integers with comparisons
+
+        # Pair single integers with Primary Keys as Comparisons
         pk_uses = 0
         for exp in a:
             if isinstance(exp, (Comparison, Operator)):
+                # Already a Comparison/Operator, just add it
                 operator_group += (exp,)
                 continue
             if not self.pks:
                 raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
             try:
+                # Create a Comparison using the next Primary Key
                 operator_group += (self[self.pks[pk_uses]] == exp,)
             except IndexError:
                 raise NoPrimaryKey('Not enough Primary Keys(s) defined for '+
                         str(self))
             pk_uses += 1
-        # Add any key/values as comparisons
-        for key, value in kw.items():
-            operator_group += (self[key] == value,)
+
+        # Add any key/values as Comparisons
+        operator_group += tuple(self[k]==v for k,v in kw.items())
 
         order_by = None
         if self.order_by:
