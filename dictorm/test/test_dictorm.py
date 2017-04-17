@@ -128,10 +128,6 @@ class PostgresTestBase(ExtraTestMethods):
 
 class TestPostgresql(PostgresTestBase):
 
-    def test_DictDB(self):
-        self.db.refresh_tables()
-
-
     def test_get_where(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
@@ -1136,6 +1132,29 @@ class TestPostgresql(PostgresTestBase):
             Person.curs.execute = original_execute
 
 
+    def test_concurrent(self):
+        """
+        A ResultsGenerator is on it's own transaction.  Changing a row's values
+        will not be reflected in the existing Results.
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        alice = Person(name='Alice').flush()
+
+        results = Person.get_where()
+        self.assertEqualNoRefs(results[0], bob)
+
+        alice['name'] = 'Amy'
+        alice.flush()
+
+        # Gotten result contains the old value
+        self.assertEqual(next(results)['name'], 'Alice')
+        # Alice was changed
+        self.assertEqual(alice['name'], 'Amy')
+        self.conn.commit()
+        self.assertEqual(alice['name'], 'Amy')
+
+
 
 class SqliteTestBase(object):
 
@@ -1295,13 +1314,14 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
 
 
     # Not supported for sqlite
+    test_columns_property = None
     test_count = None
     test_ilike = None
     test_json = None
+    test_no_idle = None
     test_offset = None
     test_order_by2 = None
     test_second_cursor = None
-    test_columns_property = None
 
 
 
