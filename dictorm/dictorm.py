@@ -96,6 +96,7 @@ class DictDB(dict):
 
         self.curs = self.get_cursor()
         self.refresh_tables()
+        self.conn.rollback()
         super(DictDB, self).__init__()
 
 
@@ -140,6 +141,7 @@ class DictDB(dict):
                 self[table['name']] = table_cls(table['name'], self)
             else:
                 self[table['table_name']] = table_cls(table['table_name'], self)
+
 
 
 def args_to_comp(operator, table, *args, **kwargs):
