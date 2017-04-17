@@ -25,21 +25,11 @@ curs.executescript(test_tables_sql)
 
 db = DictDB(conn)
 
-def rand_str():
-    return ''.join(random.sample(ascii_letters, random.randint(5, 10)))
-
 Person, Car = db['person'], db['car']
-for idx in range(10000):
-    Person(name=rand_str()).flush()
+# Insert 10,000 persons and cars
+[Person(name='foo',
+    car_id=Car(make='bar', model='baz').flush()['id']
+    ).flush() for i in range(10000)]
 
-for i in range(1, 10001):
-    person = Person.get_one(id=i)
-    car = Car(make=rand_str(), model=rand_str()).flush()
-    person['car_id'] = car['id']
-    person.flush()
-
-for person in Person.get_where():
-    person.delete()
-
-for car in Car.get_where():
-    car.delete()
+map(lambda i: i.delete, Person.get_where())
+map(lambda i: i.delete, Car.get_where())
