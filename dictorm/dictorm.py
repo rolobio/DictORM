@@ -142,6 +142,35 @@ class DictDB(dict):
                 self[table['table_name']] = table_cls(table['table_name'], self)
 
 
+def args_to_comp(operator, table, *args, **kwargs):
+    """
+    Add arguments to the provided operator paired with their respective primary
+    key.
+    """
+    operator = operator or And()
+    pk_uses = 0
+    pks = table.pks
+    for val in args:
+        if isinstance(val, (Comparison, Operator)):
+            # Already a Comparison/Operator, just add it
+            operator += (val,)
+            continue
+        if not table.pks:
+            raise NoPrimaryKey('No Primary Keys(s) defined for '+str(table))
+        try:
+            # Create a Comparison using the next Primary Key
+            operator += (table[pks[pk_uses]] == val,)
+        except IndexError:
+            raise NoPrimaryKey('Not enough Primary Keys(s) defined for '+
+                    str(table))
+        pk_uses += 1
+
+    for k,v in kwargs.items():
+        operator += table[k] == v
+
+    return operator
+
+
 
 class ResultsGenerator:
     """
@@ -237,10 +266,7 @@ class ResultsGenerator:
                                              # example
         """
         query = deepcopy(self.query)
-        for exp in a:
-            query += exp
-        for k,v in kw.items():
-            query += self.table[k]==v
+        query = args_to_comp(query, self.table, *a, **kw)
         return ResultsGenerator(self.table, query, self.db)
 
 
@@ -401,7 +427,7 @@ class Table(object):
         returns a generator-like object ResultsGenerator.
 
         If you provide only arguments, they will be paired in their respective
-        order to the primary keys defined for this table.  If the primary keys
+        order to the primary keys defined or this table.  If the primary keys
         of this table was ('id',) only:
 
             get_where(4) is equal to get_where(id=4)
@@ -432,27 +458,7 @@ class Table(object):
 
         """
         # All args/kwargs are combined in an SQL And comparison
-        operator_group = And()
-
-        # Pair single integers with Primary Keys as Comparisons
-        pk_uses = 0
-        for exp in a:
-            if isinstance(exp, (Comparison, Operator)):
-                # Already a Comparison/Operator, just add it
-                operator_group += (exp,)
-                continue
-            if not self.pks:
-                raise NoPrimaryKey('No Primary Keys(s) defined for '+str(self))
-            try:
-                # Create a Comparison using the next Primary Key
-                operator_group += (self[self.pks[pk_uses]] == exp,)
-            except IndexError:
-                raise NoPrimaryKey('Not enough Primary Keys(s) defined for '+
-                        str(self))
-            pk_uses += 1
-
-        # Add any key/values as Comparisons
-        operator_group += tuple(self[k]==v for k,v in kw.items())
+        operator_group = args_to_comp(And(), self, *a, **kw)
 
         order_by = None
         if self.order_by:
@@ -471,16 +477,15 @@ class Table(object):
         If more than one row could be returned, this will raise an
         UnexpectedRows error.
         """
-        l = self.get_where(*a, **kw)
+        rgen = self.get_where(*a, **kw)
         try:
-            i = next(l)
+            i = next(rgen)
         except StopIteration:
             return None
         try:
-            next(l)
+            next(rgen)
             raise UnexpectedRows('More than one row selected.')
-        except StopIteration:
-            # Should only be one result
+        except StopIteration: # Should only be one result
             pass
         return i
 
