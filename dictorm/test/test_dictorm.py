@@ -1,6 +1,5 @@
 #! /usr/bin/env python
-from dictorm import DictDB, Table, Dict, UnexpectedRows, NoPrimaryKey
-from dictorm import ResultsGenerator, set_json_dicts
+import dictorm
 from psycopg2.extras import DictCursor
 import os
 import psycopg2
@@ -25,11 +24,11 @@ else:
             }
 
 def _no_refs(o):
-    if isinstance(o, Dict):
+    if isinstance(o, dictorm.Dict):
         return o.no_refs()
     l = []
     for i in o:
-        if isinstance(i, Dict):
+        if isinstance(i, dictorm.Dict):
             l.append(i.no_refs())
         else:
             l.append(i)
@@ -77,7 +76,7 @@ class PostgresTestBase(ExtraTestMethods):
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
-        self.db = DictDB(self.conn)
+        self.db = dictorm.DictDB(self.conn)
         self.curs = self.db.curs
         self.tearDown()
         self.curs.execute('''
@@ -243,9 +242,9 @@ class TestPostgresql(PostgresTestBase):
         Person(name='Alice').flush()
         Person([('name','Steve'),]).flush()
 
-        Dict(Person, {'name':'Bob'}).flush()
-        Dict(Person, name='Alice').flush()
-        Dict(Person, [('name','Steve'),]).flush()
+        dictorm.Dict(Person, {'name':'Bob'}).flush()
+        dictorm.Dict(Person, name='Alice').flush()
+        dictorm.Dict(Person, [('name','Steve'),]).flush()
 
         # A fake column will fail when going into the database
         p = Person(fake_column='foo')
@@ -490,11 +489,11 @@ class TestPostgresql(PostgresTestBase):
         bob = Person(name='Bob').flush()
         aly = Person(name='Aly').flush()
 
-        self.assertRaises(NoPrimaryKey, Person.get_where, 1,2)
+        self.assertRaises(dictorm.NoPrimaryKey, Person.get_where, 1,2)
 
         self.assertRaises(KeyError, bob.__getitem__, 'foo')
 
-        self.assertRaises(UnexpectedRows, Person.get_one)
+        self.assertRaises(dictorm.UnexpectedRows, Person.get_one)
 
         bob['not_real_column'] = 1
         self.assertRaisesAny((psycopg2.ProgrammingError, sqlite3.OperationalError), bob.flush)
@@ -507,8 +506,8 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(foo, {'foo':'bar'})
         self.assertEqual(list(NoPk.get_where()), [{'foo':'bar'},])
         foo['foo'] = 'baz'
-        self.assertRaises(NoPrimaryKey, foo.flush)
-        self.assertRaises(NoPrimaryKey, NoPk.get_where, 1)
+        self.assertRaises(dictorm.NoPrimaryKey, foo.flush)
+        self.assertRaises(dictorm.NoPrimaryKey, NoPk.get_where, 1)
 
 
     def test_second_cursor(self):
@@ -578,7 +577,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(Possession.get_one()['description'], {'foo':'baz'})
 
         # Non-json row doesn't call json_dicts
-        original = set_json_dicts(error)
+        original = dictorm.set_json_dicts(error)
         self.assertRaises(Exception, p.flush)
         try:
             Person = self.db['person']
@@ -586,7 +585,7 @@ class TestPostgresql(PostgresTestBase):
             # Shouldn't raise Exception from "error" function
             bob.flush()
         finally:
-            set_json_dicts(original)
+            dictorm.set_json_dicts(original)
 
 
     def test_multiple_references(self):
@@ -662,7 +661,7 @@ class TestPostgresql(PostgresTestBase):
         alice = Person(name='Alice').flush()
         dave = Person(name='Dave', manager_id=alice['id']).flush()
         bob = Person(name='Bob', manager_id=alice['id']).flush()
-        self.assertIsInstance(alice['subordinates'], ResultsGenerator)
+        self.assertIsInstance(alice['subordinates'], dictorm.ResultsGenerator)
         self.assertNotIn(alice._curs.query.decode(), 'SELECT *')
         # get len() without running a larger query
         self.assertEqual(len(alice['subordinates']), 2)
@@ -1016,11 +1015,11 @@ class TestPostgresql(PostgresTestBase):
 
         subordinates = bob['subordinates']
         for sub in subordinates:
-            self.assertType(sub, Dict)
+            self.assertType(sub, dictorm.Dict)
         # Error would be raised if subordinates isn't cached
         bob._table.get_where = error
         for sub in subordinates:
-            self.assertType(sub, Dict)
+            self.assertType(sub, dictorm.Dict)
 
 
     def test_offset(self):
@@ -1092,7 +1091,7 @@ class TestPostgresql(PostgresTestBase):
 
 
     def test_table_cls(self):
-        class NewTable(Table): pass
+        class NewTable(dictorm.Table): pass
         self.db.table_factory = lambda: NewTable
         self.db.refresh_tables()
         self.assertIsInstance(self.db['person'], NewTable)
@@ -1142,7 +1141,7 @@ class SqliteTestBase(object):
 
     def setUp(self):
         self.conn = sqlite3.connect(':memory:')
-        self.db = DictDB(self.conn)
+        self.db = dictorm.DictDB(self.conn)
         self.curs = self.db.curs
         self.tearDown()
         self.curs.executescript('''
