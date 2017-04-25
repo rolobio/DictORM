@@ -1,5 +1,4 @@
 # DictORM
-## Use Postgres/Sqlite as if it were a Python Dictionary
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/450c0aedf92645e89bd08ec2612dc653)](https://www.codacy.com/app/rolobio/DictORM?utm_source=github.com&utm_medium=referral&utm_content=rolobio/DictORM&utm_campaign=badger)
 [![Build Status](https://travis-ci.org/rolobio/DictORM.svg?branch=master)](https://travis-ci.org/rolobio/DictORM)
@@ -7,6 +6,7 @@
 [![PyPi Version](https://img.shields.io/pypi/v/dictorm.svg?branch=master)](https://pypi.python.org/pypi/dictorm)
 [![PyPI Project Status](https://img.shields.io/pypi/status/dictorm.svg)](https://pypi.python.org/pypi/dictorm)
 
+## Manipulate Postgresql/Sqlite using Python Dictionaries
 What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update/delete rows of a database as if they were Python
 Dictionaries.
