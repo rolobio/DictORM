@@ -3,7 +3,7 @@ What if you could insert a Python dictionary into the database?  DictORM allows
 you to select/insert/update rows of a database as if they were Python
 Dictionaries.
 """
-__version__ = '3.3.2'
+__version__ = '3.3.3'
 
 from sys import modules
 from json import dumps
@@ -42,6 +42,7 @@ if not db_package_imported: # pragma: no cover
 
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
+class NoCache(Exception): pass
 
 
 global _json_dicts
@@ -191,6 +192,7 @@ class ResultsGenerator:
         self.db_kind = db.kind
         self.db = db
         self.curs = self.db.get_cursor()
+        self._nocache = False
 
 
     def __iter__(self):
@@ -209,7 +211,8 @@ class ResultsGenerator:
         # Convert returned dictionary to a Dict
         d = self.table(d)
         d._in_db = True
-        self.cache.append(d)
+        if self._nocache == False:
+            self.cache.append(d)
         return d
 
 
@@ -245,7 +248,10 @@ class ResultsGenerator:
                 try:
                     return next(self)
                 except StopIteration:
-                    raise IndexError('No row of that index')
+                    if self._nocache == True:
+                        raise NoCache('Caching has been disabled.')
+                    else:
+                        raise IndexError('No row of that index')
 
         if not self.completed:
             # Get all rows
@@ -253,10 +259,19 @@ class ResultsGenerator:
         return self.cache[i]
 
 
+    def nocache(self):
+        """
+        Return a new ResultsGenerator that will not cache the results.
+        """
+        query = deepcopy(self.query)
+        results = ResultsGenerator(self.table, query, self.db)
+        results._nocache = True
+        return results
+
 
     def refine(self, *a, **kw):
         """
-        Create a new ResultsGenerator with a refined query.  Arguments provided
+        Return a new ResultsGenerator with a refined query.  Arguments provided
         are expected to be Operators/Comparisons.  Keyword Arguments are
         converted into == Comparisons.
 
@@ -274,7 +289,7 @@ class ResultsGenerator:
 
     def order_by(self, order_by):
         """
-        Create a new ResultsGenerator with a modified ORDER BY clause.  Expects
+        Return a new ResultsGenerator with a modified ORDER BY clause.  Expects
         a raw SQL string.
 
         Examples:
@@ -287,7 +302,7 @@ class ResultsGenerator:
 
     def limit(self, limit):
         """
-        Create a new ResultsGenerator with a modified LIMIT clause.  Expects a
+        Return a new ResultsGenerator with a modified LIMIT clause.  Expects a
         raw SQL string.
 
         Examples:
@@ -300,7 +315,7 @@ class ResultsGenerator:
 
     def offset(self, offset):
         """
-        Create a new ResultsGenerator with a modified OFFSET clause.  Expects a
+        Return a new ResultsGenerator with a modified OFFSET clause.  Expects a
         raw SQL string.
 
         Example:
