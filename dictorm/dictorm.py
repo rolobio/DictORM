@@ -1,8 +1,4 @@
-"""
-What if you could insert a Python dictionary into the database?  DictORM allows
-you to select/insert/update rows of a database as if they were Python
-Dictionaries.
-"""
+"""What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 __version__ = '3.3.3'
 
 from sys import modules
