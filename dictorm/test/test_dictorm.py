@@ -1155,6 +1155,27 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(alice['name'], 'Amy')
 
 
+    def test_nocache(self):
+        """
+        A ResultsGenerator can be told not to cache results.
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        alice = Person(name='Alice').flush()
+
+        results = Person.get_where().nocache()
+        # Cache all results, if caching was enabled
+        self.assertEqual(next(results), bob)
+        self.assertEqual(next(results), alice)
+        self.assertRaises(StopIteration, next, results)
+
+        # Cache is empty
+        self.assertEqual(results.cache, [])
+
+        # Cannot iterate through results more than once
+        self.assertRaises(dictorm.NoCache, results.__getitem__, 0)
+
+
 
 class SqliteTestBase(object):
 
