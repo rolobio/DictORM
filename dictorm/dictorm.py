@@ -1,9 +1,10 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
-__version__ = '3.3.3'
+__version__ = '3.4'
 
-from sys import modules
-from json import dumps
 from copy import deepcopy
+from itertools import chain
+from json import dumps
+from sys import modules
 
 try: # pragma: no cover
     from dictorm.pg import Select, Insert, Update, Delete, And
@@ -730,7 +731,9 @@ class Dict(dict):
             if ref.many:
                 gen = table.get_where(comparison)
                 if ref._substratum:
-                    gen = [i[ref._substratum] for i in gen]
+                    gen = (i[ref._substratum] for i in gen)
+                if ref._aggregate:
+                    gen = chain(*gen)
                 return gen
             else:
                 val = table.get_one(comparison)
