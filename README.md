@@ -251,9 +251,7 @@ CREATE TABLE person_department (
 >>> PD['department'] = PD['department_id'] == Department['id']
 >>> PD['person'] = PD['person_id'] == Person['id']
 
-# Reference many rows using ">".  I would rather use "in", but "__contains__"
-# overwrites any values returned and instead returns a True/False.  So, we use
-# ">" to specify that many rows can be returned.
+# Reference many rows using .many:
 >>> Person['person_departments'] = Person['id'].many(PD['person_id'])
 
 # Create HR and Sales departments
@@ -306,18 +304,48 @@ bob
 {'name':'Sales', 'id':2}
 ```
 
+### Aggregate
+```python
+# aggregate is a short-hand for an aggregate substratum.
+# When a substratum returns a list of lists, aggregate will return a
+# single list:
+# i.e. [[a,b], [c,d]]  becomes  [a,b,c,d]
+
+# Lets promote Bob to Steve and Alice's manager
+steve['manager_id'] = bob['id']
+alice['manager_id'] = bob['id']
+bob['manager_id'] = None
+
+# Bob is now the manager with two subordinates
+>>> bob['subordinates']
+[steve, alice]
+
+# The substratum method (remember that "subordinates" returns "many")
+>>> Person['subordinates_departments'] = Person['subordinates'].substratum('deparments')
+>>> bob['subrodinates_departments']
+[
+  [hr, sales] # First, Steve's departments
+  [sales]     # Last, Alice's departments
+]
+
+# The aggregate method
+>>> Person['subordinates_departments'] = Person['subordinates'].aggregate('deparments')
+>>> bob['subrodinates_departments']
+[hr, sales, sales]
+```
+
 ### Reuse a ResultsGenerator
 ```python
 # get_where and get_one return a ResultsGenerator, which does nothing until you
 # attempt to get a result from it.  This means we can reuse a ResultsGenerator
 # to refine the results.
->>> minions = steve['subordinates']
+>>> minions = bob['subordinates']
 >>> minions
-[bob, aly]
+[steve, aly]
 
 # Limit the results to only one row
 >>> list(minions.limit(1))
-[bob,]
+[steve,]
 
 # Reverse the order, limit to one row
 >>> list(minions.order_by('id ASC').limit(1))
