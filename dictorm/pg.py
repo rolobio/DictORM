@@ -196,6 +196,7 @@ class Comparison(object):
         self.column2 = column2
         self.kind = kind
         self._substratum = None
+        self._aggregate = False
 
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
@@ -228,6 +229,12 @@ class Comparison(object):
         comp = Comparison(self.column1, self.column2, self.kind)
         comp._substratum = column
         comp.many = self.many
+        return comp
+
+
+    def aggregate(self, column):
+        comp = self.substratum(column)
+        comp._aggregate = True
         return comp
 
 

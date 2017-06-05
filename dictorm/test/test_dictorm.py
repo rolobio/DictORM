@@ -1176,6 +1176,46 @@ class TestPostgresql(PostgresTestBase):
         self.assertRaises(dictorm.NoCache, results.__getitem__, 0)
 
 
+    def test_aggregate(self):
+        """
+        A chain of many substratums creates an aggregate of the results.
+        """
+        Person, Department = self.db['person'], self.db['department']
+        PD = self.db['person_department']
+        PD.pks = ['person_id', 'department_id']
+
+        # Relations
+        PD['department'] = PD['department_id'] == Department['id']
+        PD['person'] = PD['person_id'] == Department['id']
+        Person['person_departments'] = Person['id'].many(PD['person_id'])
+        Person['departments'] = Person['person_departments'].substratum(
+                'department')
+        Person['manager'] = Person['manager_id'] == Person['id']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        Person['subordinates_departments'] = Person['subordinates'].aggregate(
+                'departments')
+
+        # People, with manager
+        bob = Person(name='Bob').flush()
+        alice = Person(name='Alice', manager_id=bob['id']).flush()
+        steve = Person(name='Steve', manager_id=bob['id']).flush()
+
+        # Departments
+        sales = Department(name='Sales').flush()
+        hr = Department(name='HR').flush()
+        it = Department(name='IT').flush()
+
+        # Person_Departments
+        steve_sales = PD(person_id=steve['id'], department_id=sales['id']).flush()
+        steve_hr = PD(person_id=steve['id'], department_id=hr['id']).flush()
+        alice_it = PD(person_id=alice['id'], department_id=it['id']).flush()
+
+        self.assertEqualNoRefs(alice['manager'], bob)
+        self.assertEqualNoRefs(steve['manager'], bob)
+        self.assertEqualNoRefs(bob['subordinates'], [alice, steve])
+        self.assertEqualNoRefs(bob['subordinates_departments'], [it, sales, hr])
+
+
 
 class SqliteTestBase(object):
 
