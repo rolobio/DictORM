@@ -257,9 +257,9 @@ class TestInsert(unittest.TestCase):
 
 
     def test_returning(self):
-        q = Insert('other_table', name='Bob').returning('*')
+        q = Insert('other_table', name='Bob').returning('id')
         self.assertEqual(q.build(),
-                ('INSERT INTO "other_table" ("name") VALUES (%s) RETURNING *',
+                ('INSERT INTO "other_table" ("name") VALUES (%s) RETURNING "id"',
                     ['Bob',])
                 )
 
