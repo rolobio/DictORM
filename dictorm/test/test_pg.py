@@ -285,9 +285,9 @@ class TestUpdate(unittest.TestCase):
             [2, 'Bob']))
 
         q = Update('some_table', name='Bob', car_id=2).where(
-                Person['id']==3).returning('*')
+                Person['id']==3).returning('id')
         self.assertEqual(q.build(), (
-            'UPDATE "some_table" SET "car_id"=%s, "name"=%s WHERE "id"=%s RETURNING *',
+            'UPDATE "some_table" SET "car_id"=%s, "name"=%s WHERE "id"=%s RETURNING "id"',
             [2, 'Bob', 3]))
 
         q = Update('some_table', name='Bob', car_id=2).where(

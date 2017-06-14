@@ -167,8 +167,10 @@ class Update(Insert):
         if self.operators_or_comp:
             parts.append(' WHERE {comps}')
             formats['comps'] = str(self.operators_or_comp)
-        if self._returning:
-            parts.append(' RETURNING '+str(self._returning))
+        if self._returning == '*':
+            parts.append(' RETURNING *')
+        elif self._returning:
+            parts.append(' RETURNING "{0}"'.format(self._returning))
         sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
