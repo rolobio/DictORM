@@ -98,7 +98,7 @@ class Insert(object):
     cvp = '({0}) VALUES ({1})'
     interpolation_str = '%s'
     append_returning = None
-    last_row = 'SELECT {0} FROM "{1}" WHERE rowid = last_insert_rowid()'
+    last_row = 'SELECT {0} FROM "{1}" WHERE "rowid" = last_insert_rowid()'
 
     def __init__(self, table, **values):
         self.table = table
