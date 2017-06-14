@@ -19,7 +19,7 @@ def set_sort_keys(val):
 
 class Select(object):
 
-    query = 'SELECT * FROM {table}'
+    query = 'SELECT * FROM "{table}"'
 
     def __init__(self, table, operators_or_comp=None, returning=None):
         self.table = table
@@ -51,8 +51,10 @@ class Select(object):
             formats['comp'] = str(ooc)
         if self._order_by:
             parts.append(' ORDER BY {0}'.format(str(self._order_by)))
-        if self.returning:
-            parts.append(' RETURNING {0}'.format(str(self.returning)))
+        if self.returning == '*':
+            parts.append(' RETURNING *')
+        elif self.returning:
+            parts.append(' RETURNING "{0}"'.format(str(self.returning)))
         if self._limit:
             parts.append(' LIMIT {0}'.format(str(self._limit)))
         if self._offset:
@@ -92,11 +94,11 @@ class Select(object):
 
 class Insert(object):
 
-    query = 'INSERT INTO {table} {cvp}'
+    query = 'INSERT INTO "{table}" {cvp}'
     cvp = '({0}) VALUES ({1})'
     interpolation_str = '%s'
     append_returning = None
-    last_row = 'SELECT {0} FROM {1} WHERE rowid = last_insert_rowid()'
+    last_row = 'SELECT {0} FROM "{1}" WHERE "rowid" = last_insert_rowid()'
 
     def __init__(self, table, **values):
         self.table = table
@@ -108,14 +110,16 @@ class Insert(object):
 
 
     def _build_cvp(self):
-        return (', '.join(self._ordered_keys),
+        return (', '.join(['"{}"'.format(i) for i in self._ordered_keys]),
             ', '.join([self.interpolation_str,]*len(self._values)))
 
 
     def __str__(self):
         sql = self.query
-        if self._returning:
-            sql += ' RETURNING '+str(self._returning)
+        if self._returning == '*':
+            sql += ' RETURNING *'
+        elif self._returning:
+            sql += ' RETURNING "{0}"'.format(self._returning)
         if not self._values:
             return sql.format(table=self.table, cvp='DEFAULT VALUES')
         return sql.format(table=self.table,
@@ -145,7 +149,7 @@ class Insert(object):
 
 class Update(Insert):
 
-    query = 'UPDATE {table} SET {cvp}'
+    query = 'UPDATE "{table}" SET {cvp}'
     interpolation_str = '%s'
 
     def __init__(self, table, **values):
@@ -154,7 +158,7 @@ class Update(Insert):
 
 
     def _build_cvp(self):
-        return ', '.join(('{0}={1}'.format(k, self.interpolation_str) \
+        return ', '.join(('"{0}"={1}'.format(k, self.interpolation_str) \
                 for k in self._ordered_keys))
 
     def __str__(self):
@@ -163,8 +167,10 @@ class Update(Insert):
         if self.operators_or_comp:
             parts.append(' WHERE {comps}')
             formats['comps'] = str(self.operators_or_comp)
-        if self._returning:
-            parts.append(' RETURNING '+str(self._returning))
+        if self._returning == '*':
+            parts.append(' RETURNING *')
+        elif self._returning:
+            parts.append(' RETURNING "{0}"'.format(self._returning))
         sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
@@ -183,7 +189,7 @@ class Update(Insert):
 
 class Delete(Update):
 
-    query = 'DELETE FROM {table}'
+    query = 'DELETE FROM "{table}"'
 
 
 class Comparison(object):
@@ -211,8 +217,8 @@ class Comparison(object):
     def __str__(self):
         c1 = self.column1.column
         if self._null_kind():
-            return '{0}{1}'.format(c1, self.kind)
-        return '{0}{1}{2}'.format(c1, self.kind, self.interpolation_str)
+            return '"{0}"{1}'.format(c1, self.kind)
+        return '"{0}"{1}{2}'.format(c1, self.kind, self.interpolation_str)
 
 
     def value(self):
