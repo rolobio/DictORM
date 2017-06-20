@@ -1,16 +1,43 @@
 import unittest
 from dictorm.pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
+from dictorm.pg import Join, LeftJoin, RightJoin, InnerJoin, OuterJoin, FullJoin
+from dictorm import Table
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''
 
     name = 'person'
 
+    def __init__(self):
+        self.fks = {}
+        self.refs = {}
+
+
     def __getitem__(self, key):
+        if key in self.refs:
+            return self.refs[key]
         return Column(self, key)
+
+    __setitem__ = Table.__setitem__
+
+
+
+class CarTable(PersonTable):
+    '''fake DictORM Table for testing'''
+
+    name = 'car'
+
+
+
+class DeptTable(PersonTable):
+    '''fake DictORM Table for testing'''
+
+    name = 'dept'
 
 
 Person = PersonTable()
+Car = CarTable()
+Dept = DeptTable()
 set_sort_keys(True)
 
 
@@ -222,6 +249,47 @@ class TestSelect(unittest.TestCase):
                 ('SELECT * FROM "cool_table" WHERE "id" IN %s ORDER BY id DESC',
                     [(1,2),]
                     )
+                )
+
+
+
+
+class TestJoin(unittest.TestCase):
+
+    def test_build(self):
+        q = Join(Person['car_id'] == Car['id'])
+        self.assertEqual(q.build(),
+                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id" = "person.car_id"',
+                    [])
+                )
+        # First column is the table being joined to
+        q = Join(Car['id'] == Person['car_id'])
+        self.assertEqual(q.build(),
+                ('SELECT "car.*" FROM "car" JOIN "person" ON "person.car_id" = "car.id"',
+                    [])
+                )
+        q = Join(Person['car_id'] == Car['id'], Dept['person_id'] == Person['id'])
+        self.assertEqual(q.build(),
+                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id" = "person.car_id" JOIN "dept" ON "dept.person_id" = "person.id"',
+                    [])
+                )
+
+
+    def test_multi_join(self):
+        q = Join(Person['car_id'] == Car['id']).LeftJoin(Dept['person_id'] == Person['id'])
+        self.assertEqual(q.build(),
+                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id" = "person.car_id" LEFT JOIN "dept" ON "dept.person_id" = "person.id"',
+                    [])
+                )
+        q = Join(Person['dept_id'] == Dept['id']).LeftJoin(Car['dept_id'] == Dept['id'])
+        self.assertEqual(q.build(),
+                ('SELECT "person.*" FROM "person" JOIN "dept" ON "dept.id" = "person.dept_id" LEFT JOIN "car" ON "car.dept_id" = "dept.id"',
+                    [])
+                )
+        q = Join(Person['dept_id'] == Dept['id']).LeftJoin(Dept['id'] == Car['dept_id'])
+        self.assertEqual(q.build(),
+                ('SELECT "person.*" FROM "person" JOIN "dept" ON "dept.id" = "person.dept_id" LEFT JOIN "dept" ON "dept.id" = "car.dept_id"',
+                    [])
                 )
 
 

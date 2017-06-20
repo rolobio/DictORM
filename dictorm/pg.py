@@ -44,6 +44,9 @@ class Select(object):
         parts = []
         formats = {'table':self.table,}
         ooc = self.operators_or_comp
+        if isinstance(ooc, Join):
+            parts.append(' {} JOIN "{}" ON {}'.format(ooc.kind, ooc.table.name,
+                ooc.on.column1))
         if (isinstance(ooc, Operator) and ooc.operators_or_comp) or (
                 isinstance(ooc, Comparison)
                 ):
@@ -89,6 +92,98 @@ class Select(object):
     def __add__(self, item):
         self.operators_or_comp += item
         return self
+
+
+
+class Join(object):
+
+    query = 'SELECT "{table}.*" FROM "{table}"{joins}'
+    join_query = '"{table1}" ON "{table1}.{col1}" = "{table2}.{col2}"'
+
+    def __init__(self, *comps, kind=''):
+        self.comps = list(comps)
+        self.kind = ' '+kind if kind else ''
+        self.ooc = None
+
+
+    def where(self, *ooc):
+        join = Join(*self.comps, kind=self.kind)
+        join.ooc = ooc
+        return join
+
+
+    def __str__(self):
+        joined_to = self.comps[0].column1.table
+        table = joined_to.name
+        formats = {'table':table,}
+        formats['joins'] = self.join_str(joined_to)
+        return self.query.format(**formats)
+
+
+    def join_str(self, joined_to):
+        other_joins = []
+        my_joins = []
+        for comp in self.comps:
+            if isinstance(comp, Join):
+                other_joins.append(comp.join_str(joined_to))
+            else:
+                c1, c2 = comp.column1, comp.column2
+                if c1.table == joined_to:
+                    c1, c2 = c2, c1
+                join_str = self.join_query.format(
+                        table1=c1.table.name,
+                        col1=c1.column,
+                        table2=c2.table.name,
+                        col2=c2.column,
+                        )
+                my_joins.append(join_str)
+        query = '{kind} JOIN '.format(kind=self.kind)
+        query = query + query.join(my_joins) + ' '.join(other_joins)
+        return query
+
+
+    def values(self):
+        return []
+
+    
+    def build(self):
+        return (str(self), self.values())
+
+
+    def LeftJoin(self, *comps):
+        join = LeftJoin(*comps)
+        self.comps.append(join)
+        return self
+
+
+
+class LeftJoin(Join):
+    def __init__(self, *comps):
+        super().__init__(*comps, kind='LEFT')
+
+
+
+class RightJoin(Join):
+    def __init__(self, *comps):
+        super().__init__(self, *comps, kind='RIGHT')
+
+
+
+class InnerJoin(Join):
+    def __init__(self, *comps):
+        super().__init__(self, *comps, kind='INNER')
+
+
+
+class OuterJoin(Join):
+    def __init__(self, *comps):
+        super().__init__(self, *comps, kind='OUTER')
+
+
+
+class FullJoin(Join):
+    def __init__(self, *comps):
+        super().__init__(self, *comps, kind='FULL')
 
 
 
@@ -192,6 +287,7 @@ class Delete(Update):
     query = 'DELETE FROM "{table}"'
 
 
+
 class Comparison(object):
 
     interpolation_str = '%s'
@@ -203,6 +299,7 @@ class Comparison(object):
         self.kind = kind
         self._substratum = None
         self._aggregate = False
+
 
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
@@ -253,7 +350,9 @@ class Comparison(object):
 
 
 
-class Null(): pass
+class Null():
+
+    def __repr__(self): return ''
 
 
 

@@ -24,7 +24,9 @@ else:
             }
 
 def _no_refs(o):
-    if isinstance(o, dictorm.Dict):
+    if o == None:
+        return None
+    elif isinstance(o, dictorm.Dict):
         return o.no_refs()
     l = []
     for i in o:
@@ -1214,6 +1216,23 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqualNoRefs(steve['manager'], bob)
         self.assertEqualNoRefs(bob['subordinates'], [alice, steve])
         self.assertEqualNoRefs(bob['subordinates_departments'], [it, sales, hr])
+
+
+    def test_join(self):
+        Person, Car = self.db['person'], self.db['car']
+        Person['car'] = Person['id'] == Car['person_id']
+
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
+
+        bob_car = Car(name='Ford', person_id=bob['id']).flush()
+        aly_car = Car(name='Dodge', person_id=aly['id']).flush()
+
+        self.assertEqualNoRefs(bob['car'], bob_car)
+        self.assertEqualNoRefs(aly['car'], aly_car)
+
+        self.assertEqual(Person.get_where(Person['car']['name']=='Dodge'),
+                [aly,])
 
 
 
