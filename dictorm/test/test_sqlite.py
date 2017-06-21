@@ -20,12 +20,12 @@ set_sort_keys(True)
 class TestSqlite(unittest.TestCase):
 
     def test_comparisons(self):
-        self.assertEqual(str(Person['name'] == 3), '"name"=?')
-        self.assertEqual(str(Person['name'] > 3),  '"name">?')
-        self.assertEqual(str(Person['name'] >= 3), '"name">=?')
-        self.assertEqual(str(Person['name'] < 3),  '"name"<?')
-        self.assertEqual(str(Person['name'] <= 3), '"name"<=?')
-        self.assertEqual(str(Person['name'] != 3), '"name"!=?')
+        self.assertEqual(str(Person['name'] == 3), '"person"."name"=?')
+        self.assertEqual(str(Person['name'] > 3),  '"person"."name">?')
+        self.assertEqual(str(Person['name'] >= 3), '"person"."name">=?')
+        self.assertEqual(str(Person['name'] < 3),  '"person"."name"<?')
+        self.assertEqual(str(Person['name'] <= 3), '"person"."name"<=?')
+        self.assertEqual(str(Person['name'] != 3), '"person"."name"!=?')
 
 
     def test_insert(self):
@@ -49,7 +49,7 @@ class TestSqlite(unittest.TestCase):
                 And(Person['name']=='Steve', Person['id']==1)
                 )
         self.assertEqual(q.build(),
-                    ('UPDATE "whatever" SET "foo"=? WHERE "name"=? AND "id"=?',
+                    ('UPDATE "whatever" SET "foo"=? WHERE "person"."name"=? AND "person"."id"=?',
                         ['bar', 'Steve', 1]))
 
 
@@ -57,7 +57,7 @@ class TestSqlite(unittest.TestCase):
         q = Select('whatever', Person['name'] == 'foo')
         self.assertEqual(q.build(),
                 (
-                    'SELECT * FROM "whatever" WHERE "name"=?',
+                    'SELECT * FROM "whatever" WHERE "person"."name"=?',
                     ['foo',]
                 )
                 )
@@ -65,7 +65,7 @@ class TestSqlite(unittest.TestCase):
         q = Select('whatever', And(Person['name'] == 'foo', Person['foo'] > 'bar'))
         self.assertEqual(q.build(),
                 (
-                    'SELECT * FROM "whatever" WHERE "name"=? AND "foo">?',
+                    'SELECT * FROM "whatever" WHERE "person"."name"=? AND "person"."foo">?',
                     ['foo', 'bar']
                 )
                 )

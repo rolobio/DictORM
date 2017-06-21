@@ -8,13 +8,13 @@ from sys import modules
 
 try: # pragma: no cover
     from dictorm.pg import Select, Insert, Update, Delete, And
-    from dictorm.pg import Column, Comparison, Operator
+    from dictorm.pg import Column, Comparison, Operator, Join
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
     from .pg import Select, Insert, Update, Delete, And
-    from .pg import Column, Comparison, Operator
+    from .pg import Column, Comparison, Operator, Join
     from .sqlite import Insert as SqliteInsert
     from .sqlite import Column as SqliteColumn
     from .sqlite import Update as SqliteUpdate
@@ -472,6 +472,8 @@ class Table(object):
 
         """
         # All args/kwargs are combined in an SQL And comparison
+        if len(a) == 1 and isinstance(a[0], Join):
+            return ResultsGenerator(self, a[0], self.db)
         operator_group = args_to_comp(And(), self, *a, **kw)
 
         order_by = None

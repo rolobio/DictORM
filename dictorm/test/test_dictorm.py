@@ -1221,6 +1221,7 @@ class TestPostgresql(PostgresTestBase):
     def test_join(self):
         Person, Car = self.db['person'], self.db['car']
         Person['car'] = Person['id'] == Car['person_id']
+        Car['owner'] = Car['person_id'] == Person['id']
 
         bob = Person(name='Bob').flush()
         aly = Person(name='Aly').flush()
@@ -1234,6 +1235,10 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqualNoRefs(
                 Person.get_where(Person['car']['name'] == 'Ford'),
                 [bob,])
+
+        self.assertEqualNoRefs(
+                Car.get_where(Car['owner']['name'] == 'Bob'),
+                [bob_car,])
 
 
 

@@ -91,11 +91,27 @@ class Select(object):
         return self
 
 
+class PreJoin(object):
+    """
+    Used only to store information for join that will be created by a
+    comparison.__getitem__
+    """
+
+    def __init__(self, comp, key):
+        self.comp = comp
+        self.key = key
+
+
+    def __eq__(self, key):
+        join = Join(self.comp)
+        return join.where(join.comps[0].column2.table[self.key] == key)
+
+
 
 class Join(object):
 
-    query = 'SELECT "{table}.*" FROM "{table}"{joins}{where}'
-    join_query = '"{table1}" ON "{table1}.{col1}"="{table2}.{col2}"'
+    query = 'SELECT "{table}".* FROM "{table}"{joins}{where}'
+    join_query = '"{table1}" ON "{table1}"."{col1}"="{table2}"."{col2}"'
 
     def __init__(self, *comps, kind=''):
         self.comps = list(comps)
@@ -316,8 +332,8 @@ class Comparison(object):
     def __str__(self):
         c1 = self.column1
         if self._null_kind():
-            return '"{0}"{1}'.format(c1.column, self.kind)
-        return '"{0}"{1}{2}'.format(c1.column, self.kind, self.interpolation_str)
+            return '"{0}"."{1}"{2}'.format(c1.table.name, c1.column, self.kind)
+        return '"{0}"."{1}"{2}{3}'.format(c1.table.name, c1.column, self.kind, self.interpolation_str)
 
 
     def value(self):
@@ -349,6 +365,9 @@ class Comparison(object):
     def Or(self, comp2): return Or(self, comp2)
     def Xor(self, comp2): return Xor(self, comp2)
     def And(self, comp2): return And(self, comp2)
+
+    def __getitem__(self, key):
+        return PreJoin(self, key)
 
 
 

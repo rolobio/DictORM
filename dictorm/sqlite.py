@@ -2,6 +2,7 @@
 Provide Sqlite3 support by making simple changes to dictorm.pg classes.
 '''
 from .pg import And
+from .pg import Join
 from .pg import Column as PostgresqlColumn
 from .pg import Comparison as PostgresqlComparison
 from .pg import Insert as PostgresqlInsert
