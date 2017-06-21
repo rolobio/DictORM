@@ -259,18 +259,18 @@ class TestJoin(unittest.TestCase):
     def test_build(self):
         q = Join(Person['car_id'] == Car['id'])
         self.assertEqual(q.build(),
-                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id" = "person.car_id"',
+                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id"="person.car_id"',
                     [])
                 )
         # First column is the table being joined to
         q = Join(Car['id'] == Person['car_id'])
         self.assertEqual(q.build(),
-                ('SELECT "car.*" FROM "car" JOIN "person" ON "person.car_id" = "car.id"',
+                ('SELECT "car.*" FROM "car" JOIN "person" ON "person.car_id"="car.id"',
                     [])
                 )
         q = Join(Person['car_id'] == Car['id'], Dept['person_id'] == Person['id'])
         self.assertEqual(q.build(),
-                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id" = "person.car_id" JOIN "dept" ON "dept.person_id" = "person.id"',
+                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id"="person.car_id" JOIN "dept" ON "dept.person_id"="person.id"',
                     [])
                 )
 
@@ -278,17 +278,17 @@ class TestJoin(unittest.TestCase):
     def test_multi_join(self):
         q = Join(Person['car_id'] == Car['id']).LeftJoin(Dept['person_id'] == Person['id'])
         self.assertEqual(q.build(),
-                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id" = "person.car_id" LEFT JOIN "dept" ON "dept.person_id" = "person.id"',
+                ('SELECT "person.*" FROM "person" JOIN "car" ON "car.id"="person.car_id" LEFT JOIN "dept" ON "dept.person_id"="person.id"',
                     [])
                 )
         q = Join(Person['dept_id'] == Dept['id']).LeftJoin(Car['dept_id'] == Dept['id'])
         self.assertEqual(q.build(),
-                ('SELECT "person.*" FROM "person" JOIN "dept" ON "dept.id" = "person.dept_id" LEFT JOIN "car" ON "car.dept_id" = "dept.id"',
+                ('SELECT "person.*" FROM "person" JOIN "dept" ON "dept.id"="person.dept_id" LEFT JOIN "car" ON "car.dept_id"="dept.id"',
                     [])
                 )
         q = Join(Person['dept_id'] == Dept['id']).LeftJoin(Dept['id'] == Car['dept_id'])
         self.assertEqual(q.build(),
-                ('SELECT "person.*" FROM "person" JOIN "dept" ON "dept.id" = "person.dept_id" LEFT JOIN "dept" ON "dept.id" = "car.dept_id"',
+                ('SELECT "person.*" FROM "person" JOIN "dept" ON "dept.id"="person.dept_id" LEFT JOIN "dept" ON "dept.id"="car.dept_id"',
                     [])
                 )
 

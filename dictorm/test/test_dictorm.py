@@ -1231,8 +1231,10 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqualNoRefs(bob['car'], bob_car)
         self.assertEqualNoRefs(aly['car'], aly_car)
 
-        self.assertEqual(Person.get_where(Person['car']['name']=='Dodge'),
-                [aly,])
+        self.assertEqualNoRefs(
+                Person.get_where(Person['car']['name'] == 'Ford'),
+                [bob,])
+
 
 
 

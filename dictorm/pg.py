@@ -44,9 +44,6 @@ class Select(object):
         parts = []
         formats = {'table':self.table,}
         ooc = self.operators_or_comp
-        if isinstance(ooc, Join):
-            parts.append(' {} JOIN "{}" ON {}'.format(ooc.kind, ooc.table.name,
-                ooc.on.column1))
         if (isinstance(ooc, Operator) and ooc.operators_or_comp) or (
                 isinstance(ooc, Comparison)
                 ):
@@ -97,8 +94,8 @@ class Select(object):
 
 class Join(object):
 
-    query = 'SELECT "{table}.*" FROM "{table}"{joins}'
-    join_query = '"{table1}" ON "{table1}.{col1}" = "{table2}.{col2}"'
+    query = 'SELECT "{table}.*" FROM "{table}"{joins}{where}'
+    join_query = '"{table1}" ON "{table1}.{col1}"="{table2}.{col2}"'
 
     def __init__(self, *comps, kind=''):
         self.comps = list(comps)
@@ -117,6 +114,9 @@ class Join(object):
         table = joined_to.name
         formats = {'table':table,}
         formats['joins'] = self.join_str(joined_to)
+        formats['where'] = ''
+        if self.ooc:
+            formats['where'] = ' WHERE ' + ''.join([str(i) for i in self.ooc])
         return self.query.format(**formats)
 
 
@@ -143,9 +143,11 @@ class Join(object):
 
 
     def values(self):
+        if self.ooc:
+            return [i.value() for i in self.ooc]
         return []
 
-    
+
     def build(self):
         return (str(self), self.values())
 
@@ -312,10 +314,10 @@ class Comparison(object):
 
 
     def __str__(self):
-        c1 = self.column1.column
+        c1 = self.column1
         if self._null_kind():
-            return '"{0}"{1}'.format(c1, self.kind)
-        return '"{0}"{1}{2}'.format(c1, self.kind, self.interpolation_str)
+            return '"{0}"{1}'.format(c1.column, self.kind)
+        return '"{0}"{1}{2}'.format(c1.column, self.kind, self.interpolation_str)
 
 
     def value(self):
