@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 import dictorm
+from dictorm.pg import Join
 from psycopg2.extras import DictCursor
 import os
 import psycopg2
@@ -1240,6 +1241,10 @@ class TestPostgresql(PostgresTestBase):
                 Car.get_where(Car['owner']['name'] == 'Bob'),
                 [bob_car,])
 
+        self.assertEqualNoRefs(
+                Car.get_where(Join(Car['person_id'] == Person['id']
+                    ).where(Person['name'] == 'Bob')),
+                [bob_car,])
 
 
 

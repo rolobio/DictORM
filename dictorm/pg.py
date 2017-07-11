@@ -111,7 +111,7 @@ class PreJoin(object):
 class Join(object):
 
     query = 'SELECT "{table}".* FROM "{table}"{joins}{where}'
-    join_query = '"{table1}" ON "{table1}"."{col1}"="{table2}"."{col2}"'
+    join_query = '"{c1.table.name}" ON {c1}={c2}'
 
     def __init__(self, *comps, kind=''):
         self.comps = list(comps)
@@ -146,13 +146,7 @@ class Join(object):
                 c1, c2 = comp.column1, comp.column2
                 if c1.table == joined_to:
                     c1, c2 = c2, c1
-                join_str = self.join_query.format(
-                        table1=c1.table.name,
-                        col1=c1.column,
-                        table2=c2.table.name,
-                        col2=c2.column,
-                        )
-                my_joins.append(join_str)
+                my_joins.append(self.join_query.format(c1=c1, c2=c2))
         query = '{kind} JOIN '.format(kind=self.kind)
         query = query + query.join(my_joins) + ' '.join(other_joins)
         return query
@@ -168,8 +162,9 @@ class Join(object):
         return (str(self), self.values())
 
 
-    def LeftJoin(self, *comps):
-        join = LeftJoin(*comps)
+    def Join(self, *comps, kind=None):
+        kind = kind or Join
+        join = kind(*comps)
         self.comps.append(join)
         return self
 
@@ -183,25 +178,25 @@ class LeftJoin(Join):
 
 class RightJoin(Join):
     def __init__(self, *comps):
-        super().__init__(self, *comps, kind='RIGHT')
+        super().__init__(*comps, kind='RIGHT')
 
 
 
 class InnerJoin(Join):
     def __init__(self, *comps):
-        super().__init__(self, *comps, kind='INNER')
+        super().__init__(*comps, kind='INNER')
 
 
 
-class OuterJoin(Join):
+class FullOuterJoin(Join):
     def __init__(self, *comps):
-        super().__init__(self, *comps, kind='OUTER')
+        super().__init__(*comps, kind='FULL OUTER')
 
 
 
 class FullJoin(Join):
     def __init__(self, *comps):
-        super().__init__(self, *comps, kind='FULL')
+        super().__init__(*comps, kind='FULL')
 
 
 
@@ -387,6 +382,9 @@ class Column(object):
 
     def __repr__(self): # pragma: no cover
         return '{0}.{1}'.format(self.table.name, self.column)
+
+    def __str__(self):
+        return '"{0}"."{1}"'.format(self.table.name, self.column)
 
     def many(self, column):
         c = self.comparison(self, column, '=')

@@ -1,6 +1,6 @@
 import unittest
 from dictorm.pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
-from dictorm.pg import Join, LeftJoin, RightJoin, InnerJoin, OuterJoin, FullJoin
+from dictorm.pg import Join, LeftJoin, RightJoin, InnerJoin, FullOuterJoin, FullJoin
 from dictorm import Table
 
 class PersonTable(object):
