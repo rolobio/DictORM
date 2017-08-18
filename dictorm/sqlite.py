@@ -23,3 +23,20 @@ class Insert(PostgresqlInsert):
 
 
 
+class Update(PostgresqlUpdate):
+
+    interpolation_str = '?'
+
+    def returning(self, returning):
+        self.append_returning = returning
+        return self
+
+
+    def build(self):
+        built = super().build()
+        if self.append_returning:
+            built[1] = Select(self.table, self.operators_or_comp).build()
+        return built
+
+
+

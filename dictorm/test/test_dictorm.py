@@ -1216,6 +1216,22 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqualNoRefs(bob['subordinates_departments'], [it, sales, hr])
 
 
+    def test_value_types(self):
+        """
+        When a row is updated, the flush should return values of the correct
+        type.
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        self.assertEqual(bob['id'], 1)
+
+        # Update "id" using a string
+        bob.update({'id':'1', 'name':'Steve'})
+        steve = bob.flush()
+        self.assertEqual(steve['id'], 1) # ID should be an integer
+        self.assertEqual(steve['name'], 'Steve')
+
+
 
 class SqliteTestBase(object):
 

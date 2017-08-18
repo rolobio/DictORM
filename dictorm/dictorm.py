@@ -638,9 +638,8 @@ class Dict(dict):
             # my values into the query
             query = self._table.db.insert(self._table.name, **items
                     ).returning('*')
-            self.__execute_query(query)
+            d = self.__execute_query(query)
             self._in_db = True
-            d = self._curs.fetchone()
         else:
             # Update this dictionary's row
             if not self._table.pks:
@@ -649,9 +648,8 @@ class Dict(dict):
                     self._table))
             # Update without references, "wheres" are the primary values
             query = self._table.db.update(self._table.name, **items
-                    ).where(self._old_pk_and or self.pk_and())
-            self.__execute_query(query)
-            d = self
+                    ).where(self._old_pk_and or self.pk_and()).returning('*')
+            d = self.__execute_query(query)
 
         super(Dict, self).__init__(d)
         self._old_pk_and = self.pk_and()
@@ -665,17 +663,21 @@ class Dict(dict):
         """
         query = self._table.db.delete(self._table.name).where(
                 self._old_pk_and or self.pk_and())
-        self.__execute_query(query)
+        return self.__execute_query(query)
 
 
     def __execute_query(self, query):
         built = query.build()
         if isinstance(built, list):
             for sql, values in built:
-                self._curs.execute(sql, values)
+                last = self._curs.execute(sql, values)
+            if query.append_returning:
+                return self._curs.fetchone()
         else:
             sql, values = built
             self._curs.execute(sql, values)
+            if query._returning:
+                return self._curs.fetchone()
 
 
     def pk_and(self):
@@ -693,7 +695,7 @@ class Dict(dict):
         this Dict in the Database.  This should be used when doing an update of
         another Dict.
         """
-        return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
+        return {k:v for k,v in self.items() if k not in self._table.pks}
 
 
     def no_refs(self):
@@ -701,15 +703,14 @@ class Dict(dict):
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
-        return dict([(k,v) for k,v in self.items() if k not in self._table.refs]
-                )
+        return {k:v for k,v in self.items() if k not in self._table.refs}
 
 
     def references(self):
         """
         Return a dictionary of only the referenced rows.
         """
-        return dict([(k,v) for k,v in self.items() if k in self._table.refs])
+        return {k:v for k,v in self.items() if k in self._table.refs}
 
 
     def __getitem__(self, key):

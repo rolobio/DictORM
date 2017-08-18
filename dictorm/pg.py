@@ -181,6 +181,7 @@ class Update(Insert):
             values.extend(list(self.operators_or_comp))
         return values
 
+
     def where(self, operators_or_comp):
         self.operators_or_comp = operators_or_comp
         return self
