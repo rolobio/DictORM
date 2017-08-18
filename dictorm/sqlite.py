@@ -9,7 +9,6 @@ from .pg import Select
 from .pg import Update as PostgresqlUpdate
 
 class Comparison(PostgresqlComparison): interpolation_str = '?'
-class Update(PostgresqlUpdate): interpolation_str = '?'
 class Column(PostgresqlColumn): comparison = Comparison
 
 

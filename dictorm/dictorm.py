@@ -671,7 +671,7 @@ class Dict(dict):
         built = query.build()
         if isinstance(built, list):
             for sql, values in built:
-                last = self._curs.execute(sql, values)
+                self._curs.execute(sql, values)
             if query.append_returning:
                 return self._curs.fetchone()
         else:
