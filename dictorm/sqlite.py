@@ -33,6 +33,7 @@ class Update(PostgresqlUpdate):
 
 
     def build(self):
+        # Replace the last_insert_rowid select with one built around this query
         built = super().build()
         if self.append_returning:
             built[1] = Select(self.table, self.operators_or_comp).build()

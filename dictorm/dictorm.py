@@ -651,7 +651,8 @@ class Dict(dict):
                     ).where(self._old_pk_and or self.pk_and()).returning('*')
             d = self.__execute_query(query)
 
-        super(Dict, self).__init__(d)
+        if d:
+            super(Dict, self).__init__(d)
         self._old_pk_and = self.pk_and()
         return self
 
