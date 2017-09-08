@@ -1,5 +1,5 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
-__version__ = '3.6'
+__version__ = '3.7'
 
 from copy import deepcopy
 from itertools import chain
@@ -40,6 +40,7 @@ if not db_package_imported: # pragma: no cover
 class NoPrimaryKey(Exception): pass
 class UnexpectedRows(Exception): pass
 class NoCache(Exception): pass
+class InvalidColumn(Exception): pass
 
 
 global _json_dicts
@@ -395,6 +396,7 @@ class Table(object):
         self.order_by = None
         self.fks = {}
         self.cached_columns_info = None
+        self.cached_column_names = None
         # Detect json column types for this table's columns
         type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
         data_types = [i[type_column_name].lower() for i in self.columns_info]
@@ -545,6 +547,18 @@ class Table(object):
         return self.cached_columns_info
 
 
+    @property
+    def column_names(self):
+        if not self.cached_column_names:
+            if self.db.kind == 'sqlite3':
+                self.cached_column_names = set(i['name'] for i in
+                        self.columns_info)
+            else:
+                self.cached_column_names = set(i['column_name'] for i in
+                        self.columns_info)
+        return self.cached_column_names
+
+
     def __setitem__(self, ref_name, ref):
         """
         Create reference that will be gotten by all Dicts created from this
@@ -632,6 +646,12 @@ class Dict(dict):
         items = self.no_refs()
         if self._table.has_json:
             items = _json_dicts(items)
+
+        # Verify that all column names are present in the table
+        invalid_columns = set(items.keys()).difference(self._table.column_names)
+        if invalid_columns:
+            raise InvalidColumn('Invalid Column "{}"'.format(
+                str(invalid_columns)))
 
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
