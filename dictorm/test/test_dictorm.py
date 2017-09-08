@@ -1241,6 +1241,13 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(bob['id'], 1)
         self.conn.commit()
 
+        # An entry can still be flushed even if a column is missing
+        del bob['manager_id']
+        self.assertNotIn('manager_id', bob)
+        bob.flush()
+        self.assertIn('manager_id', bob)
+
+        # An invalid column name raises an error
         bob[' "; DELETE FROM person;'] = 'Bob'
         self.assertRaises(dictorm.InvalidColumn, bob.flush)
 
