@@ -244,7 +244,7 @@ class TestPostgresql(PostgresTestBase):
 
         # A fake column will fail when going into the database
         p = Person(fake_column='foo')
-        self.assertRaisesAny((psycopg2.ProgrammingError, sqlite3.OperationalError), p.flush)
+        self.assertRaisesAny(dictorm.InvalidColumn, p.flush)
         self.conn.rollback()
 
 
@@ -492,7 +492,7 @@ class TestPostgresql(PostgresTestBase):
         self.assertRaises(dictorm.UnexpectedRows, Person.get_one)
 
         bob['not_real_column'] = 1
-        self.assertRaisesAny((psycopg2.ProgrammingError, sqlite3.OperationalError), bob.flush)
+        self.assertRaisesAny(dictorm.InvalidColumn, bob.flush)
         self.conn.rollback()
 
         NoPk = self.db['no_pk']
@@ -1230,6 +1230,19 @@ class TestPostgresql(PostgresTestBase):
         steve = bob.flush()
         self.assertEqual(steve['id'], 1) # ID should be an integer
         self.assertEqual(steve['name'], 'Steve')
+
+
+    def test_injection(self):
+        """
+        A column name can't be used for injection
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        self.assertEqual(bob['id'], 1)
+        self.conn.commit()
+
+        bob[' "; DELETE FROM person;'] = 'Bob'
+        self.assertRaises(dictorm.InvalidColumn, bob.flush)
 
 
 

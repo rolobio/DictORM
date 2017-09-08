@@ -1,3 +1,4 @@
+#! /usr/bin/env python3
 from setuptools import setup
 from dictorm.dictorm import __version__, __doc__ as ddoc
 
