@@ -218,9 +218,7 @@ True
 >>> aly['manager'] == steve
 True
 
-# Define that "subordinates" contains many rows by using ">".  Greater-Than is
-# used over "in" because __contains__ overwrites what is returned with a
-# True/False.  So ">" is used.
+# Define that "subordinates" contains many rows from the Person table
 >>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
 >>> list(steve['subordinates'])
 [bob, aly]
