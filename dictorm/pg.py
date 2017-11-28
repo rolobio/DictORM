@@ -5,9 +5,6 @@ dictorm.Table.
 
 Sqlite queries are slightly different, but use these methods as their base.
 """
-from psycopg2.extensions import cursor
-
-mogrify = cursor.mogrify
 
 global sort_keys
 sort_keys = False

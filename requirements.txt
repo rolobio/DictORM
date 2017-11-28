@@ -1,4 +1,3 @@
 coverage
 coveralls
 green
-psycopg2
