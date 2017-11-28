@@ -20,6 +20,9 @@ config = {
         "Topic :: Utilities",
         ],
     'test_suite':'dictorm.test_dictorm',
+    'extras_require':{
+        'Postgresql': ['psycopg2'],
+        }
     }
 
 setup(**config)
