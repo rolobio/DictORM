@@ -6,22 +6,19 @@ import psycopg2
 import sqlite3
 import unittest
 
+
+test_db_login = {
+        'database':'postgres',
+        'user':'postgres',
+        'password':'dictorm',
+        'host':'localhost',
+        'port':'54321',
+        }
+
+
 if 'CI' in os.environ.keys():
-    test_db_login = {
-            'database':'dictorm',
-            'user':'postgres',
-            'password':'',
-            'host':'localhost',
-            'port':'5432',
-            }
-else:
-    test_db_login = {
-            'database':'dictorm',
-            'user':'dictorm',
-            'password':'dictorm',
-            'host':'localhost',
-            'port':'5432',
-            }
+    test_db_login['port'] = 5432
+
 
 def _no_refs(o):
     if isinstance(o, dictorm.Dict):
@@ -38,7 +35,7 @@ def _no_refs(o):
 def error(*a, **kw): raise Exception()
 
 
-class ExtraTestMethods(unittest.TestCase):
+class ExtraTestMethods:
 
     @classmethod
     def assertDictContains(cls, d1, d2):
@@ -72,7 +69,10 @@ class ExtraTestMethods(unittest.TestCase):
 
 
 
-class PostgresTestBase(ExtraTestMethods):
+class CommonTests(unittest.TestCase, ExtraTestMethods):
+    """
+    These tests will be run for all supported databases.
+    """
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
@@ -124,9 +124,6 @@ class PostgresTestBase(ExtraTestMethods):
                 GRANT ALL ON SCHEMA public TO public;''')
         self.conn.commit()
 
-
-
-class TestPostgresql(PostgresTestBase):
 
     def test_get_where(self):
         Person = self.db['person']
@@ -506,31 +503,6 @@ class TestPostgresql(PostgresTestBase):
         self.assertRaises(dictorm.NoPrimaryKey, NoPk.get_where, 1)
 
 
-    def test_second_cursor(self):
-        """
-        Dict's cursor should not interfere with another cursor.
-        """
-        Person = self.db['person']
-        bob = Person(name='Bob').flush()
-        aly = Person(name='Aly').flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
-
-        curs2 = self.conn.cursor(cursor_factory=DictCursor)
-        persons = Person.get_where()
-        self.assertEqual(next(persons), bob)
-
-        curs2.execute('SELECT * FROM person')
-        self.assertEqual(next(persons), aly)
-
-        # Using dictorm's cursor will intefere
-        persons = Person.get_where()
-        self.assertEqual(next(persons), bob)
-        persons.curs.execute('SELECT * FROM person')
-        self.assertEqual(next(persons), bob)
-        self.assertEqual(next(persons), aly)
-        self.assertRaises(StopIteration, next, persons)
-
-
     def test_order_by(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
@@ -560,28 +532,6 @@ class TestPostgresql(PostgresTestBase):
         results = NoPk.get_where(foo='bar')
         self.assertEqual(len(list(results)), 1)
         self.assertIn('ORDER BY foo desc', results.curs.query.decode())
-
-
-    def test_json(self):
-        Possession = self.db['possession']
-        p = Possession(description={'foo':'bar', 'baz':1}).flush()
-        self.assertEqual(Possession.get_one()['description'], {'foo':'bar', 'baz':1})
-
-        # Testing an update of a json
-        p['description'] = {'foo':'baz'}
-        p.flush()
-        self.assertEqual(Possession.get_one()['description'], {'foo':'baz'})
-
-        # Non-json row doesn't call json_dicts
-        original = dictorm.set_json_dicts(error)
-        self.assertRaises(Exception, p.flush)
-        try:
-            Person = self.db['person']
-            bob = Person(name='Bob')
-            # Shouldn't raise Exception from "error" function
-            bob.flush()
-        finally:
-            dictorm.set_json_dicts(original)
 
 
     def test_multiple_references(self):
@@ -646,29 +596,6 @@ class TestPostgresql(PostgresTestBase):
             for pd in sub['person_departments']:
                 pd.delete()
             sub.delete()
-
-
-    def test_count(self):
-        """
-        Simple reference counting is supported.
-        """
-        Person = self.db['person']
-        Person['subordinates'] = Person['id'].many(Person['manager_id'])
-        alice = Person(name='Alice').flush()
-        dave = Person(name='Dave', manager_id=alice['id']).flush()
-        bob = Person(name='Bob', manager_id=alice['id']).flush()
-        self.assertIsInstance(alice['subordinates'], dictorm.ResultsGenerator)
-        self.assertNotIn(alice._curs.query.decode(), 'SELECT *')
-        # get len() without running a larger query
-        self.assertEqual(len(alice['subordinates']), 2)
-        # you can still get the same old results even after running a len()
-        self.assertEqualNoRefs(alice['subordinates'], [dave, bob])
-        # the generator can be converted to a list
-        self.assertEqualNoRefs(list(alice['subordinates']), [dave, bob])
-
-        subs = alice['subordinates']
-        self.assertEqual(len(subs), 2)
-        self.assertEqualNoRefs(subs, [dave, bob])
 
 
     def test_empty_reference(self):
@@ -870,40 +797,6 @@ class TestPostgresql(PostgresTestBase):
                 [milton, tom, peter])
 
 
-    def test_order_by2(self):
-        """
-        A result set can be refined using order by.  A reference can be refined
-        using the same technique.
-        """
-        Person = self.db['person']
-        Person['subordinates'] = Person['id'].many(Person['manager_id'])
-        Person['manager'] = Person['id'] == Person['manager_id']
-        bob = Person(name='Bob').flush()
-        # Insert the employees with IDs that are reverse of the entrydate
-        alice = Person(name='Alice', manager_id=bob['id'], id=3, other=2).flush()
-        dave = Person(name='Dave', manager_id=bob['id'], id=2, other=3).flush()
-        # Ordered by their ID by default
-        result = Person.get_where()
-        self.assertEqualNoRefs(Person.get_where(),
-                [bob, dave, alice])
-
-        # Refine the results by ordering by other, which is the reverse of how
-        # they were inserted
-        self.assertEqualNoRefs(bob['subordinates'].order_by('other ASC'),
-                [alice, dave])
-        self.assertEqualNoRefs(bob['subordinates'],
-                [dave, alice])
-
-        steve = Person(name='Steve', manager_id=alice['id'], id=4).flush()
-        self.assertEqualNoRefs(alice['subordinates'], [steve,])
-
-        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
-        self.assertEqual(list(all_subordinates), [dave, alice, steve])
-
-        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
-        self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
-
-
     def test_offset_limit(self):
         """
         A result set can be refined using an offset and limit.
@@ -1018,16 +911,6 @@ class TestPostgresql(PostgresTestBase):
             self.assertType(sub, dictorm.Dict)
 
 
-    def test_offset(self):
-        """
-        Postgres allows offset without limit, but not Sqlite
-        """
-        Person = self.db['person']
-        Person['subordinates'] = Person['id'].many(Person['manager_id'])
-        bob = Person(name='Bob').flush()
-        self.assertEqual(list(bob['subordinates'].offset(1)), [])
-
-
     def test_reference_order(self):
         """
         A reference definition cares about order.
@@ -1079,13 +962,6 @@ class TestPostgresql(PostgresTestBase):
                 [bob,])
 
 
-    def test_ilike(self):
-        Person = self.db['person']
-        alice = Person(name='Alice').flush()
-        self.assertEqualNoRefs(Person.get_where(Person['name'].Ilike('ali%')),
-                [alice,])
-
-
     def test_table_cls(self):
         class NewTable(dictorm.Table): pass
         self.db.table_factory = lambda: NewTable
@@ -1109,27 +985,6 @@ class TestPostgresql(PostgresTestBase):
         self.assertEqual(result[-1], steve)
         self.assertEqual(result[-1], steve)
         self.assertEqual(result[1:], [alice, steve])
-
-
-    def test_columns_property(self):
-        """
-        Table.columns and Table.columns_info are properties, and should only get
-        their values once.
-
-        Not supported under Sqlite3
-        """
-        Person = self.db['person']
-        original_execute = self.curs.execute
-
-        col_vals = ['id', 'name', 'other', 'manager_id', 'car_id']
-        self.assertEqual(Person.columns, col_vals)
-
-        try:
-            Person.curs.execute = error
-            # Error shouldn't be raised
-            self.assertEqual(Person.columns, col_vals)
-        finally:
-            Person.curs.execute = original_execute
 
 
     def test_concurrent(self):
@@ -1252,6 +1107,151 @@ class TestPostgresql(PostgresTestBase):
         self.assertRaises(dictorm.InvalidColumn, bob.flush)
 
 
+class TestPostgresql(CommonTests):
+
+
+    def test_columns_property(self):
+        """
+        Table.columns and Table.columns_info are properties, and should only get
+        their values once.
+
+        Not supported under Sqlite3
+        """
+        Person = self.db['person']
+        original_execute = self.curs.execute
+
+        col_vals = ['id', 'name', 'other', 'manager_id', 'car_id']
+        self.assertEqual(Person.columns, col_vals)
+
+        try:
+            Person.curs.execute = error
+            # Error shouldn't be raised
+            self.assertEqual(Person.columns, col_vals)
+        finally:
+            Person.curs.execute = original_execute
+
+
+    def test_count(self):
+        """
+        Simple reference counting is supported.
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        alice = Person(name='Alice').flush()
+        dave = Person(name='Dave', manager_id=alice['id']).flush()
+        bob = Person(name='Bob', manager_id=alice['id']).flush()
+        self.assertIsInstance(alice['subordinates'], dictorm.ResultsGenerator)
+        self.assertNotIn(alice._curs.query.decode(), 'SELECT *')
+        # get len() without running a larger query
+        self.assertEqual(len(alice['subordinates']), 2)
+        # you can still get the same old results even after running a len()
+        self.assertEqualNoRefs(alice['subordinates'], [dave, bob])
+        # the generator can be converted to a list
+        self.assertEqualNoRefs(list(alice['subordinates']), [dave, bob])
+
+        subs = alice['subordinates']
+        self.assertEqual(len(subs), 2)
+        self.assertEqualNoRefs(subs, [dave, bob])
+
+
+    def test_ilike(self):
+        Person = self.db['person']
+        alice = Person(name='Alice').flush()
+        self.assertEqualNoRefs(Person.get_where(Person['name'].Ilike('ali%')),
+                [alice,])
+
+
+    def test_json(self):
+        Possession = self.db['possession']
+        p = Possession(description={'foo':'bar', 'baz':1}).flush()
+        self.assertEqual(Possession.get_one()['description'], {'foo':'bar', 'baz':1})
+
+        # Testing an update of a json
+        p['description'] = {'foo':'baz'}
+        p.flush()
+        self.assertEqual(Possession.get_one()['description'], {'foo':'baz'})
+
+        # Non-json row doesn't call json_dicts
+        original = dictorm.set_json_dicts(error)
+        self.assertRaises(Exception, p.flush)
+        try:
+            Person = self.db['person']
+            bob = Person(name='Bob')
+            # Shouldn't raise Exception from "error" function
+            bob.flush()
+        finally:
+            dictorm.set_json_dicts(original)
+
+
+    def test_offset(self):
+        """
+        Postgres allows offset without limit, but not Sqlite
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        bob = Person(name='Bob').flush()
+        self.assertEqual(list(bob['subordinates'].offset(1)), [])
+
+
+    def test_order_by2(self):
+        """
+        A result set can be refined using order by.  A reference can be refined
+        using the same technique.
+        """
+        Person = self.db['person']
+        Person['subordinates'] = Person['id'].many(Person['manager_id'])
+        Person['manager'] = Person['id'] == Person['manager_id']
+        bob = Person(name='Bob').flush()
+        # Insert the employees with IDs that are reverse of the entrydate
+        alice = Person(name='Alice', manager_id=bob['id'], id=3, other=2).flush()
+        dave = Person(name='Dave', manager_id=bob['id'], id=2, other=3).flush()
+        # Ordered by their ID by default
+        result = Person.get_where()
+        self.assertEqualNoRefs(Person.get_where(),
+                [bob, dave, alice])
+
+        # Refine the results by ordering by other, which is the reverse of how
+        # they were inserted
+        self.assertEqualNoRefs(bob['subordinates'].order_by('other ASC'),
+                [alice, dave])
+        self.assertEqualNoRefs(bob['subordinates'],
+                [dave, alice])
+
+        steve = Person(name='Steve', manager_id=alice['id'], id=4).flush()
+        self.assertEqualNoRefs(alice['subordinates'], [steve,])
+
+        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
+        self.assertEqual(list(all_subordinates), [dave, alice, steve])
+
+        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
+        self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
+
+
+    def test_second_cursor(self):
+        """
+        Dict's cursor should not interfere with another cursor.
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        aly = Person(name='Aly').flush()
+        self.assertDictContains(bob, {'name':'Bob', 'id':1})
+
+        curs2 = self.conn.cursor(cursor_factory=DictCursor)
+        persons = Person.get_where()
+        self.assertEqual(next(persons), bob)
+
+        curs2.execute('SELECT * FROM person')
+        self.assertEqual(next(persons), aly)
+
+        # Using dictorm's cursor will intefere
+        persons = Person.get_where()
+        self.assertEqual(next(persons), bob)
+        persons.curs.execute('SELECT * FROM person')
+        self.assertEqual(next(persons), bob)
+        self.assertEqual(next(persons), aly)
+        self.assertRaises(StopIteration, next, persons)
+
+
 
 class SqliteTestBase(object):
 
@@ -1305,7 +1305,7 @@ class SqliteTestBase(object):
 
 
 
-class TestSqlite(SqliteTestBase, TestPostgresql):
+class TestSqlite(SqliteTestBase, CommonTests):
 
 
     def test_get_where(self):
@@ -1408,17 +1408,6 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         self.assertEqual(len(test_info), len(Person.columns_info))
         for i,j in zip(test_info, [dict(i) for i in Person.columns_info]):
             self.assertDictContains(j, i)
-
-
-    # Not supported for sqlite
-    test_columns_property = None
-    test_count = None
-    test_ilike = None
-    test_json = None
-    test_no_idle = None
-    test_offset = None
-    test_order_by2 = None
-    test_second_cursor = None
 
 
 
