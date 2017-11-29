@@ -428,3 +428,13 @@ bob['manager_id'] = None
 # Delete a single row
 >>> frank.delete()
 ```
+
+# Testing
+```bash
+# Get postgres container
+docker run --name dictorm -e POSTGRES_PASSWORD=dictorm -p 54321:5432 -d postgres:9.6
+# Install test requirements
+pip install -r requirements.testing.txt
+# Run the tests
+green -vv
+```
