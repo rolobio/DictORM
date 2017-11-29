@@ -2,6 +2,9 @@
 from setuptools import setup
 from dictorm.dictorm import __version__, __doc__ as ddoc
 
+with open('requirements.testing.txt', 'r') as fh:
+    testing_requirements = fh.read().splitlines()
+
 config = {
     'name':'dictorm',
     'version':str(__version__),
@@ -22,6 +25,7 @@ config = {
     'test_suite':'dictorm.test_dictorm',
     'extras_require':{
         'Postgresql': ['psycopg2'],
+        'Testing': testing_requirements,
         }
     }
 
