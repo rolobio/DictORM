@@ -39,8 +39,9 @@ class ExtraTestMethods:
 
     @classmethod
     def assertDictContains(cls, d1, d2):
-        if not set(d2.items()).issubset(set(d1.items())):
-            raise TypeError('{0} does not contain {1}'.format(d1, d2))
+        missing = set(d2.items()).difference(set(d1.items()))
+        if missing:
+            raise TypeError('{0} missing does not contain {1}'.format(d1, dict(missing)))
 
 
     @classmethod
@@ -69,7 +70,7 @@ class ExtraTestMethods:
 
 
 
-class CommonTests(unittest.TestCase, ExtraTestMethods):
+class CommonTests(ExtraTestMethods):
     """
     These tests will be run for all supported databases.
     """
@@ -82,7 +83,7 @@ class CommonTests(unittest.TestCase, ExtraTestMethods):
         self.curs.execute('''
         CREATE TABLE person (
             id SERIAL PRIMARY KEY,
-            name TEXT,
+            name VARCHAR(100),
             other INTEGER,
             manager_id INTEGER REFERENCES person(id)
         );
@@ -110,6 +111,9 @@ class CommonTests(unittest.TestCase, ExtraTestMethods):
             id SERIAL PRIMARY KEY,
             person_id INTEGER,
             description JSONB
+        );
+        CREATE TABLE foo (
+            bar VARCHAR(10)
         );
         ''')
         self.conn.commit()
@@ -943,7 +947,7 @@ class CommonTests(unittest.TestCase, ExtraTestMethods):
         Person = self.db['person']
         test_info = [
                 {'column_name':'id', 'data_type':'integer'},
-                {'column_name':'name', 'data_type':'text'},
+                {'column_name':'name', 'data_type':'character varying'},
                 {'column_name':'other', 'data_type':'integer'},
                 {'column_name':'manager_id', 'data_type':'integer'},
                 {'column_name':'car_id', 'data_type':'integer'},
@@ -1107,7 +1111,8 @@ class CommonTests(unittest.TestCase, ExtraTestMethods):
         self.assertRaises(dictorm.InvalidColumn, bob.flush)
 
 
-class TestPostgresql(CommonTests):
+
+class TestPostgresql(CommonTests, unittest.TestCase):
 
 
     def test_columns_property(self):
@@ -1252,6 +1257,17 @@ class TestPostgresql(CommonTests):
         self.assertRaises(StopIteration, next, persons)
 
 
+    def test_varchar(self):
+        """
+        A column name can't be used for injection
+        """
+        Foo = self.db['foo']
+        # bar is short enough
+        Foo(bar='abcdefghij').flush()
+        self.assertRaises(psycopg2.DataError,
+            Foo(bar='abcdefghijk').flush)
+
+
 
 class SqliteTestBase(object):
 
@@ -1305,7 +1321,7 @@ class SqliteTestBase(object):
 
 
 
-class TestSqlite(SqliteTestBase, CommonTests):
+class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
 
 
     def test_get_where(self):
@@ -1406,7 +1422,7 @@ class TestSqlite(SqliteTestBase, CommonTests):
                 {'name':'car_id', 'type':'INTEGER'},
                 ]
         self.assertEqual(len(test_info), len(Person.columns_info))
-        for i,j in zip(test_info, [dict(i) for i in Person.columns_info]):
+        for i,j in zip(test_info, map(dict, Person.columns_info)):
             self.assertDictContains(j, i)
 
 
