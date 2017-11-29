@@ -4,8 +4,7 @@ python:
     - "3.4"
     - "3.5"
 install:
-    - "pip install -r requirements.txt"
-    - "pip install psycopg2"
+    - "pip install -r requirements.testing.txt"
 before_script:
     - psql -c 'create database dictorm;' -U postgres
 script:
