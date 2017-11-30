@@ -4,12 +4,12 @@ python:
     - "3.4"
     - "3.5"
 install:
-    - "pip install -r requirements.testing.txt"
+    - "pip install -e ."
 before_script:
     - psql -c 'create database dictorm;' -U postgres
 script:
     # Run tests verbosely
-    - "green -vv --run-coverage dictorm"
+    - "python setup.py test"
     # Test installation
     - "python setup.py install"
     #  Verify that dictorm can be imported
