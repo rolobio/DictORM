@@ -3,6 +3,12 @@ python:
     - "2.7"
     - "3.4"
     - "3.5"
+env:
+    - PG_VERSION=9.2
+    - PG_VERSION=9.6
+before_install:
+    # Stop any postgres, then start a specific version of postgres to test against
+    - sudo service postgresql stop && sudo service postgresql start $PG_VERSION
 install:
     - "pip install -e .[postgresql]"
 before_script:
