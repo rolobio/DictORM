@@ -19,7 +19,6 @@ config = {
         "Development Status :: 5 - Production/Stable",
         "Topic :: Utilities",
         ],
-    'test_suite': 'dictorm.test',
     'setup_requires': ['green'],
     'tests_require': [
         'coverage',
