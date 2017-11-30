@@ -22,10 +22,16 @@ config = {
         "Development Status :: 5 - Production/Stable",
         "Topic :: Utilities",
         ],
-    'test_suite':'dictorm.test_dictorm',
+    'test_suite': 'dictorm.test',
+    'setup_requires': ['green'],
+    'tests_require': [
+        'coverage',
+        'coveralls',
+        'green',
+        'psycopg2',
+    ],
     'extras_require':{
         'Postgresql': ['psycopg2'],
-        'Testing': testing_requirements,
         }
     }
 

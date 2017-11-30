@@ -12,9 +12,14 @@ you to select/insert/update/delete rows of a database as if they were Python
 Dictionaries.
 
 ## Installation
-Install dictorm using pip:
+Install dictorm using `pip`, with the default sqlite backend:
 ```bash
 pip install dictorm
+```
+
+Install with the Postgres backend:
+```bash
+pip install dictorm[Postgresql]
 ```
 
 ## Quick & Simple Example!
@@ -432,9 +437,7 @@ bob['manager_id'] = None
 # Testing
 ```bash
 # Get postgres container
-docker run --name dictorm -e POSTGRES_PASSWORD=dictorm -p 54321:5432 -d postgres:9.6
-# Install test requirements
-pip install -r requirements.testing.txt
-# Run the tests
-green -vv
+sudo docker run --name dictorm -e POSTGRES_PASSWORD=dictorm -p 54321:5432 -d postgres:9.6
+# Install test requirements & run:
+python setup.py test
 ```
