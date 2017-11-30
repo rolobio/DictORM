@@ -1259,7 +1259,7 @@ class TestPostgresql(CommonTests, unittest.TestCase):
 
     def test_varchar(self):
         """
-        A varchar type raises and error when too many characters are passed.
+        A varchar type raises an error when too many characters are passed.
         """
         Foo = self.db['foo']
         # bar is short enough
