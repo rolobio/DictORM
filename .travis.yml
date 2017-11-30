@@ -4,6 +4,7 @@ python:
     - "3.4"
     - "3.5"
 env:
+    - PG_VERSION=9.2
     - PG_VERSION=9.4
     - PG_VERSION=9.6
 before_install:

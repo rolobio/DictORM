@@ -110,7 +110,7 @@ class CommonTests(ExtraTestMethods):
         CREATE TABLE possession (
             id SERIAL PRIMARY KEY,
             person_id INTEGER,
-            description JSONB
+            description JSON
         );
         CREATE TABLE foo (
             bar VARCHAR(10)
@@ -1306,7 +1306,7 @@ class SqliteTestBase(object):
         CREATE TABLE possession (
             id INTEGER PRIMARY KEY,
             person_id INTEGER,
-            description JSONB
+            description JSON
         );
         ''')
         self.conn.commit()
