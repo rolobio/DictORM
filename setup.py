@@ -2,9 +2,6 @@
 from setuptools import setup
 from dictorm.dictorm import __version__, __doc__ as ddoc
 
-with open('requirements.testing.txt', 'r') as fh:
-    testing_requirements = fh.read().splitlines()
-
 config = {
     'name':'dictorm',
     'version':str(__version__),
