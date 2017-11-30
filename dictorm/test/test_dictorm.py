@@ -118,7 +118,7 @@ class CommonTests(ExtraTestMethods):
             person_id INTEGER REFERENCES person(id)
         );
         ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
-        CREATE TABLE no_pk (foo TEXT);
+        CREATE TABLE no_pk (foo VARCHAR(10));
         CREATE TABLE station (
             person_id INTEGER
         );
@@ -126,9 +126,6 @@ class CommonTests(ExtraTestMethods):
             id SERIAL PRIMARY KEY,
             person_id INTEGER,
             description {JSON_OR_JSONB}
-        );
-        CREATE TABLE foo (
-            bar VARCHAR(10)
         );
         '''.format(JSON_OR_JSONB=JSONB_SUPPORT[major_version]))
         self.conn.commit()
@@ -1276,11 +1273,11 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         """
         A varchar type raises an error when too many characters are passed.
         """
-        Foo = self.db['foo']
+        NoPK = self.db['no_pk']
         # bar is short enough
-        Foo(bar='abcdefghij').flush()
+        NoPK(foo='abcdefghij').flush()
         self.assertRaises(psycopg2.DataError,
-            Foo(bar='abcdefghijk').flush)
+            NoPK(foo='abcdefghijk').flush)
 
 
 
