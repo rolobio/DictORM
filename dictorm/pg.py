@@ -5,6 +5,7 @@ dictorm.Table.
 
 Sqlite queries are slightly different, but use these methods as their base.
 """
+from copy import copy
 
 global sort_keys
 sort_keys = False
@@ -35,6 +36,18 @@ class Select(object):
                 self._order_by,
                 self._limit,
                 self._offset)
+
+
+    def _copy(self):
+        try:
+            ooc = self.operators_or_comp[:]
+        except TypeError:
+            ooc = self.operators_or_comp
+        new = type(self)(self.table, ooc, copy(self.returning))
+        new._order_by = copy(self._order_by)
+        new._limit = copy(self._limit)
+        new._offset = copy(self._offset)
+        return new
 
 
     def __str__(self):
@@ -264,7 +277,7 @@ class Column(object):
         self.column = column
 
     def __repr__(self): # pragma: no cover
-        return '{0}.{1}'.format(self.table.name, self.column)
+        return '{0}.{1}'.format(self.table, self.column)
 
     def many(self, column):
         c = self.comparison(self, column, '=')

@@ -261,8 +261,7 @@ class ResultsGenerator:
         """
         Return a new ResultsGenerator that will not cache the results.
         """
-        query = deepcopy(self.query)
-        results = ResultsGenerator(self.table, query, self.db)
+        results = ResultsGenerator(self.table, self.query._copy(), self.db)
         results._nocache = True
         return results
 
@@ -280,7 +279,7 @@ class ResultsGenerator:
             .refine(name='steve', foo='bar') # Same refinement as the above
                                              # example
         """
-        query = deepcopy(self.query)
+        query = self.query._copy()
         query = args_to_comp(query, self.table, *a, **kw)
         return ResultsGenerator(self.table, query, self.db)
 
@@ -294,7 +293,7 @@ class ResultsGenerator:
             .order_by('id ASC')
             .order_by('entrydate DESC')
         """
-        query = deepcopy(self.query).order_by(order_by)
+        query = self.query._copy().order_by(order_by)
         return ResultsGenerator(self.table, query, self.db)
 
 
@@ -307,7 +306,7 @@ class ResultsGenerator:
             .limit(10)
             .limit('ALL')
         """
-        query = deepcopy(self.query).limit(limit)
+        query = self.query._copy().limit(limit)
         return ResultsGenerator(self.table, query, self.db)
 
 
@@ -319,7 +318,7 @@ class ResultsGenerator:
         Example:
             .offset(10)
         """
-        query = deepcopy(self.query).offset(offset)
+        query = self.query._copy().offset(offset)
         return ResultsGenerator(self.table, query, self.db)
 
 
