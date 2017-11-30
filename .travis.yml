@@ -4,7 +4,7 @@ python:
     - "3.4"
     - "3.5"
 install:
-    - "pip install -e ."
+    - "pip install -e .[postgresql]"
 before_script:
     - psql -c 'create database dictorm;' -U postgres
 script:
