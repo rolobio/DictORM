@@ -1273,11 +1273,11 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         """
         A varchar type raises an error when too many characters are passed.
         """
-        NoPK = self.db['no_pk']
+        NoPk = self.db['no_pk']
         # bar is short enough
-        NoPK(foo='abcdefghij').flush()
+        NoPk(foo='abcdefghij').flush()
         self.assertRaises(psycopg2.DataError,
-            NoPK(foo='abcdefghijk').flush)
+            NoPk(foo='abcdefghijk').flush)
 
 
 
