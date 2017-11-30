@@ -15,7 +15,7 @@ before_script:
     - psql -c 'create database dictorm;' -U postgres
 script:
     # Run tests verbosely
-    - "python setup.py test"
+    - "python setup.py test -vv"
     # Test installation
     - "python setup.py install"
     #  Verify that dictorm can be imported
