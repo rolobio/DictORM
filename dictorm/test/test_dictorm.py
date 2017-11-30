@@ -69,6 +69,16 @@ class ExtraTestMethods:
         return self.assertIn(_no_refs(a), _no_refs(b))
 
 
+JSONB_SUPPORT = {
+        '902':'JSON',
+        '903':'JSON',
+        '904':'JSONB',
+        '905':'JSONB',
+        '906':'JSONB',
+        '100':'JSONB',
+        }
+
+
 
 class CommonTests(ExtraTestMethods):
     """
@@ -77,6 +87,10 @@ class CommonTests(ExtraTestMethods):
 
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
+
+        # Change the schema depending on which versin of Postgres we're using
+        server_version = str(self.conn.server_version)
+
         self.db = dictorm.DictDB(self.conn)
         self.curs = self.db.curs
         self.tearDown()
@@ -110,12 +124,12 @@ class CommonTests(ExtraTestMethods):
         CREATE TABLE possession (
             id SERIAL PRIMARY KEY,
             person_id INTEGER,
-            description JSON
+            description {JSON}
         );
         CREATE TABLE foo (
             bar VARCHAR(10)
         );
-        ''')
+        '''.format(JSON=JSONB_SUPPORT[server_version[:3]]))
         self.conn.commit()
         self.db.refresh_tables()
 
