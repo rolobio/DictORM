@@ -420,11 +420,13 @@ bob['manager_id'] = None
 "foo" IS NULL
 >>> Person['foo'].IsNotNull()
 "foo" IS NOT NULL
->>> Person['foo'].In(('bar', 'baz')) # Not supported for Sqlite3
-"foo" IN ('bar', 'baz')
 >>> Person['foo'].Like('bar')
 "foo" LIKE 'bar'
->>> Person['foo'].Ilike('bar') # Not supported for Sqlite3
+
+# The following comparisons not supported for Sqlite3
+>>> Person['foo'].In(('bar', 'baz'))
+"foo" IN ('bar', 'baz')
+>>> Person['foo'].Ilike('bar')
 "foo" ILIKE 'bar'
 >>> Person['foo'].Any(['foo', 'bar'])
 "foo" = ANY ('foo', 'bar')
