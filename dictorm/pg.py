@@ -42,7 +42,7 @@ class Select(object):
         try:
             ooc = self.operators_or_comp[:]
         except TypeError:
-            ooc = self.operators_or_comp
+            ooc = self.operators_or_comp._copy()
         new = type(self)(self.table, ooc, copy(self.returning))
         new._order_by = copy(self._order_by)
         new._limit = copy(self._limit)
@@ -232,6 +232,13 @@ class Comparison(object):
         return '"{0}"{1}{2}'.format(c1, self.kind, self.interpolation_str)
 
 
+    def _copy(self):
+        new = type(self)(self.column1, self.column2, self.kind)
+        new._substratum = self._substratum
+        new._aggregate = self._aggregate
+        return new
+
+
     def value(self):
         return self.column2
 
@@ -279,10 +286,12 @@ class Column(object):
     def __repr__(self): # pragma: no cover
         return '{0}.{1}'.format(self.table, self.column)
 
+
     def many(self, column):
         c = self.comparison(self, column, '=')
         c.many = True
         return c
+
 
     def __eq__(self, column): return self.comparison(self, column, '=')
     def __gt__(self, column): return self.comparison(self, column, '>')
@@ -360,6 +369,12 @@ class Operator(object):
         else:
             self.operators_or_comp += (i,)
         return self
+
+
+    def _copy(self):
+        new = type(self)()
+        new.operators_or_comp = tuple(i._copy() for i in self.operators_or_comp)
+        return new
 
 
 

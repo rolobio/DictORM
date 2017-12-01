@@ -801,10 +801,8 @@ class CommonTests(ExtraTestMethods):
         self.assertEqualNoRefs(limited_minions, [milton,])
         self.assertEqualNoRefs(limited_minions.order_by('id DESC'), [peter,])
         # A modified ResultsGenerator creates a new query
-        #print(repr(minions.query))
         self.assertEqualNoRefs(minions.refine(Person['name']=='Milton'),
                 [milton,])
-        a = minions.refine(Person['name']=='Peter')
         self.assertEqualNoRefs(minions.refine(Person['name']=='Peter'), [peter,])
 
         self.assertEqualNoRefs(Person.get_where(Person['id'].IsNot(None
