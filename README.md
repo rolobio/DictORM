@@ -397,35 +397,54 @@ bob['manager_id'] = None
 #### Pythonic Comparisons create SQL Comparisons
 ```python
 >>> Person['foo'] == 'bar'
-"foo = 'bar'"
+"foo = 'bar'
 >>> Person['foo'] > 'bar'
-"foo > 'bar'"
+"foo" > 'bar'
 >>> Person['foo'] >= 'bar'
-"foo >= 'bar'"
+"foo" >= 'bar'
 >>> Person['foo'] < 'bar'
-"foo < 'bar'"
+"foo" < 'bar'
 >>> Person['foo'] <= 'bar'
-"foo <= 'bar'"
+"foo" <= 'bar'
 >>> Person['foo'] != 'bar'
-"foo <= 'bar'"
+"foo" <= 'bar'
 >>> Person['foo'].Is('bar')
-"foo IS 'bar'"
+"foo" IS 'bar'
 >>> Person['foo'].IsNot('bar')
-"foo IS NOT 'bar'"
+"foo" IS NOT 'bar'
 >>> Person['foo'].IsDistinct('bar')
-"foo IS DISTINCT FROM 'bar'"
+"foo" IS DISTINCT FROM 'bar'
 >>> Person['foo'].IsNotDistinct('bar')
-"foo IS NOT DISTINCT FROM 'bar'"
+"foo" IS NOT DISTINCT FROM 'bar'
 >>> Person['foo'].IsNull()
-"foo IS NULL"
+"foo" IS NULL
 >>> Person['foo'].IsNotNull()
-"foo IS NOT NULL"
+"foo" IS NOT NULL
 >>> Person['foo'].In(('bar', 'baz')) # Not supported for Sqlite3
-"foo IN ('bar', 'baz')"
+"foo" IN ('bar', 'baz')
 >>> Person['foo'].Like('bar')
-"foo LIKE 'bar'"
+"foo" LIKE 'bar'
 >>> Person['foo'].Ilike('bar') # Not supported for Sqlite3
-"foo ILIKE 'bar'"
+"foo" ILIKE 'bar'
+>>> Person['foo'].Any(['foo', 'bar'])
+"foo" = ANY ('foo', 'bar')
+```
+
+#### Operators
+```python
+>>> from dictorm.pg import And, Or, Xor
+
+>>> And(Person['foo'] == 'bar', Person['id'] > 3)
+"foo" == 'bar' AND "id" > 3
+>>> Or(Person['foo'] == 'bar', Person['id'] > 3)
+"foo" == 'bar' Or "id" > 3
+>>> Xor(Person['foo'] == 'bar', Person['id'] > 3)
+"foo" == 'bar' XOR "id" > 3
+
+# Nested
+>>> And(Person['id'] > 3, Or(Person['name'] == 'Bob', Person['name'] == 'Dave',
+>>>     Person['name'] == 'Alice'))
+"id" > 3 AND ("name" == 'Bob' OR "name" == 'Dave' OR "name" == 'Alice')
 ```
 
 ### Delete

@@ -1280,6 +1280,16 @@ class TestPostgresql(CommonTests, unittest.TestCase):
             NoPk(foo='abcdefghijk').flush)
 
 
+    def test_any(self):
+        Person = self.db['person']
+        persons = map(lambda i: Person(name=i).flush(), ['Bob', 'Aly', 'Dave'])
+        bob, aly, dave = persons
+        self.assertEqual(
+                list(Person.get_where(Person['id'].In([2,3]))),
+                list(Person.get_where(Person['id'].Any([2,3])))
+                )
+
+
 
 class SqliteTestBase(object):
 

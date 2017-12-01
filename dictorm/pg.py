@@ -214,6 +214,7 @@ class Comparison(object):
         self.kind = kind
         self._substratum = None
         self._aggregate = False
+        self._array_exp = False
 
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
@@ -227,8 +228,14 @@ class Comparison(object):
 
     def __str__(self):
         c1 = self.column1.column
+
         if self._null_kind():
             return '"{0}"{1}'.format(c1, self.kind)
+
+        # Surround the expression with parentheses
+        if self._array_exp:
+            return '"{0}"{1}({2})'.format(c1, self.kind, self.interpolation_str)
+
         return '"{0}"{1}{2}'.format(c1, self.kind, self.interpolation_str)
 
 
@@ -330,6 +337,12 @@ class Column(object):
 
     def Ilike(self, column):
         return self.comparison(self, column, ' ILIKE ')
+
+
+    def Any(self, column):
+        comp = self.comparison(self, column, ' = ANY ')
+        comp._array_exp = True
+        return comp
 
 
 
