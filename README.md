@@ -397,7 +397,7 @@ bob['manager_id'] = None
 #### Pythonic Comparisons create SQL Comparisons
 ```python
 >>> Person['foo'] == 'bar'
-"foo = 'bar'
+"foo" = 'bar'
 >>> Person['foo'] > 'bar'
 "foo" > 'bar'
 >>> Person['foo'] >= 'bar'
