@@ -1,0 +1,7 @@
+version: "3"
+services:
+    postgres:
+        ports:
+            - "54321:5432"
+        image: postgres
+        restart: always
