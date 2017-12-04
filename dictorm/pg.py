@@ -273,7 +273,6 @@ class Comparison(object):
 
 
     def Or(self, comp2): return Or(self, comp2)
-    def Xor(self, comp2): return Xor(self, comp2)
     def And(self, comp2): return And(self, comp2)
 
 
@@ -394,10 +393,6 @@ class Operator(object):
 class Or(Operator):
     def __init__(self, *operators_or_comp):
         super(Or, self).__init__('OR', operators_or_comp)
-
-class Xor(Operator):
-    def __init__(self, *operators_or_comp):
-        super(Xor, self).__init__('XOR', operators_or_comp)
 
 class And(Operator):
     def __init__(self, *operators_or_comp):

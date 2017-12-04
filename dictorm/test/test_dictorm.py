@@ -1123,6 +1123,24 @@ class CommonTests(ExtraTestMethods):
         self.assertRaises(dictorm.InvalidColumn, bob.flush)
 
 
+    def test_operators(self):
+        Person = self.db['person']
+        persons = map(lambda i: Person(name=i).flush(), ['Bob', 'Aly', 'Dave'])
+        bob, aly, dave = persons
+
+        self.assertEqual(
+                list(Person.get_where(dictorm.And(
+                    Person['name'] == 'Bob',
+                    Person['id'] > 0))),
+                [bob])
+
+        self.assertEqual(
+                list(Person.get_where(dictorm.Or(
+                    Person['id'] == 2,
+                    Person['id'] == 3))),
+                [aly, dave])
+
+
 
 class TestPostgresql(CommonTests, unittest.TestCase):
 

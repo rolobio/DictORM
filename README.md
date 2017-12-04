@@ -434,14 +434,16 @@ bob['manager_id'] = None
 
 #### Operators
 ```python
->>> from dictorm.pg import And, Or, Xor
+>>> from dictorm import And, Or
 
 >>> And(Person['foo'] == 'bar', Person['id'] > 3)
 "foo" == 'bar' AND "id" > 3
+
+>>> Person.get_where(And(Person['foo'] == 'bar', Person['id'] > 3))
+ResultsGenerator()
+
 >>> Or(Person['foo'] == 'bar', Person['id'] > 3)
 "foo" == 'bar' Or "id" > 3
->>> Xor(Person['foo'] == 'bar', Person['id'] > 3)
-"foo" == 'bar' XOR "id" > 3
 
 # Nested
 >>> And(Person['id'] > 3, Or(Person['name'] == 'Bob', Person['name'] == 'Dave',

@@ -1,5 +1,5 @@
 import unittest
-from dictorm.pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
+from dictorm.pg import Select, Insert, Update, Delete, Or, And, Column, set_sort_keys
 
 class PersonTable(object):
     '''fake DictORM Table for testing'''
@@ -62,19 +62,9 @@ class TestSelect(unittest.TestCase):
         self.assertEqual(str(q), 'SELECT * FROM "some_table" WHERE "name"=%s OR "car_id"=%s')
         q = Select('some_table', bob_name.And(bob_car))
         self.assertEqual(str(q), 'SELECT * FROM "some_table" WHERE "name"=%s AND "car_id"=%s')
-        q = Select('some_table', bob_name.Xor(bob_car))
-        self.assertEqual(str(q), 'SELECT * FROM "some_table" WHERE "name"=%s XOR "car_id"=%s')
 
 
     def test_logical_groups(self):
-        q = Select('some_table', Xor(
-            And(Person['name'] == 'Bob', Person['car_id'] == 2),
-            Person['name'] == 'Alice'
-            ))
-
-        self.assertEqual(str(q),
-                'SELECT * FROM "some_table" WHERE ("name"=%s AND "car_id"=%s) XOR "name"=%s')
-
         q = Select('some_table', Or(
             And(Person['name'] >= 'Bob', Person['car_id'] == 2.3),
             And(Person['name'] <= 'Alice', Person['car_id'] != 3)

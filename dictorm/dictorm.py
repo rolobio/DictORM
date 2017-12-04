@@ -7,13 +7,15 @@ from json import dumps
 from sys import modules
 
 try: # pragma: no cover
-    from dictorm.pg import Select, Insert, Update, Delete, And
+    from dictorm.pg import Select, Insert, Update, Delete
+    from dictorm.pg import And, Or
     from dictorm.pg import Column, Comparison, Operator
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
     from .pg import Select, Insert, Update, Delete, And
+    from .pg import And, Or
     from .pg import Column, Comparison, Operator
     from .sqlite import Insert as SqliteInsert
     from .sqlite import Column as SqliteColumn
