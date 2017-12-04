@@ -1,8 +1,6 @@
 #! /usr/bin/env python
 from dictorm import DictDB
 import sqlite3
-import random
-from string import ascii_letters
 
 test_tables_sql = '''
 CREATE TABLE car (

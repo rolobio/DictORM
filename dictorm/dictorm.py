@@ -1,7 +1,6 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 __version__ = '3.8'
 
-from copy import deepcopy
 from itertools import chain
 from json import dumps
 from sys import modules
@@ -14,7 +13,7 @@ try: # pragma: no cover
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
-    from .pg import Select, Insert, Update, Delete, And
+    from .pg import Select, Insert, Update, Delete
     from .pg import And, Or
     from .pg import Column, Comparison, Operator
     from .sqlite import Insert as SqliteInsert

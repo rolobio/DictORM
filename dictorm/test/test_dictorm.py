@@ -496,7 +496,7 @@ class CommonTests(ExtraTestMethods):
         Person = self.db['person']
 
         bob = Person(name='Bob').flush()
-        aly = Person(name='Aly').flush()
+        Person(name='Aly').flush()
 
         self.assertRaises(dictorm.NoPrimaryKey, Person.get_where, 1,2)
 
@@ -1077,9 +1077,9 @@ class CommonTests(ExtraTestMethods):
         it = Department(name='IT').flush()
 
         # Person_Departments
-        steve_sales = PD(person_id=steve['id'], department_id=sales['id']).flush()
-        steve_hr = PD(person_id=steve['id'], department_id=hr['id']).flush()
-        alice_it = PD(person_id=alice['id'], department_id=it['id']).flush()
+        PD(person_id=steve['id'], department_id=sales['id']).flush()
+        PD(person_id=steve['id'], department_id=hr['id']).flush()
+        PD(person_id=alice['id'], department_id=it['id']).flush()
 
         self.assertEqualNoRefs(alice['manager'], bob)
         self.assertEqualNoRefs(steve['manager'], bob)
@@ -1241,7 +1241,6 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         alice = Person(name='Alice', manager_id=bob['id'], id=3, other=2).flush()
         dave = Person(name='Dave', manager_id=bob['id'], id=2, other=3).flush()
         # Ordered by their ID by default
-        result = Person.get_where()
         self.assertEqualNoRefs(Person.get_where(),
                 [bob, dave, alice])
 
