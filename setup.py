@@ -28,7 +28,7 @@ config = {
     ],
     'extras_require':{
         'Postgresql': ['psycopg2'],
-        'testing': ['psycopg2', 'green>=2.12.0'],
+        'testing': ['psycopg2', 'green>=2.12.0', 'coveralls', 'coverage'],
         }
     }
 
