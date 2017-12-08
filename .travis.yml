@@ -16,7 +16,7 @@ before_install:
     # Stop any postgres, then start a specific version of postgres to test against
     - sudo service postgresql stop && sudo service postgresql start $PG_VERSION
 install:
-    - "pip install -e .[postgresql]"
+    - "pip install -e .[testing]"
 before_script:
     - psql -c 'create database dictorm;' -U postgres
 script:
