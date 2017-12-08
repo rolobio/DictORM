@@ -19,11 +19,11 @@ config = {
         "Development Status :: 5 - Production/Stable",
         "Topic :: Utilities",
         ],
-    'setup_requires': ['green'],
+    'setup_requires': ['green>=2.12.0'],
     'tests_require': [
         'coverage',
         'coveralls',
-        'green',
+        'green>=2.12.0',
         'psycopg2',
     ],
     'extras_require':{
