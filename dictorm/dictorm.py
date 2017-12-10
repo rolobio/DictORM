@@ -175,12 +175,13 @@ def args_to_comp(operator, table, *args, **kwargs):
 
 class RawQuery:
 
-    def __init__(self, sql_query):
+    def __init__(self, sql_query, *args):
         self.sql_query = sql_query
+        self.args = args
 
 
     def build(self):
-        return (self.sql_query, ())
+        return self.sql_query, self.args
 
 
 
@@ -516,12 +517,14 @@ class Table(object):
         return i
 
 
-    def get_raw(self, sql_query):
+    def get_raw(self, sql_query, *a):
         """
         Get all rows returned by the raw SQL query provided, as Dicts.  Expects
         that the query will only return columns from this instance's table.
+
+        Extra arguments and keyword arguments pare passed to the query builder as variables.
         """
-        query = RawQuery(sql_query)
+        query = RawQuery(sql_query, *a)
         return ResultsGenerator(self, query, self.db)
 
 

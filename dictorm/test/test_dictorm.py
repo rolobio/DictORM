@@ -1151,6 +1151,9 @@ class CommonTests(ExtraTestMethods):
         persons = Person.get_raw('SELECT * FROM person')
         self.assertEqual(list(persons), [bob, aly])
 
+        persons = Person.get_raw('SELECT * FROM person WHERE id=%s', aly['id'])
+        self.assertEqual(list(persons), [aly])
+
 
 
 class TestPostgresql(CommonTests, unittest.TestCase):
@@ -1476,6 +1479,20 @@ class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
         self.assertEqual(len(test_info), len(Person.columns_info))
         for i,j in zip(test_info, map(dict, Person.columns_info)):
             self.assertDictContains(j, i)
+
+
+    def test_raw(self):
+        """
+        A raw SQL query can be executed using a Table.  It expects that the query will select
+        from its table.
+        """
+        Person = self.db['person']
+        bob, aly = map(lambda i: Person(name=i).flush(), ['Bob', 'Aly'])
+        persons = Person.get_raw('SELECT * FROM person')
+        self.assertEqual(list(persons), [bob, aly])
+
+        persons = Person.get_raw('SELECT * FROM person WHERE id=?', aly['id'])
+        self.assertEqual(list(persons), [aly])
 
 
 
