@@ -174,6 +174,9 @@ def args_to_comp(operator, table, *args, **kwargs):
 
 
 class RawQuery:
+    """
+    Used only for Table.get_raw.  Mearly returns the provided args when build is called.
+    """
 
     def __init__(self, sql_query, *args):
         self.sql_query = sql_query
