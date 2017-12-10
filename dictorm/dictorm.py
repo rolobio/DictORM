@@ -173,6 +173,16 @@ def args_to_comp(operator, table, *args, **kwargs):
     return operator
 
 
+class RawQuery:
+
+    def __init__(self, sql_query):
+        self.sql_query = sql_query
+
+
+    def build(self):
+        return (self.sql_query, ())
+
+
 
 class ResultsGenerator:
     """
@@ -504,6 +514,15 @@ class Table(object):
         except StopIteration: # Should only be one result
             pass
         return i
+
+
+    def get_raw(self, sql_query):
+        """
+        Get all rows returned by the raw SQL query provided, as Dicts.  Expects
+        that the query will only return columns from this instance's table.
+        """
+        query = RawQuery(sql_query)
+        return ResultsGenerator(self, query, self.db)
 
 
     def count(self):
