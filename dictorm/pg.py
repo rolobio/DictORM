@@ -203,6 +203,14 @@ class Delete(Update):
     query = 'DELETE FROM "{table}"'
 
 
+
+class MultiTableSelect(object):
+
+    def __init__(self, operators_or_comp=None, *tables):
+        self.ooc = operators_or_comp
+        self.tables = tables
+
+
 class Comparison(object):
 
     interpolation_str = '%s'
@@ -276,6 +284,12 @@ class Comparison(object):
     def And(self, comp2): return And(self, comp2)
 
 
+    def get_where(self, ooc=None):
+        from .dictorm import ResultsGenerator
+        query = MultiTableSelect(ooc, self.column1.table, self.column2.table)
+        return ResultsGenerator(query.tables, query, self.column1.table.db)
+
+
 
 class Null(): pass
 
@@ -299,7 +313,10 @@ class Column(object):
         return c
 
 
-    def __eq__(self, column): return self.comparison(self, column, '=')
+    def __eq__(self, column):
+        return self.comparison(self, column, '=')
+
+
     def __gt__(self, column): return self.comparison(self, column, '>')
     def __ge__(self, column): return self.comparison(self, column, '>=')
     def __lt__(self, column): return self.comparison(self, column, '<')
@@ -397,6 +414,5 @@ class Or(Operator):
 class And(Operator):
     def __init__(self, *operators_or_comp):
         super(And, self).__init__('AND', operators_or_comp)
-
 
 

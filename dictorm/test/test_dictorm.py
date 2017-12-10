@@ -1155,6 +1155,19 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(list(persons), [aly])
 
 
+    def test_join(self):
+        Person, Car = self.db['person'], self.db['car']
+        bob = Person(name='Bob').flush()
+        Person(name='Aly').flush()
+        bob_car = Car(name='foo', person_id=bob['id']).flush()
+
+        PersonCarJoin = Person['id'] == Car['person_id']
+        person_car = PersonCarJoin.get_where(Person['name'] == 'Bob')
+        self.assertEqual(list(person_car),
+                         [{'person': bob, 'car': bob_car}]
+                         )
+
+
 
 class TestPostgresql(CommonTests, unittest.TestCase):
 
