@@ -1141,6 +1141,17 @@ class CommonTests(ExtraTestMethods):
                 [aly, dave])
 
 
+    def test_raw(self):
+        """
+        A raw SQL query can be executed using a Table.  It expects that the query will select
+        from its table.
+        """
+        Person = self.db['person']
+        bob, aly = map(lambda i: Person(name=i).flush(), ['Bob', 'Aly'])
+        persons = Person.get_raw('SELECT * FROM person')
+        self.assertEqual(list(persons), [bob, aly])
+
+
 
 class TestPostgresql(CommonTests, unittest.TestCase):
 
