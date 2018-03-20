@@ -29,5 +29,5 @@ Person, Car = db['person'], db['car']
     car_id=Car(make='bar', model='baz').flush()['id']
     ).flush() for i in range(10000)]
 
-map(lambda i: i.delete, Person.get_where())
-map(lambda i: i.delete, Car.get_where())
+list(map(lambda i: i.delete, Person.get_where()))
+list(map(lambda i: i.delete, Car.get_where()))
