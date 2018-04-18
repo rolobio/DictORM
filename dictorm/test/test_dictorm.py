@@ -1155,6 +1155,45 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(list(persons), [aly])
 
 
+    def test_transaction(self):
+        """
+        A helper method exists on the db object to facilitate a database transaction.
+
+        :return:
+        """
+        Person = self.db['person']
+        with self.db.transaction():
+            bob = Person(name='Bob').flush()
+
+        # Bob was created during the transaction
+        self.assertEqual(bob, Person.get_one())
+        self.conn.commit()
+        self.assertEqual({'Bob'}, set([i['name'] for i in Person.get_where()]))
+
+        class FakeException(Exception):
+            pass
+
+        # The creation of Alice has an error
+        try:
+            with self.db.transaction():
+                alice = Person(name='Alice').flush()
+                raise FakeException('oh no')
+        except FakeException:
+            pass
+
+        # Alice doesn't exist
+        self.assertEqual({'Bob'}, set([i['name'] for i in Person.get_where()]))
+
+        # Autocommit on success
+        with self.db.transaction(commit=True):
+            alice = Person(name='Alice').flush()
+            dave = Person(name='Dave').flush()
+
+        # New persons were committed, so rollback should have no effect
+        self.conn.rollback()
+        self.assertEqual({'Bob', 'Alice', 'Dave'},
+                         set([i['name'] for i in Person.get_where()]))
+
 
 class TestPostgresql(CommonTests, unittest.TestCase):
 

@@ -8,28 +8,27 @@ from .pg import Insert as PostgresqlInsert
 from .pg import Select
 from .pg import Update as PostgresqlUpdate
 
+
 class Comparison(PostgresqlComparison): interpolation_str = '?'
+
+
 class Column(PostgresqlColumn): comparison = Comparison
 
 
 class Insert(PostgresqlInsert):
-
     interpolation_str = '?'
 
     def returning(self, returning):
         self.append_returning = returning
         return self
-
 
 
 class Update(PostgresqlUpdate):
-
     interpolation_str = '?'
 
     def returning(self, returning):
         self.append_returning = returning
         return self
-
 
     def build(self):
         # Replace the last_insert_rowid select with one built around this query
@@ -37,6 +36,3 @@ class Update(PostgresqlUpdate):
         if self.append_returning:
             built[1] = Select(self.table, self.operators_or_comp).build()
         return built
-
-
-

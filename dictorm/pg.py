@@ -9,6 +9,8 @@ from copy import copy
 
 global sort_keys
 sort_keys = False
+
+
 def set_sort_keys(val):
     "Used only for testing"
     global sort_keys
@@ -16,7 +18,6 @@ def set_sort_keys(val):
 
 
 class Select(object):
-
     query = 'SELECT * FROM "{table}"'
 
     def __init__(self, table, operators_or_comp=None, returning=None):
@@ -25,18 +26,16 @@ class Select(object):
         self.returning = returning
         self._order_by = None
         self._limit = None
-        self._offset= None
+        self._offset = None
 
-
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         return 'Select({0}, {1}, ret:{2}, order:{3}, limit:{4}, offset:{5}'.format(
-                self.table,
-                repr(self.operators_or_comp),
-                self.returning,
-                self._order_by,
-                self._limit,
-                self._offset)
-
+            self.table,
+            repr(self.operators_or_comp),
+            self.returning,
+            self._order_by,
+            self._limit,
+            self._offset)
 
     def _copy(self):
         try:
@@ -49,14 +48,13 @@ class Select(object):
         new._offset = copy(self._offset)
         return new
 
-
     def __str__(self):
         parts = []
-        formats = {'table':self.table,}
+        formats = {'table': self.table, }
         ooc = self.operators_or_comp
         if (isinstance(ooc, Operator) and ooc.operators_or_comp) or (
                 isinstance(ooc, Comparison)
-                ):
+        ):
             parts.append(' WHERE {comp}')
             formats['comp'] = str(ooc)
         if self._order_by:
@@ -72,38 +70,30 @@ class Select(object):
         sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
-
     def values(self):
         return list(self.operators_or_comp or [])
 
-
     def build(self):
         return (str(self), self.values())
-
 
     def order_by(self, order_by):
         self._order_by = order_by
         return self
 
-
     def limit(self, limit):
         self._limit = limit
         return self
 
-
     def offset(self, offset):
         self._offset = offset
         return self
-
 
     def __add__(self, item):
         self.operators_or_comp += item
         return self
 
 
-
 class Insert(object):
-
     query = 'INSERT INTO "{table}" {cvp}'
     cvp = '({0}) VALUES ({1})'
     interpolation_str = '%s'
@@ -118,11 +108,9 @@ class Insert(object):
         if sort_keys:
             self._ordered_keys = sorted(self._ordered_keys)
 
-
     def _build_cvp(self):
         return (', '.join(['"{}"'.format(i) for i in self._ordered_keys]),
-            ', '.join([self.interpolation_str,]*len(self._values)))
-
+                ', '.join([self.interpolation_str, ] * len(self._values)))
 
     def __str__(self):
         sql = self.query
@@ -133,32 +121,27 @@ class Insert(object):
         if not self._values:
             return sql.format(table=self.table, cvp='DEFAULT VALUES')
         return sql.format(table=self.table,
-                cvp=self.cvp.format(*self._build_cvp()))
-
+                          cvp=self.cvp.format(*self._build_cvp()))
 
     def values(self):
         return [self._values[k] for k in self._ordered_keys]
 
-
     def build(self):
         sql, values = str(self), self.values()
         if self.append_returning:
-            ret = [(sql, values),]
+            ret = [(sql, values), ]
             ret.append((self.last_row.format(
                 self.append_returning, self.table),
-                []))
+                        []))
             return ret
         return (sql, values)
-
 
     def returning(self, returning):
         self._returning = returning
         return self
 
 
-
 class Update(Insert):
-
     query = 'UPDATE "{table}" SET {cvp}'
     interpolation_str = '%s'
 
@@ -166,14 +149,13 @@ class Update(Insert):
         self.operators_or_comp = None
         super(Update, self).__init__(table, **values)
 
-
     def _build_cvp(self):
         return ', '.join(('"{0}"={1}'.format(k, self.interpolation_str) \
-                for k in self._ordered_keys))
+                          for k in self._ordered_keys))
 
     def __str__(self):
         parts = []
-        formats = {'table':self.table, 'cvp':self._build_cvp()}
+        formats = {'table': self.table, 'cvp': self._build_cvp()}
         if self.operators_or_comp:
             parts.append(' WHERE {comps}')
             formats['comps'] = str(self.operators_or_comp)
@@ -184,27 +166,22 @@ class Update(Insert):
         sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
-
     def values(self):
         values = super(Update, self).values()
         if self.operators_or_comp:
             values.extend(list(self.operators_or_comp))
         return values
 
-
     def where(self, operators_or_comp):
         self.operators_or_comp = operators_or_comp
         return self
 
 
-
 class Delete(Update):
-
     query = 'DELETE FROM "{table}"'
 
 
 class Comparison(object):
-
     interpolation_str = '%s'
     many = False
 
@@ -216,15 +193,14 @@ class Comparison(object):
         self._aggregate = False
         self._array_exp = False
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         if isinstance(self.column2, Null):
             ret = 'Comparison({0}{1})'.format(self.column1, self.kind)
         ret = 'Comparison{0}({1}{2}{3})'.format('Many' if self.many else '',
-                self.column1, str(self.kind), self.column2)
+                                                self.column1, str(self.kind), self.column2)
         if self._substratum:
             ret += '.substratum({0})'.format(self._substratum)
         return ret
-
 
     def __str__(self):
         c1 = self.column1.column
@@ -238,23 +214,19 @@ class Comparison(object):
 
         return '"{0}"{1}{2}'.format(c1, self.kind, self.interpolation_str)
 
-
     def _copy(self):
         new = type(self)(self.column1, self.column2, self.kind)
         new._substratum = self._substratum
         new._aggregate = self._aggregate
         return new
 
-
     def value(self):
         return self.column2
-
 
     def __iter__(self):
         if self._null_kind():
             return iter([])
-        return iter([self.column2,])
-
+        return iter([self.column2, ])
 
     def substratum(self, column):
         comp = Comparison(self.column1, self.column2, self.kind)
@@ -262,87 +234,82 @@ class Comparison(object):
         comp.many = self.many
         return comp
 
-
     def aggregate(self, column):
         comp = self.substratum(column)
         comp._aggregate = True
         return comp
 
+    def _null_kind(self):
+        return isinstance(self.column2, Null)
 
-    def _null_kind(self): return isinstance(self.column2, Null)
+    def Or(self, comp2):
+        return Or(self, comp2)
 
-
-    def Or(self, comp2): return Or(self, comp2)
-    def And(self, comp2): return And(self, comp2)
-
+    def And(self, comp2):
+        return And(self, comp2)
 
 
 class Null(): pass
 
 
-
 class Column(object):
-
     comparison = Comparison
 
     def __init__(self, table, column):
         self.table = table
         self.column = column
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         return '{0}.{1}'.format(self.table, self.column)
-
 
     def many(self, column):
         c = self.comparison(self, column, '=')
         c.many = True
         return c
 
-
     def __eq__(self, column): return self.comparison(self, column, '=')
+
     def __gt__(self, column): return self.comparison(self, column, '>')
+
     def __ge__(self, column): return self.comparison(self, column, '>=')
+
     def __lt__(self, column): return self.comparison(self, column, '<')
+
     def __le__(self, column): return self.comparison(self, column, '<=')
+
     def __ne__(self, column): return self.comparison(self, column, '!=')
+
     def Is(self, column):     return self.comparison(self, column, ' IS ')
+
     def IsNot(self, column):  return self.comparison(self, column, ' IS NOT ')
 
     def IsDistinct(self, column):
         return self.comparison(self, column, ' IS DISTINCT FROM ')
 
-
     def IsNotDistinct(self, column):
         return self.comparison(self, column, ' IS NOT DISTINCT FROM ')
-
 
     def IsNull(self):
         return self.comparison(self, Null(), ' IS NULL')
 
-
     def IsNotNull(self):
         return self.comparison(self, Null(), ' IS NOT NULL')
-
 
     def In(self, tup):
         if isinstance(tup, list):
             tup = tuple(tup)
         return self.comparison(self, tup, ' IN ')
 
-
     def Like(self, column):
         return self.comparison(self, column, ' LIKE ')
 
-
     def Ilike(self, column):
         return self.comparison(self, column, ' ILIKE ')
-
 
     def Any(self, column):
         comp = self.comparison(self, column, ' = ANY ')
         comp._array_exp = True
         return comp
-
 
 
 def wrap_ooc(ooc):
@@ -357,13 +324,12 @@ class Operator(object):
         self.kind = kind
         self.operators_or_comp = operators_or_comp
 
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         return '{0}{1}'.format(self.kind, repr(self.operators_or_comp))
 
     def __str__(self):
         kind = ' {0} '.format(self.kind)
         return kind.join(map(wrap_ooc, self.operators_or_comp))
-
 
     def __iter__(self):
         i = []
@@ -374,7 +340,6 @@ class Operator(object):
                 i.append(comp.value())
         return iter(i)
 
-
     def __add__(self, i):
         if isinstance(i, tuple):
             self.operators_or_comp += i
@@ -382,21 +347,17 @@ class Operator(object):
             self.operators_or_comp += (i,)
         return self
 
-
     def _copy(self):
         new = type(self)()
         new.operators_or_comp = tuple(i._copy() for i in self.operators_or_comp)
         return new
 
 
-
 class Or(Operator):
     def __init__(self, *operators_or_comp):
         super(Or, self).__init__('OR', operators_or_comp)
 
+
 class And(Operator):
     def __init__(self, *operators_or_comp):
         super(And, self).__init__('AND', operators_or_comp)
-
-
-

@@ -1,18 +1,19 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 __version__ = '3.8.1'
 
+from contextlib import contextmanager
 from itertools import chain
 from json import dumps
 from sys import modules
 
-try: # pragma: no cover
+try:  # pragma: no cover
     from dictorm.pg import Select, Insert, Update, Delete
     from dictorm.pg import And, Or
     from dictorm.pg import Column, Comparison, Operator
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
     from dictorm.sqlite import Update as SqliteUpdate
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     from .pg import Select, Insert, Update, Delete
     from .pg import And, Or
     from .pg import Column, Comparison, Operator
@@ -21,30 +22,44 @@ except ImportError: # pragma: no cover
     from .sqlite import Update as SqliteUpdate
 
 db_package_imported = False
-try: # pragma: no cover
+try:  # pragma: no cover
     from psycopg2.extras import DictCursor
+
     db_package_imported = True
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     pass
 
-try: # pragma: no cover
+try:  # pragma: no cover
     import sqlite3
+
     db_package_imported = True
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     pass
 
-if not db_package_imported: # pragma: no cover
+if not db_package_imported:  # pragma: no cover
     raise ImportError('Failed to import psycopg2 or sqlite3.  These are the'
-            'only supported Databases and you must import one of them')
+                      'only supported Databases and you must import one of them')
 
 
-class NoPrimaryKey(Exception): pass
-class UnexpectedRows(Exception): pass
-class NoCache(Exception): pass
-class InvalidColumn(Exception): pass
+class NoPrimaryKey(Exception):
+    pass
+
+
+class UnexpectedRows(Exception):
+    pass
+
+
+class NoCache(Exception):
+    pass
+
+
+class InvalidColumn(Exception):
+    pass
 
 
 global _json_dicts
+
+
 def _json_dicts(d):
     """
     Convert all dictionaries contained in this object into JSON strings.
@@ -56,7 +71,12 @@ def _json_dicts(d):
 
 
 def set_json_dicts(func):
-    "Used only for testing"
+    """
+    Used only for testing
+
+    :param func:
+    :return:
+    """
     global _json_dicts
     original, _json_dicts = _json_dicts, func
     return original
@@ -99,22 +119,19 @@ class DictDB(dict):
         self.conn.rollback()
         super(DictDB, self).__init__()
 
-
     @classmethod
     def table_factory(cls):
         return Table
 
-
     def __list_tables(self):
         if self.kind == 'sqlite3':
             self.curs.execute('SELECT name FROM sqlite_master WHERE type ='
-                    '"table"')
+                              '"table"')
         else:
             self.curs.execute('''SELECT DISTINCT table_name
                     FROM information_schema.columns
                     WHERE table_schema='public' ''')
         return self.curs.fetchall()
-
 
     def get_cursor(self):
         """
@@ -126,7 +143,6 @@ class DictDB(dict):
             return self.conn.cursor()
         elif self.kind == 'postgresql':
             return self.conn.cursor(cursor_factory=DictCursor)
-
 
     def refresh_tables(self):
         """
@@ -142,6 +158,17 @@ class DictDB(dict):
             else:
                 self[table['table_name']] = table_cls(table['table_name'], self)
 
+    @contextmanager
+    def transaction(self, commit=False):
+        try:
+            yield
+        except:
+            self.conn.rollback()
+            raise
+        else:
+            # Commit if no exceptions occur
+            if commit:
+                self.conn.commit()
 
 
 def args_to_comp(operator, table, *args, **kwargs):
@@ -158,16 +185,16 @@ def args_to_comp(operator, table, *args, **kwargs):
             operator += (val,)
             continue
         if not table.pks:
-            raise NoPrimaryKey('No Primary Keys(s) defined for '+str(table))
+            raise NoPrimaryKey('No Primary Keys(s) defined for ' + str(table))
         try:
             # Create a Comparison using the next Primary Key
             operator += (table[pks[pk_uses]] == val,)
         except IndexError:
-            raise NoPrimaryKey('Not enough Primary Keys(s) defined for '+
-                    str(table))
+            raise NoPrimaryKey('Not enough Primary Keys(s) defined for ' +
+                               str(table))
         pk_uses += 1
 
-    for k,v in kwargs.items():
+    for k, v in kwargs.items():
         operator += table[k] == v
 
     return operator
@@ -182,10 +209,8 @@ class RawQuery:
         self.sql_query = sql_query
         self.args = args
 
-
     def build(self):
         return self.sql_query, self.args
-
 
 
 class ResultsGenerator:
@@ -207,13 +232,11 @@ class ResultsGenerator:
         self.curs = self.db.get_cursor()
         self._nocache = False
 
-
     def __iter__(self):
         if self.completed:
             return iter(self.cache)
         else:
             return self
-
 
     def __next__(self):
         self.__execute_once()
@@ -228,17 +251,14 @@ class ResultsGenerator:
             self.cache.append(d)
         return d
 
-
     def __execute_once(self):
         if not self.executed:
             self.executed = True
             sql, values = self.query.build()
             self.curs.execute(sql, values)
 
-
     # for python 2.7
     next = __next__
-
 
     def __len__(self):
         self.__execute_once()
@@ -248,7 +268,6 @@ class ResultsGenerator:
             # is converted into a list()
             return 0
         return self.curs.rowcount
-
 
     def __getitem__(self, i):
         if isinstance(i, int) and i >= 0:
@@ -271,7 +290,6 @@ class ResultsGenerator:
             list(self)
         return self.cache[i]
 
-
     def nocache(self):
         """
         Return a new ResultsGenerator that will not cache the results.
@@ -279,7 +297,6 @@ class ResultsGenerator:
         results = ResultsGenerator(self.table, self.query._copy(), self.db)
         results._nocache = True
         return results
-
 
     def refine(self, *a, **kw):
         """
@@ -298,7 +315,6 @@ class ResultsGenerator:
         query = args_to_comp(query, self.table, *a, **kw)
         return ResultsGenerator(self.table, query, self.db)
 
-
     def order_by(self, order_by):
         """
         Return a new ResultsGenerator with a modified ORDER BY clause.  Expects
@@ -310,7 +326,6 @@ class ResultsGenerator:
         """
         query = self.query._copy().order_by(order_by)
         return ResultsGenerator(self.table, query, self.db)
-
 
     def limit(self, limit):
         """
@@ -324,7 +339,6 @@ class ResultsGenerator:
         query = self.query._copy().limit(limit)
         return ResultsGenerator(self.table, query, self.db)
 
-
     def offset(self, offset):
         """
         Return a new ResultsGenerator with a modified OFFSET clause.  Expects a
@@ -337,8 +351,8 @@ class ResultsGenerator:
         return ResultsGenerator(self.table, query, self.db)
 
 
-
 _json_column_types = ('json', 'jsonb')
+
 
 class Table(object):
     """
@@ -415,9 +429,8 @@ class Table(object):
         type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
         data_types = [i[type_column_name].lower() for i in self.columns_info]
         self.has_json = True if \
-                [i for i in _json_column_types if i in data_types]\
-                else False
-
+            [i for i in _json_column_types if i in data_types] \
+            else False
 
     def _refresh_pks(self):
         """
@@ -436,10 +449,8 @@ class Table(object):
                     AND i.indisprimary;''' % self.name)
             self.pks = [i[0] for i in self.curs.fetchall()]
 
-
-    def __repr__(self): # pragma: no cover
+    def __repr__(self):  # pragma: no cover
         return 'Table({0}, {1})'.format(self.name, self.pks)
-
 
     def __call__(self, *a, **kw):
         """
@@ -449,7 +460,6 @@ class Table(object):
         for ref_name in self.refs:
             d[ref_name] = None
         return d
-
 
     def get_where(self, *a, **kw):
         """
@@ -494,10 +504,9 @@ class Table(object):
         if self.order_by:
             order_by = self.order_by
         elif self.pks:
-            order_by = str(self.pks[0])+' ASC'
+            order_by = str(self.pks[0]) + ' ASC'
         query = Select(self.name, operator_group).order_by(order_by)
         return ResultsGenerator(self, query, self.db)
-
 
     def get_one(self, *a, **kw):
         """
@@ -514,11 +523,11 @@ class Table(object):
             return None
         try:
             next(rgen)
-            raise UnexpectedRows('More than one row selected.')
-        except StopIteration: # Should only be one result
+        except StopIteration:  # Should only be one result
             pass
+        else:
+            raise UnexpectedRows('More than one row selected.')
         return i
-
 
     def get_raw(self, sql_query, *a):
         """
@@ -530,7 +539,6 @@ class Table(object):
         query = RawQuery(sql_query, *a)
         return ResultsGenerator(self, query, self.db)
 
-
     def count(self):
         """
         Get the count of rows in this table.
@@ -538,7 +546,6 @@ class Table(object):
         self.curs.execute('SELECT COUNT(*) FROM {table}'.format(
             table=self.name))
         return int(self.curs.fetchone()[0])
-
 
     @property
     def columns(self):
@@ -551,7 +558,6 @@ class Table(object):
             key = 'column_name'
         return [i[key] for i in self.columns_info]
 
-
     @property
     def columns_info(self):
         """
@@ -562,27 +568,25 @@ class Table(object):
             return self.cached_columns_info
 
         if self.db.kind == 'sqlite3':
-            sql = "PRAGMA TABLE_INFO("+str(self.name)+")"
+            sql = "PRAGMA TABLE_INFO(" + str(self.name) + ")"
             self.curs.execute(sql)
             self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
         else:
             sql = "SELECT * FROM information_schema.columns WHERE table_name=%s"
-            self.curs.execute(sql, [self.name,])
+            self.curs.execute(sql, [self.name, ])
             self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
         return self.cached_columns_info
-
 
     @property
     def column_names(self):
         if not self.cached_column_names:
             if self.db.kind == 'sqlite3':
                 self.cached_column_names = set(i['name'] for i in
-                        self.columns_info)
+                                               self.columns_info)
             else:
                 self.cached_column_names = set(i['column_name'] for i in
-                        self.columns_info)
+                                               self.columns_info)
         return self.cached_column_names
-
 
     def __setitem__(self, ref_name, ref):
         """
@@ -601,7 +605,6 @@ class Table(object):
         self.fks[ref.column1.column] = ref_name
         self.refs[ref_name] = ref
 
-
     def __getitem__(self, ref_name):
         """
         Get a reference if it has already been created.  Otherwise, return a
@@ -610,7 +613,6 @@ class Table(object):
         if ref_name in self.refs:
             return self.refs[ref_name]
         return self.db.column(self, ref_name)
-
 
 
 class Dict(dict):
@@ -650,7 +652,6 @@ class Dict(dict):
         super(Dict, self).__init__(*a, **kw)
         self._old_pk_and = None
 
-
     def flush(self):
         """
         Insert this dictionary into it's table if its no yet in the Database, or
@@ -682,18 +683,18 @@ class Dict(dict):
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
             query = self._table.db.insert(self._table.name, **items
-                    ).returning('*')
+                                          ).returning('*')
             d = self.__execute_query(query)
             self._in_db = True
         else:
             # Update this dictionary's row
             if not self._table.pks:
                 raise NoPrimaryKey(
-                        'Cannot update to {0}, no primary keys defined.'.format(
-                    self._table))
+                    'Cannot update to {0}, no primary keys defined.'.format(
+                        self._table))
             # Update without references, "wheres" are the primary values
             query = self._table.db.update(self._table.name, **items
-                    ).where(self._old_pk_and or self.pk_and()).returning('*')
+                                          ).where(self._old_pk_and or self.pk_and()).returning('*')
             d = self.__execute_query(query)
 
         if d:
@@ -701,16 +702,14 @@ class Dict(dict):
         self._old_pk_and = self.pk_and()
         return self
 
-
     def delete(self):
         """
         Delete this row from it's table in the database.  Requires primary keys
         to be specified.
         """
         query = self._table.db.delete(self._table.name).where(
-                self._old_pk_and or self.pk_and())
+            self._old_pk_and or self.pk_and())
         return self.__execute_query(query)
-
 
     def __execute_query(self, query):
         built = query.build()
@@ -725,15 +724,13 @@ class Dict(dict):
             if query._returning:
                 return self._curs.fetchone()
 
-
     def pk_and(self):
         """
         Return an And() of all this Dict's primary key and values. i.e.
         And(id=1, other_primary=4)
         """
-        return And(*[self._table[k]==v for k,v in self.items() if k in \
-                self._table.pks])
-
+        return And(*[self._table[k] == v for k, v in self.items() if k in \
+                     self._table.pks])
 
     def no_pks(self):
         """
@@ -741,23 +738,20 @@ class Dict(dict):
         this Dict in the Database.  This should be used when doing an update of
         another Dict.
         """
-        return {k:v for k,v in self.items() if k not in self._table.pks}
-
+        return {k: v for k, v in self.items() if k not in self._table.pks}
 
     def no_refs(self):
         """
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
-        return {k:v for k,v in self.items() if k not in self._table.refs}
-
+        return {k: v for k, v in self.items() if k not in self._table.refs}
 
     def references(self):
         """
         Return a dictionary of only the referenced rows.
         """
-        return {k:v for k,v in self.items() if k in self._table.refs}
-
+        return {k: v for k, v in self.items() if k in self._table.refs}
 
     def __getitem__(self, key):
         """
@@ -789,12 +783,10 @@ class Dict(dict):
                 super(Dict, self).__setitem__(key, val)
         return val
 
-
     def get(self, key, default=None):
         # Provide the same functionality as a dict.get, but use this class's
         # __getitem__ instead of builtin __getitem__
         return self[key] if key in self else default
-
 
     def __setitem__(self, key, value):
         """
@@ -806,10 +798,6 @@ class Dict(dict):
             super(Dict, self).__setitem__(ref, None)
         return super(Dict, self).__setitem__(key, value)
 
-
     # Copy docs for methods that recreate dict() functionality
     __getitem__.__doc__ += dict.__getitem__.__doc__
     get.__doc__ = dict.get.__doc__
-
-
-
