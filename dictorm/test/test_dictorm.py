@@ -876,7 +876,7 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
         alice = Person(name='Alice').flush()
         steve = Person(name='Steve').flush()
 
-        bill['manager_id'] = bob['id'];
+        bill['manager_id'] = bob['id']
         bill.flush()
         alice['manager_id'] = bob['id']
         alice.flush()
