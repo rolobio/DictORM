@@ -457,6 +457,13 @@ ResultsGenerator()
 >>> frank.delete()
 ```
 
+### Transaction
+DictORM provides a minimal transaction context manager on it's db object:
+```python
+>>> with db.transaction():
+        bob = Person('name').flush()
+```
+
 # Testing
 ```bash
 # Get postgres container
