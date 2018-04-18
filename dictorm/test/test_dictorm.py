@@ -1128,7 +1128,7 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
         # The creation of Alice has an error
         try:
             with self.db.transaction():
-                alice = Person(name='Alice').flush()
+                Person(name='Alice').flush()
                 raise FakeException('oh no')
         except FakeException:
             pass
@@ -1138,8 +1138,8 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
 
         # Autocommit on success
         with self.db.transaction(commit=True):
-            alice = Person(name='Alice').flush()
-            dave = Person(name='Dave').flush()
+            Person(name='Alice').flush()
+            Person(name='Dave').flush()
 
         # New persons were committed, so rollback should have no effect
         self.conn.rollback()
