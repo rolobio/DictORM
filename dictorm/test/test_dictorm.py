@@ -6,15 +6,13 @@ import psycopg2
 import sqlite3
 import unittest
 
-
 test_db_login = {
-        'database':'postgres',
-        'user':'postgres',
-        'password':'dictorm',
-        'host':'localhost',
-        'port':'54321',
-        }
-
+    'database': 'postgres',
+    'user': 'postgres',
+    'password': 'dictorm',
+    'host': 'localhost',
+    'port': '54321',
+}
 
 if 'CI' in os.environ.keys():
     test_db_login['port'] = 5432
@@ -43,7 +41,6 @@ class ExtraTestMethods:
         if missing:
             raise TypeError('{0} missing does not contain {1}'.format(d1, dict(missing)))
 
-
     @classmethod
     def assertRaisesAny(cls, exps, func, a=None, kw=None):
         a = a or []
@@ -54,33 +51,29 @@ class ExtraTestMethods:
             if isinstance(e, exps): return
         raise Exception('Did not raise one of the exceptions provided!')
 
-
     @classmethod
     def assertType(cls, a, b):
         if not isinstance(a, b):
             raise TypeError('{0} is not type {1}'.format(str(a), b0))
 
-
     def assertEqualNoRefs(self, a, b):
         return self.assertEqual(_no_refs(a), _no_refs(b))
-
 
     def assertInNoRefs(self, a, b):
         return self.assertIn(_no_refs(a), _no_refs(b))
 
 
-
 JSONB_SUPPORT = {
-        '902':'JSON',
-        '903':'JSON',
-        '904':'JSONB',
-        '905':'JSONB',
-        '906':'JSONB',
-        '100':'JSONB',
-        }
+    '902': 'JSON',
+    '903': 'JSON',
+    '904': 'JSONB',
+    '905': 'JSONB',
+    '906': 'JSONB',
+    '100': 'JSONB',
+}
 
 
-class CommonTests(ExtraTestMethods):
+class CommonTests(ExtraTestMethods, unittest.TestCase):
     """
     These tests will be run for all supported databases.
     """
@@ -131,7 +124,6 @@ class CommonTests(ExtraTestMethods):
         self.conn.commit()
         self.db.refresh_tables()
 
-
     def tearDown(self):
         self.conn.rollback()
         self.curs.execute('''DROP SCHEMA public CASCADE;
@@ -140,26 +132,25 @@ class CommonTests(ExtraTestMethods):
                 GRANT ALL ON SCHEMA public TO public;''')
         self.conn.commit()
 
-
     def test_get_where(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
 
         bob = Person(name='Bob')
-        self.assertEqual({'name':'Bob'}, bob)
+        self.assertEqual({'name': 'Bob'}, bob)
         bob.flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertDictContains(bob, {'name': 'Bob', 'id': 1})
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
 
         # A second flush does not fail
         bob.flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertDictContains(bob, {'name': 'Bob', 'id': 1})
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
 
         bob['name'] = 'Jon'
         bob.flush()
-        self.assertDictContains(bob, {'name':'Jon', 'id':1})
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertDictContains(bob, {'name': 'Jon', 'id': 1})
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
 
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')
@@ -169,18 +160,16 @@ class CommonTests(ExtraTestMethods):
 
         # get_where with a single integer argument should produce a single
         # Dict row that matches that row's id
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
         self.assertEqual(self.curs.rowcount, 1)
 
         # get_where with no parameters returns the entire table
         self.assertEqual(list(Person.get_where()), [bob, dave, alice])
 
-
     def test_empty(self):
         Person = self.db['person']
         p = Person().flush()
         self.assertEqual(p['id'], 1)
-
 
     def test_delete(self):
         Person = self.db['person']
@@ -196,8 +185,8 @@ class CommonTests(ExtraTestMethods):
 
         # get_where accepts a tuple of ids, and returns those rows
         if self.db.kind != 'sqlite3':
-            self.assertEqual(list(Person.get_where(Person['id'].In([1,3]))),
-                    [bob, alice])
+            self.assertEqual(list(Person.get_where(Person['id'].In([1, 3]))),
+                             [bob, alice])
 
         # Database row survives an object deletion
         del bob
@@ -209,7 +198,6 @@ class CommonTests(ExtraTestMethods):
         bob.delete()
         alice.delete()
         self.assertEqual(Person.count(), 0)
-
 
     def test_get_where_multiple_pks(self):
         Person = self.db['person']
@@ -227,13 +215,12 @@ class CommonTests(ExtraTestMethods):
         # Searching person_department with two key/value pairs returns the new
         # row.
         self.assertEqual(
-                list(PD.get_where(person_id=1, department_id=1)),
-                [bob_sales,])
+            list(PD.get_where(person_id=1, department_id=1)),
+            [bob_sales, ])
 
         # Test deletion with multiple Primary Keys
         bob_sales.delete()
         self.assertEqual(PD.count(), 0)
-
 
     def test_already_in_db(self):
         Person = self.db['person']
@@ -244,44 +231,41 @@ class CommonTests(ExtraTestMethods):
         bob_copy.flush()
         self.assertEqual(bob, bob_copy)
 
-
     def test_dict_inits(self):
         Person = self.db['person']
-        Person({'name':'Bob'}).flush()
+        Person({'name': 'Bob'}).flush()
         Person(name='Alice').flush()
-        Person([('name','Steve'),]).flush()
+        Person([('name', 'Steve'), ]).flush()
 
-        dictorm.Dict(Person, {'name':'Bob'}).flush()
+        dictorm.Dict(Person, {'name': 'Bob'}).flush()
         dictorm.Dict(Person, name='Alice').flush()
-        dictorm.Dict(Person, [('name','Steve'),]).flush()
+        dictorm.Dict(Person, [('name', 'Steve'), ]).flush()
 
         # A fake column will fail when going into the database
         p = Person(fake_column='foo')
         self.assertRaisesAny(dictorm.InvalidColumn, p.flush)
         self.conn.rollback()
 
-
     def test_remove_pks(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
         bob = Person(name='Bob')
-        self.assertEqual(bob, {'name':'Bob'})
+        self.assertEqual(bob, {'name': 'Bob'})
         bob.flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertDictContains(bob.no_pks(), {'name':'Bob'})
+        self.assertDictContains(bob, {'name': 'Bob', 'id': 1})
+        self.assertDictContains(bob.no_pks(), {'name': 'Bob'})
 
         aly = Person(name='Aly')
-        self.assertEqual(aly, {'name':'Aly'})
+        self.assertEqual(aly, {'name': 'Aly'})
         aly.flush()
-        self.assertDictContains(aly, {'name':'Aly', 'id':2})
-        self.assertDictContains(aly.no_pks(), {'name':'Aly'})
+        self.assertDictContains(aly, {'name': 'Aly', 'id': 2})
+        self.assertDictContains(aly.no_pks(), {'name': 'Aly'})
 
         bob.update(aly.no_pks())
         bob.flush()
         aly.flush()
-        self.assertDictContains(bob, {'name':'Aly', 'id':1})
-        self.assertDictContains(aly, {'name':'Aly', 'id':2})
-
+        self.assertDictContains(bob, {'name': 'Aly', 'id': 1})
+        self.assertDictContains(aly, {'name': 'Aly', 'id': 2})
 
     def test_manytomany(self):
         """
@@ -303,11 +287,11 @@ class CommonTests(ExtraTestMethods):
         Person['person_departments'] = Person['id'].many(PD['person_id'])
 
         bob = Person(name='Bob').flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
+        self.assertDictContains(bob, {'name': 'Bob', 'id': 1})
 
         sales = Department(name='Sales').flush()
         bob_pd_sales = PD(department_id=sales['id'], person_id=bob['id']).flush()
-        self.assertEqual(list(bob['person_departments']), [bob_pd_sales,])
+        self.assertEqual(list(bob['person_departments']), [bob_pd_sales, ])
 
         hr = Department(name='HR').flush()
         bob_pd_hr = PD(department_id=hr['id'], person_id=bob['id']).flush()
@@ -319,15 +303,14 @@ class CommonTests(ExtraTestMethods):
 
         aly_pd_sales = PD(department_id=sales['id'], person_id=aly['id']).flush()
         aly.flush()
-        self.assertEqual(list(aly['person_departments']), [aly_pd_sales,])
+        self.assertEqual(list(aly['person_departments']), [aly_pd_sales, ])
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
         # Move bob's hr to aly
         bob_pd_hr['person_id'] = aly['id']
         aly_pd_hr = bob_pd_hr.flush()
         self.assertEqualNoRefs(aly['person_departments'], [aly_pd_sales, aly_pd_hr])
-        self.assertEqualNoRefs(bob['person_departments'], [bob_pd_sales,])
-
+        self.assertEqualNoRefs(bob['person_departments'], [bob_pd_sales, ])
 
     def test_substratum_many(self):
         """
@@ -357,7 +340,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(list(bob['departments']), [sales, hr])
         self.assertEqual(list(bob['person_departments']), [bob_pd_sales, bob_pd_hr])
 
-
     def test_substratum_one(self):
         Person = self.db['person']
         Car = self.db['car']
@@ -381,7 +363,6 @@ class CommonTests(ExtraTestMethods):
         bob['manager_name'] = 'foo'
         bob.flush()
         self.assertEqual(bob['manager_name'], 'foo')
-
 
     def test_onetomany(self):
         """
@@ -407,8 +388,7 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(list(bob.get('cars')), [toyota, honda, ford])
         self.assertEqual(list(bob['cars']), [toyota, honda, ford])
 
-        self.assertEqual(list(bob.references().keys()), ['cars',])
-
+        self.assertEqual(list(bob.references().keys()), ['cars', ])
 
     def test_onetomany_alter_primary_key(self):
         Person = self.db['person']
@@ -437,7 +417,6 @@ class CommonTests(ExtraTestMethods):
         aly.flush()
         self.assertEqual(list(aly['stations']), [desk1, desk2, desk3])
 
-
     def test_changing_pks(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
@@ -445,7 +424,6 @@ class CommonTests(ExtraTestMethods):
         bob['id'] = 2
         bob.flush()
         self.assertEqual(bob['id'], 2)
-
 
     def test_onetoone(self):
         """
@@ -468,8 +446,7 @@ class CommonTests(ExtraTestMethods):
         self.assertEqualNoRefs(will.get('car'), stratus)
         self.assertEqualNoRefs(will['car'], stratus)
         self.assertEqualNoRefs(stratus['person'], will)
-        self.assertEqual(list(will.references().keys()), ['car',])
-
+        self.assertEqual(list(will.references().keys()), ['car', ])
 
     def test_onetoself(self):
         """
@@ -486,8 +463,7 @@ class CommonTests(ExtraTestMethods):
         bob['manager_id'] = bob['id']
         bob.flush()
         self.assertEqualNoRefs(bob['manager'], bob)
-        self.assertEqual(list(bob.references().keys()), ['manager',])
-
+        self.assertEqual(list(bob.references().keys()), ['manager', ])
 
     def test_errors(self):
         """
@@ -498,7 +474,7 @@ class CommonTests(ExtraTestMethods):
         bob = Person(name='Bob').flush()
         Person(name='Aly').flush()
 
-        self.assertRaises(dictorm.NoPrimaryKey, Person.get_where, 1,2)
+        self.assertRaises(dictorm.NoPrimaryKey, Person.get_where, 1, 2)
 
         self.assertRaises(KeyError, bob.__getitem__, 'foo')
 
@@ -512,12 +488,11 @@ class CommonTests(ExtraTestMethods):
         foo = NoPk(foo='bar')
         foo.flush()
         self.conn.commit()
-        self.assertEqual(foo, {'foo':'bar'})
-        self.assertEqual(list(NoPk.get_where()), [{'foo':'bar'},])
+        self.assertEqual(foo, {'foo': 'bar'})
+        self.assertEqual(list(NoPk.get_where()), [{'foo': 'bar'}, ])
         foo['foo'] = 'baz'
         self.assertRaises(dictorm.NoPrimaryKey, foo.flush)
         self.assertRaises(dictorm.NoPrimaryKey, NoPk.get_where, 1)
-
 
     def test_order_by(self):
         Person = self.db['person']
@@ -549,7 +524,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(len(list(results)), 1)
         self.assertIn('ORDER BY foo desc', results.curs.query.decode())
 
-
     def test_multiple_references(self):
         """
         person               | person
@@ -569,7 +543,7 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(None, alice['manager'])
 
         dave = Person(name='Dave', manager_id=alice['id']).flush()
-        self.assertDictContains(dave, {'name':'Dave', 'manager_id':1, 'manager':None})
+        self.assertDictContains(dave, {'name': 'Dave', 'manager_id': 1, 'manager': None})
         self.assertEqualNoRefs(dave['manager'], alice)
         bob = Person(name='Bob', manager_id=alice['id']).flush()
         self.assertNotEqual(bob['manager'], None)
@@ -578,7 +552,7 @@ class CommonTests(ExtraTestMethods):
         # New reference, no flush required
         Person['subordinates'] = Person['id'].many(Person['manager_id'])
         self.assertEqualNoRefs(alice['subordinates'],
-                [dave, bob])
+                               [dave, bob])
 
         # Changes survive a commit/flush
         self.conn.commit()
@@ -586,7 +560,7 @@ class CommonTests(ExtraTestMethods):
         alice.flush()
         dave.flush()
         self.assertEqualNoRefs(alice['subordinates'],
-                [dave, bob])
+                               [dave, bob])
         self.assertEqualNoRefs(dave['manager'], alice)
         self.assertEqualNoRefs(bob['manager'], alice)
 
@@ -601,9 +575,9 @@ class CommonTests(ExtraTestMethods):
 
         # All references are available on demand
         self.assertEqualNoRefs(dave['person_departments'],
-                [hr_pd, sales_pd])
+                               [hr_pd, sales_pd])
         self.assertEqualNoRefs(alice['subordinates'],
-                [dave, bob])
+                               [dave, bob])
         self.assertEqualNoRefs(dave['manager'], alice)
         self.assertEqualNoRefs(bob['manager'], alice)
 
@@ -612,7 +586,6 @@ class CommonTests(ExtraTestMethods):
             for pd in sub['person_departments']:
                 pd.delete()
             sub.delete()
-
 
     def test_empty_reference(self):
         """
@@ -630,7 +603,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(alice['manager'], None)
         # An empty substratum doesn't error
         self.assertEqual(alice['managers_manager'], None)
-
 
     def test_reexecute(self):
         """
@@ -654,7 +626,6 @@ class CommonTests(ExtraTestMethods):
         alice.flush()
         self.assertEqualNoRefs(alice['manager'], steve)
 
-
     def test_modify_subdict(self):
         Person = self.db['person']
         Car = self.db['car']
@@ -677,7 +648,6 @@ class CommonTests(ExtraTestMethods):
         stratus.flush()
         self.assertNotEqual(stratus['license_plate'], 'foo')
         self.assertNotEqual(stratus, stratus2)
-
 
     def test_table_equal(self):
         """
@@ -706,7 +676,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(will['car']._table, Car)
         self.assertIs(will['car']._table, Car)
 
-
     def test_real(self):
         """
         An attempt at a real-world example.
@@ -723,7 +692,7 @@ class CommonTests(ExtraTestMethods):
         Person['possessions'] = Person['id'].many(Possession['person_id'])
         Car['person'] = Car['person_id'] == Person['id']
         PD['person'] = Person['id'] == PD['person_id']
-        PD['department'] =  PD['department_id'] == Department['id']
+        PD['department'] = PD['department_id'] == Department['id']
         Department['person_departments'] = Department['id'].many(PD['department_id'])
         Department['persons'] = Department['person_departments'].substratum('person')
         Possession['person'] = Possession['person_id'] == Person['id']
@@ -743,15 +712,15 @@ class CommonTests(ExtraTestMethods):
         self.assertEqualNoRefs(milton_sales, PD.get_one())
         self.assertEqualNoRefs(milton_sales['person'], milton)
         self.assertEqualNoRefs(milton_sales['department'], sales)
-        self.assertEqualNoRefs(milton['departments'], [sales,])
-        self.assertEqualNoRefs(sales['persons'], [milton,])
+        self.assertEqualNoRefs(milton['departments'], [sales, ])
+        self.assertEqualNoRefs(sales['persons'], [milton, ])
 
         # Milton has a stapler
         miltons_stapler = Possession(person_id=milton['id'],
-                description={'kind':'stapler', 'brand':'Swingline', 'color':'Red'}
-                ).flush()
+                                     description={'kind': 'stapler', 'brand': 'Swingline', 'color': 'Red'}
+                                     ).flush()
         self.assertEqualNoRefs(miltons_stapler['person'], milton)
-        self.assertEqualNoRefs(milton['possessions'], [miltons_stapler,])
+        self.assertEqualNoRefs(milton['possessions'], [miltons_stapler, ])
 
         # Milton has a manager
         tom = Person(name='Tom').flush()
@@ -763,7 +732,7 @@ class CommonTests(ExtraTestMethods):
         miltons_stapler['person_id'] = tom['id']
         toms_stapler = miltons_stapler.flush()
         self.assertEqualNoRefs(toms_stapler['person'], tom)
-        self.assertEqualNoRefs(tom['possessions'], [toms_stapler,])
+        self.assertEqualNoRefs(tom['possessions'], [toms_stapler, ])
 
         # Peter is Tom's subordinate
         peter = Person(name='Peter', manager_id=tom['id']).flush()
@@ -798,20 +767,19 @@ class CommonTests(ExtraTestMethods):
         minions = tom['subordinates']
         self.assertEqualNoRefs(minions, [milton, peter])
         limited_minions = minions.limit(1)
-        self.assertEqualNoRefs(limited_minions, [milton,])
-        self.assertEqualNoRefs(limited_minions.order_by('id DESC'), [peter,])
+        self.assertEqualNoRefs(limited_minions, [milton, ])
+        self.assertEqualNoRefs(limited_minions.order_by('id DESC'), [peter, ])
         # A modified ResultsGenerator creates a new query
-        self.assertEqualNoRefs(minions.refine(Person['name']=='Milton'),
-                [milton,])
-        self.assertEqualNoRefs(minions.refine(Person['name']=='Peter'), [peter,])
+        self.assertEqualNoRefs(minions.refine(Person['name'] == 'Milton'),
+                               [milton, ])
+        self.assertEqualNoRefs(minions.refine(Person['name'] == 'Peter'), [peter, ])
 
         self.assertEqualNoRefs(Person.get_where(Person['id'].IsNot(None
-            )).order_by('id ASC'),
-                [milton, tom, peter])
-        self.assertEqualNoRefs(Person.get_where(Person['id']>0).order_by(
+                                                                   )).order_by('id ASC'),
+                               [milton, tom, peter])
+        self.assertEqualNoRefs(Person.get_where(Person['id'] > 0).order_by(
             'id ASC'),
-                [milton, tom, peter])
-
+            [milton, tom, peter])
 
     def test_offset_limit(self):
         """
@@ -831,7 +799,7 @@ class CommonTests(ExtraTestMethods):
         # Using limit and offset, but in such a way that it returns everything
         if self.db.kind == 'postgresql':
             self.assertEqual(list(persons.limit('ALL').offset(0)),
-                    [bob, aly, tom, abe, gus])
+                             [bob, aly, tom, abe, gus])
 
         # Single refine
         limited = persons.limit(2)
@@ -841,7 +809,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(list(limited.offset(3)), [abe, gus])
         # Multiple refinings
         self.assertEqual(list(persons.limit(2).offset(2)), [tom, abe])
-
 
     def test_refine_comparisons(self):
         Person = self.db['person']
@@ -854,19 +821,18 @@ class CommonTests(ExtraTestMethods):
         frank = Person(name='Frank', manager_id=bob['id']).flush()
 
         self.assertEqual(list(bob['subordinates']),
-                [steve, aly, frank])
+                         [steve, aly, frank])
         self.assertEqual(list(bob['subordinates'].order_by('id DESC')),
-                [frank, aly, steve])
+                         [frank, aly, steve])
         self.assertEqual(list(bob['subordinates'].order_by('id DESC'
-            ).limit(1)),
-                [frank,])
+                                                           ).limit(1)),
+                         [frank, ])
         self.assertEqual(list(bob['subordinates'].order_by('id DESC'
-            ).limit(1).offset(1)),
-                [aly,])
+                                                           ).limit(1).offset(1)),
+                         [aly, ])
 
-        self.assertEqual(list(bob['subordinates'].refine(Person['car_id']>0)),
-                [steve,])
-
+        self.assertEqual(list(bob['subordinates'].refine(Person['car_id'] > 0)),
+                         [steve, ])
 
     @unittest.expectedFailure
     def test_onetoone_cache(self):
@@ -899,7 +865,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqualNoRefs(bob['manager'], bill)
         self.assertEqualNoRefs(bob['manager_car'], bill_car)
 
-
     def test_results_cache(self):
         """
         A result will not be gotten again, since it's results were cached.
@@ -926,7 +891,6 @@ class CommonTests(ExtraTestMethods):
         for sub in subordinates:
             self.assertType(sub, dictorm.Dict)
 
-
     def test_reference_order(self):
         """
         A reference definition cares about order.
@@ -942,15 +906,13 @@ class CommonTests(ExtraTestMethods):
         alice = Person.get_one(id=2)
         self.assertEqual(alice['manager'], None)
 
-
     def test_columns(self):
         """
         Table.columns is a method that gets a list of a table's columns
         """
         Person = self.db['person']
         self.assertEqual(Person.columns,
-                ['id', 'name', 'other', 'manager_id', 'car_id'])
-
+                         ['id', 'name', 'other', 'manager_id', 'car_id'])
 
     def test_column_info(self):
         """
@@ -958,32 +920,30 @@ class CommonTests(ExtraTestMethods):
         """
         Person = self.db['person']
         test_info = [
-                {'column_name':'id', 'data_type':'integer'},
-                {'column_name':'name', 'data_type':'character varying'},
-                {'column_name':'other', 'data_type':'integer'},
-                {'column_name':'manager_id', 'data_type':'integer'},
-                {'column_name':'car_id', 'data_type':'integer'},
-                ]
+            {'column_name': 'id', 'data_type': 'integer'},
+            {'column_name': 'name', 'data_type': 'character varying'},
+            {'column_name': 'other', 'data_type': 'integer'},
+            {'column_name': 'manager_id', 'data_type': 'integer'},
+            {'column_name': 'car_id', 'data_type': 'integer'},
+        ]
         self.assertEqual(len(test_info), len(Person.columns_info))
-        for i,j in zip(test_info, Person.columns_info):
+        for i, j in zip(test_info, Person.columns_info):
             self.assertDictContains(j, i)
-
 
     def test_like(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
         self.assertEqualNoRefs(Person.get_where(Person['name'].Like('Bob')),
-                [bob,])
+                               [bob, ])
         self.assertEqualNoRefs(Person.get_where(Person['name'].Like('%Bo%')),
-                [bob,])
-
+                               [bob, ])
 
     def test_table_cls(self):
         class NewTable(dictorm.Table): pass
+
         self.db.table_factory = lambda: NewTable
         self.db.refresh_tables()
         self.assertIsInstance(self.db['person'], NewTable)
-
 
     def test_indexing(self):
         Person = self.db['person']
@@ -1001,7 +961,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(result[-1], steve)
         self.assertEqual(result[-1], steve)
         self.assertEqual(result[1:], [alice, steve])
-
 
     def test_concurrent(self):
         """
@@ -1025,7 +984,6 @@ class CommonTests(ExtraTestMethods):
         self.conn.commit()
         self.assertEqual(alice['name'], 'Amy')
 
-
     def test_nocache(self):
         """
         A ResultsGenerator can be told not to cache results.
@@ -1046,7 +1004,6 @@ class CommonTests(ExtraTestMethods):
         # Cannot iterate through results more than once
         self.assertRaises(dictorm.NoCache, results.__getitem__, 0)
 
-
     def test_aggregate(self):
         """
         A chain of many substratums creates an aggregate of the results.
@@ -1060,11 +1017,11 @@ class CommonTests(ExtraTestMethods):
         PD['person'] = PD['person_id'] == Department['id']
         Person['person_departments'] = Person['id'].many(PD['person_id'])
         Person['departments'] = Person['person_departments'].substratum(
-                'department')
+            'department')
         Person['manager'] = Person['manager_id'] == Person['id']
         Person['subordinates'] = Person['id'].many(Person['manager_id'])
         Person['subordinates_departments'] = Person['subordinates'].aggregate(
-                'departments')
+            'departments')
 
         # People, with manager
         bob = Person(name='Bob').flush()
@@ -1086,7 +1043,6 @@ class CommonTests(ExtraTestMethods):
         self.assertEqualNoRefs(bob['subordinates'], [alice, steve])
         self.assertEqualNoRefs(bob['subordinates_departments'], [it, sales, hr])
 
-
     def test_value_types(self):
         """
         When a row is updated, the flush should return values of the correct
@@ -1097,11 +1053,10 @@ class CommonTests(ExtraTestMethods):
         self.assertEqual(bob['id'], 1)
 
         # Update "id" using a string
-        bob.update({'id':'1', 'name':'Steve'})
+        bob.update({'id': '1', 'name': 'Steve'})
         steve = bob.flush()
-        self.assertEqual(steve['id'], 1) # ID should be an integer
+        self.assertEqual(steve['id'], 1)  # ID should be an integer
         self.assertEqual(steve['name'], 'Steve')
-
 
     def test_injection(self):
         """
@@ -1122,24 +1077,22 @@ class CommonTests(ExtraTestMethods):
         bob[' "; DELETE FROM person;'] = 'Bob'
         self.assertRaises(dictorm.InvalidColumn, bob.flush)
 
-
     def test_operators(self):
         Person = self.db['person']
         persons = map(lambda i: Person(name=i).flush(), ['Bob', 'Aly', 'Dave'])
         bob, aly, dave = persons
 
         self.assertEqual(
-                list(Person.get_where(dictorm.And(
-                    Person['name'] == 'Bob',
-                    Person['id'] > 0))),
-                [bob])
+            list(Person.get_where(dictorm.And(
+                Person['name'] == 'Bob',
+                Person['id'] > 0))),
+            [bob])
 
         self.assertEqual(
-                list(Person.get_where(dictorm.Or(
-                    Person['id'] == 2,
-                    Person['id'] == 3))),
-                [aly, dave])
-
+            list(Person.get_where(dictorm.Or(
+                Person['id'] == 2,
+                Person['id'] == 3))),
+            [aly, dave])
 
     def test_raw(self):
         """
@@ -1153,7 +1106,6 @@ class CommonTests(ExtraTestMethods):
 
         persons = Person.get_raw('SELECT * FROM person WHERE id=%s', aly['id'])
         self.assertEqual(list(persons), [aly])
-
 
     def test_transaction(self):
         """
@@ -1195,8 +1147,7 @@ class CommonTests(ExtraTestMethods):
                          set([i['name'] for i in Person.get_where()]))
 
 
-class TestPostgresql(CommonTests, unittest.TestCase):
-
+class TestPostgresql(CommonTests):
 
     def test_columns_property(self):
         """
@@ -1217,7 +1168,6 @@ class TestPostgresql(CommonTests, unittest.TestCase):
             self.assertEqual(Person.columns, col_vals)
         finally:
             Person.curs.execute = original_execute
-
 
     def test_count(self):
         """
@@ -1241,23 +1191,21 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         self.assertEqual(len(subs), 2)
         self.assertEqualNoRefs(subs, [dave, bob])
 
-
     def test_ilike(self):
         Person = self.db['person']
         alice = Person(name='Alice').flush()
         self.assertEqualNoRefs(Person.get_where(Person['name'].Ilike('ali%')),
-                [alice,])
-
+                               [alice, ])
 
     def test_json(self):
         Possession = self.db['possession']
-        p = Possession(description={'foo':'bar', 'baz':1}).flush()
-        self.assertEqual(Possession.get_one()['description'], {'foo':'bar', 'baz':1})
+        p = Possession(description={'foo': 'bar', 'baz': 1}).flush()
+        self.assertEqual(Possession.get_one()['description'], {'foo': 'bar', 'baz': 1})
 
         # Testing an update of a json
-        p['description'] = {'foo':'baz'}
+        p['description'] = {'foo': 'baz'}
         p.flush()
-        self.assertEqual(Possession.get_one()['description'], {'foo':'baz'})
+        self.assertEqual(Possession.get_one()['description'], {'foo': 'baz'})
 
         # Non-json row doesn't call json_dicts
         original = dictorm.set_json_dicts(error)
@@ -1270,7 +1218,6 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         finally:
             dictorm.set_json_dicts(original)
 
-
     def test_offset(self):
         """
         Postgres allows offset without limit, but not Sqlite
@@ -1279,7 +1226,6 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         Person['subordinates'] = Person['id'].many(Person['manager_id'])
         bob = Person(name='Bob').flush()
         self.assertEqual(list(bob['subordinates'].offset(1)), [])
-
 
     def test_order_by2(self):
         """
@@ -1295,24 +1241,23 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         dave = Person(name='Dave', manager_id=bob['id'], id=2, other=3).flush()
         # Ordered by their ID by default
         self.assertEqualNoRefs(Person.get_where(),
-                [bob, dave, alice])
+                               [bob, dave, alice])
 
         # Refine the results by ordering by other, which is the reverse of how
         # they were inserted
         self.assertEqualNoRefs(bob['subordinates'].order_by('other ASC'),
-                [alice, dave])
+                               [alice, dave])
         self.assertEqualNoRefs(bob['subordinates'],
-                [dave, alice])
+                               [dave, alice])
 
         steve = Person(name='Steve', manager_id=alice['id'], id=4).flush()
-        self.assertEqualNoRefs(alice['subordinates'], [steve,])
+        self.assertEqualNoRefs(alice['subordinates'], [steve, ])
 
-        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
+        all_subordinates = Person.get_where(Person['manager_id'].In((1, 3)))
         self.assertEqual(list(all_subordinates), [dave, alice, steve])
 
-        all_subordinates = Person.get_where(Person['manager_id'].In((1,3)))
-        self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice,])
-
+        all_subordinates = Person.get_where(Person['manager_id'].In((1, 3)))
+        self.assertEqual(list(all_subordinates.refine(name='Alice')), [alice, ])
 
     def test_second_cursor(self):
         """
@@ -1321,7 +1266,7 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
         aly = Person(name='Aly').flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
+        self.assertDictContains(bob, {'name': 'Bob', 'id': 1})
 
         curs2 = self.conn.cursor(cursor_factory=DictCursor)
         persons = Person.get_where()
@@ -1338,7 +1283,6 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         self.assertEqual(next(persons), aly)
         self.assertRaises(StopIteration, next, persons)
 
-
     def test_varchar(self):
         """
         A varchar type raises an error when too many characters are passed.
@@ -1347,8 +1291,7 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         # bar is short enough
         NoPk(foo='abcdefghij').flush()
         self.assertRaises(psycopg2.DataError,
-            NoPk(foo='abcdefghijk').flush)
-
+                          NoPk(foo='abcdefghijk').flush)
 
     def test_any(self):
         """
@@ -1357,10 +1300,9 @@ class TestPostgresql(CommonTests, unittest.TestCase):
         Person = self.db['person']
         map(lambda i: Person(name=i).flush(), ['Bob', 'Aly', 'Dave'])
         self.assertEqual(
-                list(Person.get_where(Person['id'].In([2,3]))),
-                list(Person.get_where(Person['id'].Any([2,3])))
-                )
-
+            list(Person.get_where(Person['id'].In([2, 3]))),
+            list(Person.get_where(Person['id'].Any([2, 3])))
+        )
 
 
 class SqliteTestBase(object):
@@ -1406,37 +1348,34 @@ class SqliteTestBase(object):
         self.conn.commit()
         self.db.refresh_tables()
 
-
     def tearDown(self):
         self.conn.rollback()
-        self.curs.execute("""select 'drop table ' || name || ';' from
-                sqlite_master where type = 'table';""")
+        self.curs.execute("""SELECT 'drop table ' || name || ';' FROM
+                sqlite_master WHERE type = 'table';""")
         self.conn.commit()
 
 
-
-class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
-
+class TestSqlite(SqliteTestBase, CommonTests):
 
     def test_get_where(self):
         Person = self.db['person']
         self.assertEqual(0, Person.count())
 
         bob = Person(name='Bob')
-        self.assertEqual({'name':'Bob'}, bob)
+        self.assertEqual({'name': 'Bob'}, bob)
         bob.flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertDictContains(bob, {'name': 'Bob', 'id': 1})
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
 
         # A second flush does not fail
         bob.flush()
-        self.assertDictContains(bob, {'name':'Bob', 'id':1})
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertDictContains(bob, {'name': 'Bob', 'id': 1})
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
 
         bob['name'] = 'Jon'
         bob.flush()
-        self.assertDictContains(bob, {'name':'Jon', 'id':1})
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertDictContains(bob, {'name': 'Jon', 'id': 1})
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
 
         # Items are inserted in the order they are flushed
         alice = Person(name='Alice')
@@ -1446,7 +1385,7 @@ class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
 
         # get_where with a single integer argument should produce a single
         # Dict row that matches that row's id
-        self.assertEqual(list(Person.get_where(1)), [bob,])
+        self.assertEqual(list(Person.get_where(1)), [bob, ])
 
         # get_where with no parameters returns the entire table
         self.assertEqual(list(Person.get_where()), [bob, dave, alice])
@@ -1467,7 +1406,6 @@ class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
         bob.delete()
         alice.delete()
         self.assertEqual(Person.count(), 0)
-
 
     def test_order_by(self):
         Person = self.db['person']
@@ -1500,8 +1438,7 @@ class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
         NoPk.order_by = 'foo desc'
         results = list(NoPk.get_where(foo='bar'))
         self.assertEqual(len(results), 1)
-        self.assertEqual(results, [{'foo': 'bar'},])
-
+        self.assertEqual(results, [{'foo': 'bar'}, ])
 
     def test_column_info(self):
         """
@@ -1509,16 +1446,15 @@ class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
         """
         Person = self.db['person']
         test_info = [
-                {'name':'id', 'type':'INTEGER'},
-                {'name':'name', 'type':'TEXT'},
-                {'name':'other', 'type':'INTEGER'},
-                {'name':'manager_id', 'type':'INTEGER'},
-                {'name':'car_id', 'type':'INTEGER'},
-                ]
+            {'name': 'id', 'type': 'INTEGER'},
+            {'name': 'name', 'type': 'TEXT'},
+            {'name': 'other', 'type': 'INTEGER'},
+            {'name': 'manager_id', 'type': 'INTEGER'},
+            {'name': 'car_id', 'type': 'INTEGER'},
+        ]
         self.assertEqual(len(test_info), len(Person.columns_info))
-        for i,j in zip(test_info, map(dict, Person.columns_info)):
+        for i, j in zip(test_info, map(dict, Person.columns_info)):
             self.assertDictContains(j, i)
-
 
     def test_raw(self):
         """
@@ -1532,7 +1468,6 @@ class TestSqlite(SqliteTestBase, CommonTests, unittest.TestCase):
 
         persons = Person.get_raw('SELECT * FROM person WHERE id=?', aly['id'])
         self.assertEqual(list(persons), [aly])
-
 
 
 if __name__ == '__main__':

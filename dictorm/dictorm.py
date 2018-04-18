@@ -617,7 +617,7 @@ class Table(object):
 
 class Dict(dict):
     """
-    This is a represenation of a database row that behaves exactly like a
+    This is a representation of a database row that behaves exactly like a
     dictionary.  You may update this dictionary using update or simply by
     setting an item.  After you make changes, be sure to call "flush" to send
     your changes to the DB.  Your changes will not be commited or rolled-back,
