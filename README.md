@@ -177,6 +177,7 @@ ResultsGenerator()
 {'name':'Bob', 'id':1}
 ```
 
+# DictORM's Features
 ### Update a Dict without overwriting Primary Keys
 ```python
 # A Dict behaves like a Python dictionary and can be updated/set.  Update bob
@@ -461,7 +462,15 @@ ResultsGenerator()
 DictORM provides a minimal transaction context manager on it's db object:
 ```python
 >>> with db.transaction():
-        bob = Person('name').flush()
+        bob = Person(name='Bob').flush()
+```
+
+### Raw queries
+You can execute a raw query on a Table.  The resulting rows will be converted to Dict's
+for that table.  In this example, we get all persons whose ID is 1, 2, 3 or 4.  This
+returns a ResultsGenerator that creates Dicts from the person table.
+```python
+>>> persons = Person.get_raw('SELECT * FROM person WHERE id IN (1,2,3,4)')
 ```
 
 # Testing
