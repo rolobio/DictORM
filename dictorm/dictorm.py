@@ -53,10 +53,6 @@ class NoCache(Exception):
     pass
 
 
-class InvalidColumn(Exception):
-    pass
-
-
 global _json_dicts
 
 
@@ -673,11 +669,9 @@ class Dict(dict):
         if self._table.has_json:
             items = _json_dicts(items)
 
-        # Verify that all column names are present in the table
-        invalid_columns = set(items.keys()).difference(self._table.column_names)
-        if invalid_columns:
-            raise InvalidColumn('Invalid Column "{}"'.format(
-                str(invalid_columns)))
+        # Insert/Update only with columns present on the table, this allows custom
+        # instances of Dicts to be inserted even if they have columns not on the table
+        items = {k: v for k, v in items.items() if k in self._table.column_names}
 
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
