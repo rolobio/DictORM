@@ -73,7 +73,7 @@ JSONB_SUPPORT = {
 }
 
 
-class CommonTests(ExtraTestMethods, unittest.TestCase):
+class TestPostgresql(ExtraTestMethods, unittest.TestCase):
     """
     These tests will be run for all supported databases.
     """
@@ -240,11 +240,6 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
         dictorm.Dict(Person, {'name': 'Bob'}).flush()
         dictorm.Dict(Person, name='Alice').flush()
         dictorm.Dict(Person, [('name', 'Steve'), ]).flush()
-
-        # A fake column will fail when going into the database
-        p = Person(fake_column='foo')
-        self.assertRaisesAny(dictorm.InvalidColumn, p.flush)
-        self.conn.rollback()
 
     def test_remove_pks(self):
         Person = self.db['person']
@@ -479,10 +474,6 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
         self.assertRaises(KeyError, bob.__getitem__, 'foo')
 
         self.assertRaises(dictorm.UnexpectedRows, Person.get_one)
-
-        bob['not_real_column'] = 1
-        self.assertRaisesAny(dictorm.InvalidColumn, bob.flush)
-        self.conn.rollback()
 
         NoPk = self.db['no_pk']
         foo = NoPk(foo='bar')
@@ -1075,7 +1066,6 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
 
         # An invalid column name raises an error
         bob[' "; DELETE FROM person;'] = 'Bob'
-        self.assertRaises(dictorm.InvalidColumn, bob.flush)
 
     def test_operators(self):
         Person = self.db['person']
@@ -1106,6 +1096,23 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
 
         persons = Person.get_raw('SELECT * FROM person WHERE id=%s', aly['id'])
         self.assertEqual(list(persons), [aly])
+
+    def test_raw_custom_column(self):
+        """
+        Custom columns can be selected in a raw query.  This shouldn't break the flush.
+
+        :return:
+        """
+        Person = self.db['person']
+        bob = Person(name='Bob').flush()
+        persons = Person.get_raw('SELECT * FROM person')
+        self.assertEqual(list(persons), [bob])
+
+        custom_bob, = Person.get_raw("SELECT *, 'bar' AS foo FROM person")
+        self.assertIn('foo', custom_bob)
+
+        # Custom column "foo" should be ignored in the flush
+        custom_bob.flush()
 
     def test_transaction(self):
         """
@@ -1146,8 +1153,22 @@ class CommonTests(ExtraTestMethods, unittest.TestCase):
         self.assertEqual({'Bob', 'Alice', 'Dave'},
                          set([i['name'] for i in Person.get_where()]))
 
+    def test_insert_custom_columns(self):
+        """
+        A Dict with custom columns is inserted, with the custom columns ignored.
 
-class TestPostgresql(CommonTests):
+        :return:
+        """
+        Person = self.db['person']
+        steve = dictorm.Dict(Person, foo='bar', name='Steve').flush()
+        self.assertEqual(steve['id'], 1)
+        self.assertEqual(steve['name'], 'Steve')
+
+        # Get the real Steve from the database
+        real_steve = Person.get_one()
+        # Remove the "foo", they should then be equal
+        del steve['foo']
+        self.assertEqual(real_steve, steve)
 
     def test_columns_property(self):
         """
@@ -1355,7 +1376,7 @@ class SqliteTestBase(object):
         self.conn.commit()
 
 
-class TestSqlite(SqliteTestBase, CommonTests):
+class TestSqlite(SqliteTestBase, TestPostgresql):
 
     def test_get_where(self):
         Person = self.db['person']
@@ -1468,6 +1489,17 @@ class TestSqlite(SqliteTestBase, CommonTests):
 
         persons = Person.get_raw('SELECT * FROM person WHERE id=?', aly['id'])
         self.assertEqual(list(persons), [aly])
+
+    # These tests are inherited from Postgres, but they don't function for Sqlite
+    test_any = None
+    test_columns_property = None
+    test_count = None
+    test_ilike = None
+    test_json = None
+    test_offset = None
+    test_order_by2 = None
+    test_second_cursor = None
+    test_varchar = None
 
 
 if __name__ == '__main__':
