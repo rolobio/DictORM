@@ -30,6 +30,6 @@ services:
     - postgresql
 after_success:
     # Submit coverage report to coveralls
-    coveralls
+    - coveralls
     # Run profiler
-    time python ./profiler.py
+    - time python ./profiler.py
