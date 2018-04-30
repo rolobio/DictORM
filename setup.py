@@ -24,11 +24,11 @@ config = {
         'coverage',
         'coveralls',
         'green>=2.12.0',
-        'psycopg2',
+        'psycopg2-binary',
     ],
     'extras_require':{
-        'Postgresql': ['psycopg2'],
-        'testing': ['psycopg2', 'green>=2.12.0', 'coveralls', 'coverage'],
+        'Postgresql': ['psycopg2-binary'],
+        'testing': ['psycopg2-binary', 'green>=2.12.0', 'coveralls', 'coverage'],
         }
     }
 

@@ -33,3 +33,10 @@ after_success:
     - coveralls
     # Run profiler
     - time python ./profiler.py
+deploy:
+  provider: pypi
+  user: rolobio
+  password:
+    secure: vQdc1p4zDA87PVcr6/vD2lH9hBltJbF+9O0UhTH2EGpMOgB+Fm69YXRnkbBg2La2yQsXDHpNyXCi0SR0vw8+z+ufDMgTux4yTZS5rpnR1lJVuV+p1ANSk9s6Pn6So+3OL2jl45FMwcjb3MDhr1Qx7Ot7VhtI7ZqcCXv3fWGdpaPtfdWBFZA4u7g0jmEswBDAIOnnda7uKJWLaXIshhqt4R5FKNWPidGUuiN0ZPe2n69C3gx9PBqHEuLPCOA74waG4F7d/1bavfe2sOgZJGFtUevyWpuxb53lxQ49VjYKn4li78VonwzgJxJSXt7ABiURHi4osTlCwyhOnvEor+vIb6DEIgUuFCDpqONY9gijh7mMk2jvf87hy2Pi7DQJnap5riJ0KRL3DaXLwEm4k+mjL2nAnXiCjTWgIWjC3+wXQwqrQ1dhhLcYItwgQNRyAkJEQ6lYfLgKzx3wO+TAurb6ET3/aFLBM8x4Xop3fItF/IZdCOSn3BU2I8mWKXcEaZp3REw97+sfJ7XbZ5ni/TXPsqJfWCNyLM2Z23mlwSWfvouGJnN0vRZptlbimTeOtzyidBT3JnvvQ6lyD60QzwrUziQ+4G6jC+ZeQjZh2qy6W8/T/V9loT9xdYjGzJyzXAKE2iyohiyBB4N6ve/zazTmlfgb8klXvUgpNO8X3AT+5IA=
+  on:
+    tags: true
