@@ -31,3 +31,5 @@ services:
 after_success:
     # Submit coverage report to coveralls
     coveralls
+    # Run profiler
+    time python ./profiler.py
