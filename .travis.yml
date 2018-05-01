@@ -4,8 +4,8 @@ dist: trusty
 addons:
   apt:
     packages:
-      - postgres-10
-      - postgres-client-10
+      - postgresql-10
+      - postgresql-client-10
   postgresql: 10
 language: python
 python:
