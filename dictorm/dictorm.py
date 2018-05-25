@@ -36,6 +36,12 @@ try:  # pragma: no cover
 except ImportError:  # pragma: no cover
     pass
 
+try:
+    import asyncpg
+    db_package_imported = True
+except ImportError:
+    pass
+
 if not db_package_imported:  # pragma: no cover
     raise ImportError('Failed to import psycopg2 or sqlite3.  These are the'
                       'only supported Databases and you must import one of them')
@@ -103,7 +109,10 @@ class DictDB(dict):
             self.update = SqliteUpdate
             self.column = SqliteColumn
         else:
-            self.kind = 'postgresql'
+            if 'asyncpg' in modules and isinstance(db_conn, asyncpg.connection.Connection):
+                self.kind = 'asyncpg'
+            else:
+                self.kind = 'postgresql'
             self.insert = Insert
             self.update = Update
             self.column = Column
@@ -139,6 +148,8 @@ class DictDB(dict):
             return self.conn.cursor()
         elif self.kind == 'postgresql':
             return self.conn.cursor(cursor_factory=DictCursor)
+        elif self.kind == 'asyncpg':
+            return self.conn
 
     def refresh_tables(self):
         """
