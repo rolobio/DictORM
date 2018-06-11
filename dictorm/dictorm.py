@@ -459,11 +459,16 @@ class Table(object):
     def __repr__(self):  # pragma: no cover
         return 'Table({0}, {1})'.format(self.name, self.pks)
 
+    @classmethod
+    def _dict_factory(cls):
+        return Dict
+
     def __call__(self, *a, **kw):
         """
         Used to insert a row into this table.
         """
-        d = Dict(self, *a, **kw)
+        dict_cls = self._dict_factory()
+        d = dict_cls(self, *a, **kw)
         for ref_name in self.refs:
             d[ref_name] = None
         return d
@@ -659,15 +664,10 @@ class Dict(dict):
         super(Dict, self).__init__(*a, **kw)
         self._old_pk_and = None
 
-    def flush(self):
+    def _get_db_items(self):
         """
-        Insert this dictionary into it's table if its no yet in the Database, or
-        Update it's row if it is already in the database.  This method relies
-        heavily on the primary keys of the row's respective table.  If no
-        primary keys are specified, this method will not function!
-
-        All original column/values will bet inserted/updated by this method.
-        All references will be flushed as well.
+        Run the setup code before the flush query is executed.  This is separated for Async purposes
+        :return:
         """
         if self._table.refs:
             for i in self.values():
@@ -680,6 +680,20 @@ class Dict(dict):
         if self._table.has_json:
             items = _json_dicts(items)
 
+        return items
+
+    def flush(self):
+        """
+        Insert this dictionary into it's table if its no yet in the Database, or
+        Update it's row if it is already in the database.  This method relies
+        heavily on the primary keys of the row's respective table.  If no
+        primary keys are specified, this method will not function!
+
+        All original column/values will bet inserted/updated by this method.
+        All references will be flushed as well.
+        """
+        items = self._get_db_items()
+
         # Insert/Update only with columns present on the table, this allows custom
         # instances of Dicts to be inserted even if they have columns not on the table
         items = {k: v for k, v in items.items() if k in self._table.column_names}
@@ -687,8 +701,7 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = self._table.db.insert(self._table.name, **items
-                                          ).returning('*')
+            query = self._table.db.insert(self._table.name, **items).returning('*')
             d = self.__execute_query(query)
             self._in_db = True
         else:

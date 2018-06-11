@@ -39,6 +39,7 @@ schema = '''
     );
 '''
 
+
 @pytest.mark.asyncio
 async def test_one():
     conn = await asyncpg.connect(**test_db_login)
@@ -51,7 +52,10 @@ async def test_one():
     await db.init()
     Person = db['person']
     bob = Person(name='Bob')
-    print(bob)
-    bob.flush()
-    print(bob)
-    raise
+    assert bob == {'name': 'Bob'}
+    await bob.flush()
+    assert set(bob.items()).issuperset({('name', 'Bob'), ('id', 1)})
+
+    bob['name'] = 'Steve'
+    await bob.flush()
+    assert set(bob.items()).issuperset({('name', 'Steve'), ('id', 1)})

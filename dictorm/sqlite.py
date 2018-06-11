@@ -1,21 +1,20 @@
-'''
+"""
 Provide Sqlite3 support by making simple changes to dictorm.pg classes.
-'''
-from .pg import And
-from .pg import Column as PostgresqlColumn
-from .pg import Comparison as PostgresqlComparison
-from .pg import Insert as PostgresqlInsert
-from .pg import Select
-from .pg import Update as PostgresqlUpdate
+"""
+from dictorm import pg
+
+Select = pg.Select
 
 
-class Comparison(PostgresqlComparison): interpolation_str = '?'
+class Comparison(pg.Comparison):
+    interpolation_str = '?'
 
 
-class Column(PostgresqlColumn): comparison = Comparison
+class Column(pg.Column):
+    comparison = Comparison
 
 
-class Insert(PostgresqlInsert):
+class Insert(pg.Insert):
     interpolation_str = '?'
 
     def returning(self, returning):
@@ -23,7 +22,7 @@ class Insert(PostgresqlInsert):
         return self
 
 
-class Update(PostgresqlUpdate):
+class Update(pg.Update):
     interpolation_str = '?'
 
     def returning(self, returning):

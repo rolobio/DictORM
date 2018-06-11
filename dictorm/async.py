@@ -1,5 +1,5 @@
 import dictorm
-from .pg import Insert, Select, Update, Column, Delete
+from .asyncpg import Insert, Select, Update, Column, Delete
 
 
 class DictDB(dictorm.DictDB):
@@ -52,11 +52,22 @@ class Table(dictorm.Table):
         self.curs = db.curs
         self.pks = []
         self.refs = {}
-        self._refresh_pks()
         self.order_by = None
         self.fks = {}
         self.cached_columns_info = None
         self.cached_column_names = None
+
+    async def _refresh_pks(self):
+        """
+        Get a list of Primary Keys set for this table in the DB.
+        """
+        query = '''SELECT a.attname
+                FROM pg_index i
+                JOIN pg_attribute a ON a.attrelid = i.indrelid
+                AND a.attnum = ANY(i.indkey)
+                WHERE i.indrelid = '{}'::regclass
+                AND i.indisprimary;'''.format(self.name)
+        self.pks = [i[0] for i in await self.curs.fetch(query)]
 
     async def init(self):
         # Detect json column types for this table's columns
@@ -64,6 +75,7 @@ class Table(dictorm.Table):
         self.has_json = True if \
             [i for i in _json_column_types if i in data_types] \
             else False
+        await self._refresh_pks()
 
     @property
     async def columns_info(self):
@@ -83,3 +95,36 @@ class Table(dictorm.Table):
         if not self.cached_column_names:
             self.cached_column_names = set(i['column_name'] for i in await self.columns_info)
         return self.cached_column_names
+
+    @classmethod
+    def _dict_factory(cls):
+        return Dict
+
+
+class Dict(dictorm.Dict):
+
+    async def flush(self):
+        items = self._get_db_items()
+        items = {k: v for k, v in items.items() if k in await self._table.column_names}
+        if not self._in_db:
+            query = self._table.db.insert(self._table.name, **items).returning('*')
+            d = await self.__execute_query(query)
+            self._in_db = True
+        else:
+            if not self._table.pks:
+                raise dictorm.NoPrimaryKey(
+                    'Cannot update to {0}, no primary keys defined.'.format(
+                        self._table))
+            query = self._table.db.update(self._table.name, **items
+                                          ).where(self._old_pk_and or self.pk_and()).returning('*')
+            d = await self.__execute_query(query)
+
+        if d:
+            super(dictorm.Dict, self).__init__(d)
+        self._old_pk_and = self.pk_and()
+        return self
+
+    async def __execute_query(self, query):
+        sql, values = query.build()
+        print(sql, values)
+        return await self._curs.fetchrow(sql, *values)

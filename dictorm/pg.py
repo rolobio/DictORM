@@ -150,21 +150,24 @@ class Update(Insert):
         super(Update, self).__init__(table, **values)
 
     def _build_cvp(self):
-        return ', '.join(('"{0}"={1}'.format(k, self.interpolation_str) \
+        return ', '.join(('"{0}"={1}'.format(k, self.interpolation_str)
                           for k in self._ordered_keys))
 
-    def __str__(self):
+    def str(self):
         parts = []
         formats = {'table': self.table, 'cvp': self._build_cvp()}
         if self.operators_or_comp:
             parts.append(' WHERE {comps}')
-            formats['comps'] = str(self.operators_or_comp)
+            formats['comps'] = self.operators_or_comp.str(offset=len(self.values()))
         if self._returning == '*':
             parts.append(' RETURNING *')
         elif self._returning:
             parts.append(' RETURNING "{0}"'.format(self._returning))
         sql = self.query + ''.join(parts)
         return sql.format(**formats)
+
+    def __str__(self):
+        return self.str()
 
     def values(self):
         values = super(Update, self).values()
@@ -203,16 +206,19 @@ class Comparison(object):
         return ret
 
     def __str__(self):
+        return self.str()
+
+    def str(self, offset=''):
         c1 = self.column1.column
 
         if self._null_kind():
-            return '"{0}"{1}'.format(c1, self.kind)
+            return '"{}"{}'.format(c1, self.kind)
 
         # Surround the expression with parentheses
         if self._array_exp:
-            return '"{0}"{1}({2})'.format(c1, self.kind, self.interpolation_str)
+            return '"{}"{}({}{})'.format(c1, self.kind, self.interpolation_str, offset)
 
-        return '"{0}"{1}{2}'.format(c1, self.kind, self.interpolation_str)
+        return '"{}"{}{}{}'.format(c1, self.kind, self.interpolation_str, offset)
 
     def _copy(self):
         new = type(self)(self.column1, self.column2, self.kind)
@@ -312,10 +318,10 @@ class Column(object):
         return comp
 
 
-def wrap_ooc(ooc):
+def wrap_ooc(ooc, offset=''):
     if isinstance(ooc, Comparison):
-        return '%s' % str(ooc)
-    return '(%s)' % str(ooc)
+        return '%s' % ooc.str(offset=offset)
+    return '(%s)' % ooc.str(offset=offset)
 
 
 class Operator(object):
@@ -327,9 +333,12 @@ class Operator(object):
     def __repr__(self):  # pragma: no cover
         return '{0}{1}'.format(self.kind, repr(self.operators_or_comp))
 
-    def __str__(self):
+    def str(self, offset=''):
         kind = ' {0} '.format(self.kind)
-        return kind.join(map(wrap_ooc, self.operators_or_comp))
+        return kind.join(wrap_ooc(i, offset) for i in self.operators_or_comp)
+
+    def __str__(self):
+        return self.str()
 
     def __iter__(self):
         i = []
