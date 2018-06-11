@@ -7,6 +7,18 @@ Delete = pg.Delete
 class Comparison(pg.Comparison):
     interpolation_str = '$'
 
+    def str(self, var_offset=''):
+        c1 = self.column1.column
+
+        if self._null_kind():
+            return '"{}"{}'.format(c1, self.kind)
+
+        # Surround the expression with parentheses
+        if self._array_exp:
+            return '"{}"{}({}{})'.format(c1, self.kind, self.interpolation_str, var_offset)
+
+        return '"{}"{}{}{}'.format(c1, self.kind, self.interpolation_str, var_offset)
+
 
 class Column(pg.Column):
     comparison = Comparison

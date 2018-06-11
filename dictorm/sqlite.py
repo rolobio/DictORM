@@ -4,6 +4,7 @@ Provide Sqlite3 support by making simple changes to dictorm.pg classes.
 from dictorm import pg
 
 Select = pg.Select
+And = pg.And
 
 
 class Comparison(pg.Comparison):

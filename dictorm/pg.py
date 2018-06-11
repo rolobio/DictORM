@@ -158,7 +158,7 @@ class Update(Insert):
         formats = {'table': self.table, 'cvp': self._build_cvp()}
         if self.operators_or_comp:
             parts.append(' WHERE {comps}')
-            formats['comps'] = self.operators_or_comp.str(offset=len(self.values()))
+            formats['comps'] = self.operators_or_comp.str(var_offset=len(self.values()))
         if self._returning == '*':
             parts.append(' RETURNING *')
         elif self._returning:
@@ -208,7 +208,7 @@ class Comparison(object):
     def __str__(self):
         return self.str()
 
-    def str(self, offset=''):
+    def str(self, var_offset=''):
         c1 = self.column1.column
 
         if self._null_kind():
@@ -216,9 +216,9 @@ class Comparison(object):
 
         # Surround the expression with parentheses
         if self._array_exp:
-            return '"{}"{}({}{})'.format(c1, self.kind, self.interpolation_str, offset)
+            return '"{}"{}({})'.format(c1, self.kind, self.interpolation_str)
 
-        return '"{}"{}{}{}'.format(c1, self.kind, self.interpolation_str, offset)
+        return '"{}"{}{}'.format(c1, self.kind, self.interpolation_str)
 
     def _copy(self):
         new = type(self)(self.column1, self.column2, self.kind)
@@ -318,10 +318,10 @@ class Column(object):
         return comp
 
 
-def wrap_ooc(ooc, offset=''):
+def wrap_ooc(ooc, var_offset=''):
     if isinstance(ooc, Comparison):
-        return '%s' % ooc.str(offset=offset)
-    return '(%s)' % ooc.str(offset=offset)
+        return '%s' % ooc.str(var_offset=var_offset)
+    return '(%s)' % ooc.str(var_offset=var_offset)
 
 
 class Operator(object):
@@ -333,9 +333,9 @@ class Operator(object):
     def __repr__(self):  # pragma: no cover
         return '{0}{1}'.format(self.kind, repr(self.operators_or_comp))
 
-    def str(self, offset=''):
+    def str(self, var_offset=''):
         kind = ' {0} '.format(self.kind)
-        return kind.join(wrap_ooc(i, offset) for i in self.operators_or_comp)
+        return kind.join(wrap_ooc(i, var_offset) for i in self.operators_or_comp)
 
     def __str__(self):
         return self.str()
