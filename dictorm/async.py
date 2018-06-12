@@ -1,5 +1,7 @@
+from contextlib import contextmanager
+
 import dictorm
-from .asyncpg import Insert, Select, Update, Column, Delete
+from .asyncpg import Insert, Select, Update, Column, Delete, And
 
 
 class DictDB(dictorm.DictDB):
@@ -41,6 +43,35 @@ class DictDB(dictorm.DictDB):
             await self[table['table_name']].init()
 
 
+class ResultsGenerator(dictorm.ResultsGenerator):
+
+    def __init__(self, table, query, db):
+        self.table = table
+        self.query = query
+        self.cache = []
+        self.completed = False
+        self.executed = False
+        self.db_kind = db.kind
+        self.db = db
+        self.curs = None
+        self._nocache = False
+
+    async def __aenter__(self):
+        sql, values = self.query.build()
+        async with self.db.conn.transaction():
+            self.curs = await self.db.conn.cursor(sql, *values)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    async def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return await self.curs.fetchrow()
+
+
 _json_column_types = ('json', 'jsonb')
 
 
@@ -68,6 +99,10 @@ class Table(dictorm.Table):
                 WHERE i.indrelid = '{}'::regclass
                 AND i.indisprimary;'''.format(self.name)
         self.pks = [i[0] for i in await self.curs.fetch(query)]
+
+    @classmethod
+    def _results_generator_factory(cls):
+        return ResultsGenerator
 
     async def init(self):
         # Detect json column types for this table's columns
@@ -100,6 +135,19 @@ class Table(dictorm.Table):
     def _dict_factory(cls):
         return Dict
 
+    async def get_where(self, *a, **kw):
+        # All args/kwargs are combined in an SQL And comparison
+        operator_group = dictorm.args_to_comp(And(), self, *a, **kw)
+
+        order_by = None
+        if self.order_by:
+            order_by = self.order_by
+        elif self.pks:
+            order_by = str(self.pks[0]) + ' ASC'
+        query = Select(self.name, operator_group).order_by(order_by)
+        sql, values = query.build()
+        return map(self, await self.db.curs.fetch(sql, *values))
+
 
 class Dict(dictorm.Dict):
 
@@ -126,5 +174,8 @@ class Dict(dictorm.Dict):
 
     async def __execute_query(self, query):
         sql, values = query.build()
-        print(sql, values)
         return await self._curs.fetchrow(sql, *values)
+
+    @classmethod
+    def _results_generator_factory(cls):
+        return ResultsGenerator

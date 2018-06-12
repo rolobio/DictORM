@@ -48,7 +48,7 @@ class Select(object):
         new._offset = copy(self._offset)
         return new
 
-    def __str__(self):
+    def str(self, var_offset=''):
         parts = []
         formats = {'table': self.table, }
         ooc = self.operators_or_comp
@@ -56,7 +56,7 @@ class Select(object):
                 isinstance(ooc, Comparison)
         ):
             parts.append(' WHERE {comp}')
-            formats['comp'] = str(ooc)
+            formats['comp'] = ooc.str(var_offset=var_offset)
         if self._order_by:
             parts.append(' ORDER BY {0}'.format(str(self._order_by)))
         if self.returning == '*':
@@ -70,11 +70,15 @@ class Select(object):
         sql = self.query + ''.join(parts)
         return sql.format(**formats)
 
+    def __str__(self):
+        return self.str()
+
     def values(self):
         return list(self.operators_or_comp or [])
 
     def build(self):
-        return (str(self), self.values())
+        return (self.str(var_offset=len(self.values())),
+                self.values())
 
     def order_by(self, order_by):
         self._order_by = order_by
@@ -255,7 +259,8 @@ class Comparison(object):
         return And(self, comp2)
 
 
-class Null(): pass
+class Null:
+    pass
 
 
 class Column(object):

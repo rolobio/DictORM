@@ -297,11 +297,16 @@ class ResultsGenerator:
             list(self)
         return self.cache[i]
 
+    @classmethod
+    def _results_generator_factory(cls):
+        return ResultsGenerator
+
     def nocache(self):
         """
         Return a new ResultsGenerator that will not cache the results.
         """
-        results = ResultsGenerator(self.table, self.query._copy(), self.db)
+        rg = self._results_generator_factory()
+        results = rg(self.table, self.query._copy(), self.db)
         results._nocache = True
         return results
 
@@ -320,7 +325,8 @@ class ResultsGenerator:
         """
         query = self.query._copy()
         query = args_to_comp(query, self.table, *a, **kw)
-        return ResultsGenerator(self.table, query, self.db)
+        rg = self._results_generator_factory()
+        return rg(self.table, query, self.db)
 
     def order_by(self, order_by):
         """
@@ -332,7 +338,8 @@ class ResultsGenerator:
             .order_by('entrydate DESC')
         """
         query = self.query._copy().order_by(order_by)
-        return ResultsGenerator(self.table, query, self.db)
+        rg = self._results_generator_factory()
+        return rg(self.table, query, self.db)
 
     def limit(self, limit):
         """
@@ -344,7 +351,8 @@ class ResultsGenerator:
             .limit('ALL')
         """
         query = self.query._copy().limit(limit)
-        return ResultsGenerator(self.table, query, self.db)
+        rg = self._results_generator_factory()
+        return rg(self.table, query, self.db)
 
     def offset(self, offset):
         """
@@ -355,7 +363,8 @@ class ResultsGenerator:
             .offset(10)
         """
         query = self.query._copy().offset(offset)
-        return ResultsGenerator(self.table, query, self.db)
+        rg = self._results_generator_factory()
+        return rg(self.table, query, self.db)
 
 
 _json_column_types = ('json', 'jsonb')
@@ -473,6 +482,10 @@ class Table(object):
             d[ref_name] = None
         return d
 
+    @classmethod
+    def _results_generator_factory(cls):
+        return ResultsGenerator
+
     def get_where(self, *a, **kw):
         """
         Get all rows as Dicts where column values are as specified.  This always
@@ -518,7 +531,8 @@ class Table(object):
         elif self.pks:
             order_by = str(self.pks[0]) + ' ASC'
         query = Select(self.name, operator_group).order_by(order_by)
-        return ResultsGenerator(self, query, self.db)
+        rg = self._results_generator_factory()
+        return rg(self, query, self.db)
 
     def get_one(self, *a, **kw):
         """
@@ -549,7 +563,8 @@ class Table(object):
         Extra arguments and keyword arguments pare passed to the query builder as variables.
         """
         query = RawQuery(sql_query, *a)
-        return ResultsGenerator(self, query, self.db)
+        rg = self._results_generator_factory()
+        return rg(self, query, self.db)
 
     def count(self):
         """

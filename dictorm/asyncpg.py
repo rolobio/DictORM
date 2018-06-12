@@ -1,7 +1,11 @@
 from dictorm import pg
 
-Select = pg.Select
+And = pg.And
 Delete = pg.Delete
+Null = pg.Null
+Operator = pg.Operator
+Or = pg.Or
+Select = pg.Select
 
 
 class Comparison(pg.Comparison):

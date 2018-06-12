@@ -1,3 +1,5 @@
+import asyncio
+
 import asyncpg
 import pytest
 
@@ -51,11 +53,47 @@ async def test_one():
     db = DictDB(conn)
     await db.init()
     Person = db['person']
+
+    # Create a person, their ID should be set after flush
     bob = Person(name='Bob')
     assert bob == {'name': 'Bob'}
     await bob.flush()
     assert set(bob.items()).issuperset({('name', 'Bob'), ('id', 1)})
 
+    # Name change sticks after flush
     bob['name'] = 'Steve'
     await bob.flush()
     assert set(bob.items()).issuperset({('name', 'Steve'), ('id', 1)})
+
+    # Create a second person
+    alice = await Person(name='Alice').flush()
+    assert set(alice.items()).issuperset({('name', 'Alice'), ('id', 2)})
+
+    # Can get all people
+    persons = await Person.get_where()
+    for person, expected in zip(persons, [bob, alice]):
+        assert person._table == expected._table
+        assert person == expected
+
+    # Delete Bob, a single person remains untouched
+    await bob.delete()
+    persons = list(await Person.get_where())
+    assert persons == [alice]
+    assert persons[0]['id'] == 2
+
+    # Can get all people
+    persons = list(await Person.get_where(Person['id'] == 2))
+    assert persons[0]['id'] == 2
+
+    # Create a new person, can use greater-than filter
+    steve = await Person(name='Steve').flush()
+    persons = list(await Person.get_where(Person['id'] > 2))
+    assert [steve] == persons
+
+    # Insert several people
+    persons = await asyncio.gather(
+        Person(name='Frank').flush(),
+        Person(name='Phil').flush(),
+        Person(name='Sally').flush(),
+    )
+    print(persons)
