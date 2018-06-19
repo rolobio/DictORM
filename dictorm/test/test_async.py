@@ -42,16 +42,21 @@ schema = '''
 '''
 
 
-@pytest.mark.asyncio
-async def test_one():
+async def _set_up():
     conn = await asyncpg.connect(**test_db_login)
     await conn.execute('''DROP SCHEMA public CASCADE;
-                CREATE SCHEMA public;
-                GRANT ALL ON SCHEMA public TO postgres;
-                GRANT ALL ON SCHEMA public TO public;''')
+                    CREATE SCHEMA public;
+                    GRANT ALL ON SCHEMA public TO postgres;
+                    GRANT ALL ON SCHEMA public TO public;''')
     await conn.execute(schema)
     db = DictDB(conn)
     await db.init()
+    return db
+
+
+@pytest.mark.asyncio
+async def test_basic():
+    db = await _set_up()
     Person = db['person']
 
     # Create a person, their ID should be set after flush
@@ -90,10 +95,60 @@ async def test_one():
     persons = list(await Person.get_where(Person['id'] > 2))
     assert [steve] == persons
 
-    # Insert several people
-    persons = await asyncio.gather(
-        Person(name='Frank').flush(),
-        Person(name='Phil').flush(),
-        Person(name='Sally').flush(),
-    )
-    print(persons)
+
+@pytest.mark.asyncio
+async def test_relations():
+    db = await _set_up()
+    Person, Department, PD = db['person'], db['department'], db['person_department']
+    PD['department'] = PD['department_id'] == Department['id']
+    PD['person'] = PD['person_id'] == Person['id']
+    Person['person_departments'] = Person['id'].many(PD['person_id'])
+    Person['departments'] = Person['person_departments'].substratum('department')
+
+    # Bob is in Sales, but not HR
+    bob = await Person(name='Bob').flush()
+    aly = await Person(name='Aly').flush()
+    sales = await Department(name='Sales').flush()
+    hr = await Department(name='HR').flush()
+    bob_sales = await PD(person_id=await bob['id'], department_id=await sales['id']).flush()
+    assert list(await bob['person_departments']) == [bob_sales]
+
+    # Aly is in HR and Sales
+    aly_hr = await PD(person_id=aly['id'], department_id=hr['id']).flush()
+    aly_sales = await PD(person_id=aly['id'], department_id=sales['id']).flush()
+    assert list(await bob['person_departments']) == [bob_sales]
+    assert list(await aly['person_departments']) == [aly_hr, aly_sales]
+
+    assert await aly['departments'] == [hr, sales]
+    # Bob is still only in Sales
+    assert await bob['departments'] == [sales]
+
+    # Get all the people in each department
+    steve = await Person(name='Steve').flush()
+    await PD(person_id=steve['id'], department_id=sales['id']).flush()
+    Department['person_departments'] = Department['id'].many(PD['department_id'])
+    Department['persons'] = Department['person_departments'].substratum('person')
+    assert await sales['persons'] == [bob, aly, steve]
+    assert await hr['persons'] == [aly]
+
+
+@pytest.mark.asyncio
+async def test_searching():
+    db = await _set_up()
+    Person, Department, PD = db['person'], db['department'], db['person_department']
+    PD['department'] = PD['department_id'] == Department['id']
+    PD['person'] = PD['person_id'] == Person['id']
+    Person['person_departments'] = Person['id'].many(PD['person_id'])
+    Person['departments'] = Person['person_departments'].substratum('department')
+
+    # Bob is in Sales, but not HR
+    bob = await Person(name='Bob').flush()
+    aly = await Person(name='Aly').flush()
+    steve = await Person(name='Steve').flush()
+    frank = await Person(name='Frank').flush()
+
+    persons = await Person.get_where(Person['id'] > 1)
+    assert list(persons) == [aly, steve, frank]
+
+    persons2 = await persons.refine(Person['id'] < 4)
+    assert list(persons2) == [aly, steve]

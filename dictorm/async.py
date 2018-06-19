@@ -1,4 +1,6 @@
+import asyncio
 from contextlib import contextmanager
+from itertools import chain
 
 import dictorm
 from .asyncpg import Insert, Select, Update, Column, Delete, And
@@ -148,12 +150,34 @@ class Table(dictorm.Table):
         sql, values = query.build()
         return map(self, await self.db.curs.fetch(sql, *values))
 
+    async def get_one(self, *a, **kw):
+        """
+        Get a single row as a Dict from the Database that matches the arguments
+        provided to this method.  See Table.get_where for more details.
+
+        If more than one row could be returned, this will raise an
+        UnexpectedRows error.
+        """
+        rgen = await self.get_where(*a, **kw)
+        try:
+            i = next(rgen)
+        except StopIteration:
+            return None
+        try:
+            next(rgen)
+        except StopIteration:  # Should only be one result
+            pass
+        else:
+            raise dictorm.UnexpectedRows('More than one row selected.')
+        return i
+
 
 class Dict(dictorm.Dict):
 
     async def flush(self):
         items = self._get_db_items()
-        items = {k: v for k, v in items.items() if k in await self._table.column_names}
+        items = {k: (await v if asyncio.iscoroutine(v) else v)
+                 for k, v in items.items() if k in await self._table.column_names}
         if not self._in_db:
             query = self._table.db.insert(self._table.name, **items).returning('*')
             d = await self.__execute_query(query)
@@ -173,9 +197,42 @@ class Dict(dictorm.Dict):
         return self
 
     async def __execute_query(self, query):
-        sql, values = query.build()
+        sql, values = await query.build()
         return await self._curs.fetchrow(sql, *values)
 
     @classmethod
     def _results_generator_factory(cls):
         return ResultsGenerator
+
+    async def get(self, key, default=None):
+        # Provide the same functionality as a dict.get, but use this class's
+        # getitem instead of dictorm.Dict.getitem
+        return await self[key] if key in self else default
+
+    async def _aget(self, key):
+        ref = self._table.refs.get(key)
+        if not ref and key not in self:
+            raise KeyError(str(key))
+        # Only get the referenced row once, if it has a value, the reference's
+        # column hasn't been changed.
+        val = super(dictorm.Dict, self).get(key)
+        if ref and not val:
+            table = ref.column2.table
+            comparison = table[ref.column2.column] == await self[ref.column1.column]
+
+            if ref.many:
+                gen = await table.get_where(comparison)
+                if ref._substratum:
+                    gen = [await i[ref._substratum] for i in gen]
+                if ref._aggregate:
+                    gen = list(chain(*gen))
+                return gen
+            else:
+                val = await table.get_one(comparison)
+                if ref._substratum and val:
+                    return await val[ref._substratum]
+                super(Dict, self).__setitem__(key, val)
+        return val
+
+    def __getitem__(self, item):
+        return self._aget(item)
