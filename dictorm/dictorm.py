@@ -109,10 +109,7 @@ class DictDB(dict):
             self.update = SqliteUpdate
             self.column = SqliteColumn
         else:
-            if 'asyncpg' in modules and isinstance(db_conn, asyncpg.connection.Connection):
-                self.kind = 'asyncpg'
-            else:
-                self.kind = 'postgresql'
+            self.kind = 'psycopg2'
             self.insert = Insert
             self.update = Update
             self.column = Column
@@ -146,10 +143,8 @@ class DictDB(dict):
         if self.kind == 'sqlite3':
             self.conn.row_factory = sqlite3.Row
             return self.conn.cursor()
-        elif self.kind == 'postgresql':
+        else:
             return self.conn.cursor(cursor_factory=DictCursor)
-        elif self.kind == 'asyncpg':
-            return self.conn
 
     def refresh_tables(self):
         """
@@ -430,6 +425,14 @@ class Table(object):
     3
     """
 
+    __SELECT_PG_PKEYS = '''
+      SELECT a.attname
+      FROM pg_index i
+      JOIN pg_attribute a ON a.attrelid = i.indrelid
+      AND a.attnum = ANY(i.indkey)
+      WHERE i.indrelid = '%s'::regclass
+      AND i.indisprimary'''
+
     def __init__(self, table_name, db):
         self.name = table_name
         self.db = db
@@ -456,13 +459,8 @@ class Table(object):
             self.curs.execute('pragma table_info(%s)' % self.name)
             self.pks = [i['name'] for i in self.curs.fetchall() if i['pk']]
 
-        elif self.db.kind == 'postgresql':
-            self.curs.execute('''SELECT a.attname
-                    FROM pg_index i
-                    JOIN pg_attribute a ON a.attrelid = i.indrelid
-                    AND a.attnum = ANY(i.indkey)
-                    WHERE i.indrelid = '%s'::regclass
-                    AND i.indisprimary;''' % self.name)
+        elif self.db.kind == 'psycopg2':
+            self.curs.execute(self.__SELECT_PG_PKEYS % self.name)
             self.pks = [i[0] for i in self.curs.fetchall()]
 
     def __repr__(self):  # pragma: no cover

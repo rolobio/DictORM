@@ -27,7 +27,7 @@ config = {
         'psycopg2-binary',
     ],
     'extras_require': {
-        'asyncpg': ['asyncpg'],
+        'async': ['aiopg'],
         'Postgresql': ['psycopg2-binary'],
         'testing': ['psycopg2-binary', 'green>=2.12.0', 'coveralls', 'coverage'],
     }

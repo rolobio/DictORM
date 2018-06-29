@@ -1,10 +1,9 @@
 import asyncio
 
-import asyncpg
+import aiopg
 import pytest
 
 from dictorm.async import DictDB
-from .test_dictorm import test_db_login
 
 
 schema = '''
@@ -41,16 +40,20 @@ schema = '''
     );
 '''
 
+dsn = 'dbname=postgres user=postgres password=dictorm host=localhost port=54321'
+
 
 async def _set_up():
-    conn = await asyncpg.connect(**test_db_login)
-    await conn.execute('''DROP SCHEMA public CASCADE;
-                    CREATE SCHEMA public;
-                    GRANT ALL ON SCHEMA public TO postgres;
-                    GRANT ALL ON SCHEMA public TO public;''')
-    await conn.execute(schema)
-    db = DictDB(conn)
-    await db.init()
+    pool = await aiopg.create_pool(dsn)
+    async with pool.acquire() as conn:
+        curs = await conn.cursor()
+        await curs.execute('''DROP SCHEMA public CASCADE;
+                        CREATE SCHEMA public;
+                        GRANT ALL ON SCHEMA public TO postgres;
+                        GRANT ALL ON SCHEMA public TO public;''')
+        await curs.execute(schema)
+        conn.commit()
+    db = await DictDB(pool).init()
     return db
 
 
@@ -75,25 +78,40 @@ async def test_basic():
     assert set(alice.items()).issuperset({('name', 'Alice'), ('id', 2)})
 
     # Can get all people
-    persons = await Person.get_where()
+    persons = Person.get_where()
     for person, expected in zip(persons, [bob, alice]):
         assert person._table == expected._table
         assert person == expected
 
     # Delete Bob, a single person remains untouched
     await bob.delete()
-    persons = list(await Person.get_where())
+    persons = list(Person.get_where())
     assert persons == [alice]
     assert persons[0]['id'] == 2
 
     # Can get all people
-    persons = list(await Person.get_where(Person['id'] == 2))
+    persons = list(Person.get_where(Person['id'] == 2))
     assert persons[0]['id'] == 2
 
     # Create a new person, can use greater-than filter
     steve = await Person(name='Steve').flush()
     persons = list(await Person.get_where(Person['id'] > 2))
     assert [steve] == persons
+
+
+@pytest.mark.asyncio
+async def test_multi_insert():
+    db = await _set_up()
+    Person = db['person']
+    from uuid import uuid4
+
+    NUMBER = 10
+    coros = (Person(name=str(uuid4())).flush() for _ in range(NUMBER))
+    await asyncio.gather(*coros)
+    curs = db.get_cursor()
+    curs.execute('select count(*) from person')
+    assert curs.fetchone() == [NUMBER]
+    assert len(list(Person.get_where())) == NUMBER
 
 
 @pytest.mark.asyncio
@@ -147,8 +165,8 @@ async def test_searching():
     steve = await Person(name='Steve').flush()
     frank = await Person(name='Frank').flush()
 
-    persons = await Person.get_where(Person['id'] > 1)
+    persons = Person.get_where(Person['id'] > 1)
     assert list(persons) == [aly, steve, frank]
 
-    persons2 = await persons.refine(Person['id'] < 4)
+    persons2 = persons.refine(Person['id'] < 4)
     assert list(persons2) == [aly, steve]
