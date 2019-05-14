@@ -1,10 +1,12 @@
 #! /usr/bin/env python
-import dictorm
-from psycopg2.extras import DictCursor
 import os
-import psycopg2
 import sqlite3
 import unittest
+
+import psycopg2
+from psycopg2.extras import DictCursor
+
+import dictorm
 
 test_db_login = {
     'database': 'postgres',

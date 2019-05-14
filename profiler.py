@@ -1,6 +1,7 @@
 #! /usr/bin/env python
-from dictorm import DictDB
 import sqlite3
+
+from dictorm import DictDB
 
 test_tables_sql = '''
 CREATE TABLE car (
@@ -26,8 +27,8 @@ db = DictDB(conn)
 Person, Car = db['person'], db['car']
 # Insert 10,000 persons and cars
 [Person(name='foo',
-    car_id=Car(make='bar', model='baz').flush()['id']
-    ).flush() for i in range(10000)]
+        car_id=Car(make='bar', model='baz').flush()['id']
+        ).flush() for i in range(10000)]
 
 list(map(lambda i: i.delete, Person.get_where()))
 list(map(lambda i: i.delete, Car.get_where()))
