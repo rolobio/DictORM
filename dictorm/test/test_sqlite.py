@@ -1,6 +1,7 @@
 import unittest
-from dictorm.sqlite import Select, Insert, Update, And, Column
+
 from dictorm.pg import set_sort_keys
+from dictorm.sqlite import Select, Insert, Update, And, Column
 
 
 class PersonTable(object):

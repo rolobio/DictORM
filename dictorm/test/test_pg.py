@@ -1,4 +1,5 @@
 import unittest
+
 from dictorm.pg import Select, Insert, Update, Delete, Or, And, Column, set_sort_keys
 
 
@@ -94,8 +95,8 @@ class TestSelect(unittest.TestCase):
                    )
         self.assertEqual(q.build(),
                          (
-                         'SELECT * FROM "other_table" WHERE ("name"=%s AND "car_id"=%s) OR ("name"=%s AND "car_id"=%s)',
-                         ['Steve', 12, 'Bob', 1]
+                             'SELECT * FROM "other_table" WHERE ("name"=%s AND "car_id"=%s) OR ("name"=%s AND "car_id"=%s)',
+                             ['Steve', 12, 'Bob', 1]
                          )
                          )
 
@@ -123,8 +124,8 @@ class TestSelect(unittest.TestCase):
         ))
         self.assertEqual(q.build(),
                          (
-                         'SELECT * FROM "other_table" WHERE "name" IS NULL AND "foo"=%s AND "baz" IS %s AND "whatever" IS DISTINCT FROM %s AND "whatever" IS NOT DISTINCT FROM %s',
-                         ['bar', 'bake', 'foo', 'bar'])
+                             'SELECT * FROM "other_table" WHERE "name" IS NULL AND "foo"=%s AND "baz" IS %s AND "whatever" IS DISTINCT FROM %s AND "whatever" IS NOT DISTINCT FROM %s',
+                             ['bar', 'bake', 'foo', 'bar'])
                          )
         q = Select('other_table', Person['name'].IsNotNull())
         self.assertEqual(q.build(),
