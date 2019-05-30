@@ -1,41 +1,52 @@
 os:
-    - linux
+  - linux
 dist: xenial  # for Python 3.7
 language: python
 python:
-    - "2.7"
-    - "3.4"
-    - "3.5"
-    - "3.6"
-    - "3.7"
-    - "3.7-dev"
+  - "2.7"
+  - "3.4"
+  - "3.5"
+  - "3.6"
+  - "3.7"
+  - "3.7-dev"
 env:
-    - PG_VERSION=9.2
-    - PG_VERSION=9.3
-    - PG_VERSION=9.4
-    - PG_VERSION=9.5
-    - PG_VERSION=9.6
+  - PG_VERSION=9.2
+  - PG_VERSION=9.3
+  - PG_VERSION=9.4
+  - PG_VERSION=9.5
+  - PG_VERSION=9.6
+  - PG_VERSION=10
+  global:
+    - PGPORT=5433
+addons:
+  postgresql: "10"
+  apt:
+    packages:
+      - postgresql-10
+      - postgresql-client-10
 before_install:
-    # Stop any postgres, then start a specific version of postgres to test against
-    - sudo service postgresql stop && sudo service postgresql start $PG_VERSION
+  # Copy postgres config for version 10
+  - sudo cp /etc/postgresql/{9.6,10}/main/pg_hba.conf
+  # Stop any postgres, then start a specific version of postgres to test against
+  - sudo service postgresql stop && sudo service postgresql start $PG_VERSION
 install:
-    - "pip install -e .[testing]"
+  - "pip install -e .[testing]"
 before_script:
-    - psql -c 'create database dictorm;' -U postgres
+  - psql -c 'create database dictorm;' -U postgres
 script:
-    # Run tests verbosely, with coverage
-    - "green -rvv"
-    # Test installation
-    - "python setup.py install"
-    #  Verify that dictorm can be imported
-    - "python -c 'from dictorm import *'"
+  # Run tests verbosely, with coverage
+  - "green -rvv"
+  # Test installation
+  - "python setup.py install"
+  #  Verify that dictorm can be imported
+  - "python -c 'from dictorm import *'"
 services:
-    - postgresql
+  - postgresql
 after_success:
-    # Submit coverage report to coveralls
-    - coveralls
-    # Run profiler
-    - time python ./profiler.py
+  # Submit coverage report to coveralls
+  - coveralls
+  # Run profiler
+  - time python ./profiler.py
 deploy:
   provider: pypi
   user: rolobio

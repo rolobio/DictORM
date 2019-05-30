@@ -17,7 +17,7 @@ test_db_login = {
 }
 
 if 'CI' in os.environ.keys():
-    test_db_login['port'] = 5432
+    test_db_login['port'] = 5433
 
 
 def _no_refs(o):
