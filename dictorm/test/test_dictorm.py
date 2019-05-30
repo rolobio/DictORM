@@ -53,11 +53,6 @@ class ExtraTestMethods:
             if isinstance(e, exps): return
         raise Exception('Did not raise one of the exceptions provided!')
 
-    @classmethod
-    def assertType(cls, a, b):
-        if not isinstance(a, b):
-            raise TypeError('{0} is not type {1}'.format(str(a), b0))
-
     def assertEqualNoRefs(self, a, b):
         return self.assertEqual(_no_refs(a), _no_refs(b))
 
@@ -92,7 +87,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         self.tearDown()
         self.curs.execute('''
         CREATE TABLE person (
-            id SERIAL PRIMARY KEY,
+            id BIGSERIAL PRIMARY KEY,
             name VARCHAR(100),
             other INTEGER,
             manager_id INTEGER REFERENCES person(id)
@@ -878,11 +873,11 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
 
         subordinates = bob['subordinates']
         for sub in subordinates:
-            self.assertType(sub, dictorm.Dict)
+            assert isinstance(sub, dictorm.Dict)
         # Error would be raised if subordinates isn't cached
         bob._table.get_where = error
         for sub in subordinates:
-            self.assertType(sub, dictorm.Dict)
+            assert isinstance(sub, dictorm.Dict)
 
     def test_reference_order(self):
         """
@@ -913,7 +908,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         """
         Person = self.db['person']
         test_info = [
-            {'column_name': 'id', 'data_type': 'integer'},
+            {'column_name': 'id', 'data_type': 'bigint'},
             {'column_name': 'name', 'data_type': 'character varying'},
             {'column_name': 'other', 'data_type': 'integer'},
             {'column_name': 'manager_id', 'data_type': 'integer'},

@@ -6,6 +6,7 @@ dictorm.Table.
 Sqlite queries are slightly different, but use these methods as their base.
 """
 from copy import copy
+from typing import Union
 
 global sort_keys
 sort_keys = False
@@ -179,6 +180,9 @@ class Update(Insert):
 
 class Delete(Update):
     query = 'DELETE FROM "{table}"'
+
+
+QueryHint = Union[Select, Insert, Update, Delete]
 
 
 class Comparison(object):
