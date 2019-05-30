@@ -10,7 +10,7 @@ from sys import modules
 
 try:  # pragma: no cover
     from dictorm.pg import Select, Insert, Update, Delete
-    from dictorm.pg import And, Or, QueryHint
+    from dictorm.pg import And, Or
     from dictorm.pg import Column, Comparison, Operator
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
@@ -114,9 +114,9 @@ class Dict(dict):
     """
 
     def __init__(self, table, *a, **kw):
-        self._table: Table = table
+        self._table = table
         self._in_db = False
-        self._curs: CursorHint = table.db.curs
+        self._curs = table.db.curs
         super(Dict, self).__init__(*a, **kw)
         self._old_pk_and = None
 
@@ -290,15 +290,15 @@ class ResultsGenerator:
     create a new ResultsGenerator instance, or flush your Dict.
     """
 
-    def __init__(self, table, query: QueryHint, db):
-        self.table: Table = table
+    def __init__(self, table, query, db):
+        self.table = table
         self.query = query
         self.cache = []
         self.completed = False
         self.executed = False
         self.db_kind = db.kind
-        self.db: DictDB = db
-        self.curs: CursorHint = self.db.get_cursor()
+        self.db = db
+        self.curs = self.db.get_cursor()
         self._nocache = False
 
     def __iter__(self):

@@ -182,9 +182,6 @@ class Delete(Update):
     query = 'DELETE FROM "{table}"'
 
 
-QueryHint = Union[Select, Insert, Update, Delete]
-
-
 class Comparison(object):
     interpolation_str = '%s'
     many = False
