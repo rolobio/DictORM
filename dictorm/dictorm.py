@@ -27,12 +27,16 @@ db_package_imported = False
 try:  # pragma: no cover
     from psycopg2.extras import DictCursor
 
+    CursorHint = DictCursor
+
     db_package_imported = True
 except ImportError:  # pragma: no cover
     pass
 
 try:  # pragma: no cover
     import sqlite3
+
+    CursorHint = sqlite3.Cursor
 
     db_package_imported = True
 except ImportError:  # pragma: no cover
@@ -78,9 +82,6 @@ def set_json_dicts(func):
     global _json_dicts
     original, _json_dicts = _json_dicts, func
     return original
-
-
-CursorHint = Union[sqlite3.Cursor, DictCursor]
 
 
 class Dict(dict):
