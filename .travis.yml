@@ -17,8 +17,7 @@ env:
   - PG_VERSION=9.5
   - PG_VERSION=9.6
   - PG_VERSION=10
-  global:
-    - PGPORT=5433
+  - PGPORT=5433
 addons:
   postgresql: "10"
   apt:
@@ -39,7 +38,7 @@ script:
   - "green -rvv"
   # Test installation
   - "python setup.py install"
-  #  Verify that dictorm can be imported
+  # Verify that dictorm can be imported
   - "python -c 'from dictorm import *'"
 services:
   - postgresql
