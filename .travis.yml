@@ -9,6 +9,7 @@ python:
   - "3.6"
   - "3.7"
   - "3.7-dev"
+cache: pip
 env:
   - PG_VERSION=9.2
   - PG_VERSION=9.3
