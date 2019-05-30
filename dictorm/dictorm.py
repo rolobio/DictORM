@@ -1,4 +1,6 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
+from typing import Union, Optional, List
+
 __version__ = '3.8.4'
 
 from contextlib import contextmanager
@@ -8,7 +10,7 @@ from sys import modules
 
 try:  # pragma: no cover
     from dictorm.pg import Select, Insert, Update, Delete
-    from dictorm.pg import And, Or
+    from dictorm.pg import And, Or, QueryHint
     from dictorm.pg import Column, Comparison, Operator
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
@@ -78,537 +80,7 @@ def set_json_dicts(func):
     return original
 
 
-class DictDB(dict):
-    """
-    Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
-    Table instance for each table, and keep them in this DictDB using the
-    table's name as a key.
-
-    >>> db = DictDB(your_db_connection)
-    >>> db['table1']
-    Table('table1')
-
-    >>> db['other_table']
-    Table('other_table')
-
-    If your tables have changed while your DictDB instance existed, you can call
-    DictDB.refresh_tables() to have it rebuild all Table objects.
-    """
-
-    def __init__(self, db_conn):
-        self.conn = db_conn
-        if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
-            self.kind = 'sqlite3'
-            self.insert = SqliteInsert
-            self.update = SqliteUpdate
-            self.column = SqliteColumn
-        else:
-            self.kind = 'postgresql'
-            self.insert = Insert
-            self.update = Update
-            self.column = Column
-        self.select = Select
-        self.delete = Delete
-
-        self.curs = self.get_cursor()
-        self.refresh_tables()
-        self.conn.rollback()
-        super(DictDB, self).__init__()
-
-    @classmethod
-    def table_factory(cls):
-        return Table
-
-    def __list_tables(self):
-        if self.kind == 'sqlite3':
-            self.curs.execute('SELECT name FROM sqlite_master WHERE type ='
-                              '"table"')
-        else:
-            self.curs.execute('''SELECT DISTINCT table_name
-                    FROM information_schema.columns
-                    WHERE table_schema='public' ''')
-        return self.curs.fetchall()
-
-    def get_cursor(self):
-        """
-        Returns a cursor from the provided database connection that DictORM
-        objects expect.
-        """
-        if self.kind == 'sqlite3':
-            self.conn.row_factory = sqlite3.Row
-            return self.conn.cursor()
-        elif self.kind == 'postgresql':
-            return self.conn.cursor(cursor_factory=DictCursor)
-
-    def refresh_tables(self):
-        """
-        Create all Table instances from all tables found in the database.
-        """
-        if self.keys():
-            # Reset this DictDB because it contains old tables
-            super(DictDB, self).__init__()
-        table_cls = self.table_factory()
-        for table in self.__list_tables():
-            if self.kind == 'sqlite3':
-                self[table['name']] = table_cls(table['name'], self)
-            else:
-                self[table['table_name']] = table_cls(table['table_name'], self)
-
-    @contextmanager
-    def transaction(self, commit=False):
-        try:
-            yield
-        except:
-            self.conn.rollback()
-            raise
-        else:
-            # Commit if no exceptions occur
-            if commit:
-                self.conn.commit()
-
-
-def args_to_comp(operator, table, *args, **kwargs):
-    """
-    Add arguments to the provided operator paired with their respective primary
-    key.
-    """
-    operator = operator or And()
-    pk_uses = 0
-    pks = table.pks
-    for val in args:
-        if isinstance(val, (Comparison, Operator)):
-            # Already a Comparison/Operator, just add it
-            operator += (val,)
-            continue
-        if not table.pks:
-            raise NoPrimaryKey('No Primary Keys(s) defined for ' + str(table))
-        try:
-            # Create a Comparison using the next Primary Key
-            operator += (table[pks[pk_uses]] == val,)
-        except IndexError:
-            raise NoPrimaryKey('Not enough Primary Keys(s) defined for ' +
-                               str(table))
-        pk_uses += 1
-
-    for k, v in kwargs.items():
-        operator += table[k] == v
-
-    return operator
-
-
-class RawQuery:
-    """
-    Used only for Table.get_raw.  Merely returns the provided args when build is called.
-    """
-
-    def __init__(self, sql_query, *args):
-        self.sql_query = sql_query
-        self.args = args
-
-    def build(self):
-        return self.sql_query, self.args
-
-
-class ResultsGenerator:
-    """
-    This class replicates a Generator, the query will not be executed and no
-    results will be fetched until "__next__" is called.  Results are cached and
-    will not be gotten again.  To get new results if they have been changed,
-    create a new ResultsGenerator instance, or flush your Dict.
-    """
-
-    def __init__(self, table, query, db):
-        self.table = table
-        self.query = query
-        self.cache = []
-        self.completed = False
-        self.executed = False
-        self.db_kind = db.kind
-        self.db = db
-        self.curs = self.db.get_cursor()
-        self._nocache = False
-
-    def __iter__(self):
-        if self.completed:
-            return iter(self.cache)
-        else:
-            return self
-
-    def __next__(self):
-        self.__execute_once()
-        d = self.curs.fetchone()
-        if not d:
-            self.completed = True
-            raise StopIteration
-        # Convert returned dictionary to a Dict
-        d = self.table(d)
-        d._in_db = True
-        if self._nocache == False:
-            self.cache.append(d)
-        return d
-
-    def __execute_once(self):
-        if not self.executed:
-            self.executed = True
-            sql, values = self.query.build()
-            self.curs.execute(sql, values)
-
-    # for python 2.7
-    next = __next__
-
-    def __len__(self):
-        self.__execute_once()
-        if self.db_kind == 'sqlite3':
-            # sqlite3's cursor.rowcount doesn't support select statements
-            # returns a 0 because this method is called when a ResultsGenerator
-            # is converted into a list()
-            return 0
-        return self.curs.rowcount
-
-    def __getitem__(self, i):
-        if isinstance(i, int) and i >= 0:
-            try:
-                return self.cache[i]
-            except IndexError:
-                # Haven't gotten that far yet, get the rest
-                pass
-            while i >= 0 and i <= len(self.cache):
-                try:
-                    return next(self)
-                except StopIteration:
-                    if self._nocache == True:
-                        raise NoCache('Caching has been disabled.')
-                    else:
-                        raise IndexError('No row of that index')
-
-        if not self.completed:
-            # Get all rows
-            list(self)
-        return self.cache[i]
-
-    def nocache(self):
-        """
-        Return a new ResultsGenerator that will not cache the results.
-        """
-        results = ResultsGenerator(self.table, self.query._copy(), self.db)
-        results._nocache = True
-        return results
-
-    def refine(self, *a, **kw):
-        """
-        Return a new ResultsGenerator with a refined query.  Arguments provided
-        are expected to be Operators/Comparisons.  Keyword Arguments are
-        converted into == Comparisons.
-
-        Arguments:
-            .refine(Person['name']=='steve', Person['foo']=='bar')
-
-        Keyword Arguments:
-            .refine(name='steve', foo='bar') # Same refinement as the above
-                                             # example
-        """
-        query = self.query._copy()
-        query = args_to_comp(query, self.table, *a, **kw)
-        return ResultsGenerator(self.table, query, self.db)
-
-    def order_by(self, order_by):
-        """
-        Return a new ResultsGenerator with a modified ORDER BY clause.  Expects
-        a raw SQL string.
-
-        Examples:
-            .order_by('id ASC')
-            .order_by('entrydate DESC')
-        """
-        query = self.query._copy().order_by(order_by)
-        return ResultsGenerator(self.table, query, self.db)
-
-    def limit(self, limit):
-        """
-        Return a new ResultsGenerator with a modified LIMIT clause.  Expects a
-        raw SQL string.
-
-        Examples:
-            .limit(10)
-            .limit('ALL')
-        """
-        query = self.query._copy().limit(limit)
-        return ResultsGenerator(self.table, query, self.db)
-
-    def offset(self, offset):
-        """
-        Return a new ResultsGenerator with a modified OFFSET clause.  Expects a
-        raw SQL string.
-
-        Example:
-            .offset(10)
-        """
-        query = self.query._copy().offset(offset)
-        return ResultsGenerator(self.table, query, self.db)
-
-
-_json_column_types = ('json', 'jsonb')
-
-
-class Table(object):
-    """
-    A representation of a DB table.  You will primarily retrieve rows (Dicts)
-    from the database using the get_where and get_one methods.
-
-    Insert into this table:
-
-    >>> your_table(some_column='some value', other=False)
-    {'some_column':'some value', 'other':False}
-
-    Get all rows that need to be updated:
-
-    >>> list(table.get_where(outdated=True))
-    [Dict(), Dict(), Dict(), Dict()]
-
-    Get a single row (will raise an UnexpectedRow error if more than one row
-    could have been returned):
-
-    >>> table.get_one(id=12)
-    Dict()
-    >>> table.get_one(manager_id=14)
-    Dict()
-    >>> table.get_one(id=500) # id does not exist
-    None
-
-    You can reference another table using setitem.  Link to an employee's
-    manager using the manager's id, and the employee's manager_id.
-
-    >>> Person['manager'] = Person['manager_id'] == Person['id']
-    >>> bob['manager']
-    Dict()
-
-    The foreign key should be on the right side of the Comparison.
-    >>> Person['manager'] = Person['manager_id'] == Person['id'] # right
-    >>> Person['manager'] = Person['id'] == Person['manager_id'] # wrong
-
-    Reference a manager's subordinates using their collective manager_id's.
-    Again, the foreign key is on the right.
-
-    >>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
-    >>> list(bob['manager'])
-    [Dict(), Dict()]
-
-    Table.get_where returns a generator object, this makes it so you won't have
-    an entire table's object in memory at once, they are generated when gotten:
-
-    >>> bob['subordinates']
-    ResultsGenerator()
-    >>> for sub in bob['subordinates']:
-    >>>     print(sub)
-    Dict()
-    Dict()
-    Dict()
-
-    Get a count of all rows in this table:
-
-    >>> Person.count()
-    3
-    """
-
-    def __init__(self, table_name, db):
-        self.name = table_name
-        self.db = db
-        self.curs = db.curs
-        self.pks = []
-        self.refs = {}
-        self._refresh_pks()
-        self.order_by = None
-        self.fks = {}
-        self.cached_columns_info = None
-        self.cached_column_names = None
-        # Detect json column types for this table's columns
-        type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
-        data_types = [i[type_column_name].lower() for i in self.columns_info]
-        self.has_json = True if \
-            [i for i in _json_column_types if i in data_types] \
-            else False
-
-    def _refresh_pks(self):
-        """
-        Get a list of Primary Keys set for this table in the DB.
-        """
-        if self.db.kind == 'sqlite3':
-            self.curs.execute('pragma table_info(%s)' % self.name)
-            self.pks = [i['name'] for i in self.curs.fetchall() if i['pk']]
-
-        elif self.db.kind == 'postgresql':
-            self.curs.execute('''SELECT a.attname
-                    FROM pg_index i
-                    JOIN pg_attribute a ON a.attrelid = i.indrelid
-                    AND a.attnum = ANY(i.indkey)
-                    WHERE i.indrelid = '%s'::regclass
-                    AND i.indisprimary;''' % self.name)
-            self.pks = [i[0] for i in self.curs.fetchall()]
-
-    def __repr__(self):  # pragma: no cover
-        return 'Table({0}, {1})'.format(self.name, self.pks)
-
-    def __call__(self, *a, **kw):
-        """
-        Used to insert a row into this table.
-        """
-        d = Dict(self, *a, **kw)
-        for ref_name in self.refs:
-            d[ref_name] = None
-        return d
-
-    def get_where(self, *a, **kw):
-        """
-        Get all rows as Dicts where column values are as specified.  This always
-        returns a generator-like object ResultsGenerator.
-
-        If you provide only arguments, they will be paired in their respective
-        order to the primary keys defined or this table.  If the primary keys
-        of this table was ('id',) only:
-
-            get_where(4) is equal to get_where(id=4)
-
-            get_where(4, 5) would raise a NoPrimaryKey error because there is
-                            only one primary key.
-
-        Primary keys are defined automatically during the init of the Table, but
-        you can overwrite that by changing .pks:
-
-        >>> your_table.pks = ['id', 'some_column', 'whatever_you_want']
-
-            get_where(4, 5, 6) is now equal to get_where(id=4, some_column=5,
-                                                    whatever_you_want=6)
-
-        If there were two primary keys, such as in a join table (id, group):
-
-            get_where(4, 5) is equal to get_where(id=4, group=5)
-
-        You cannot use this method without primary keys, unless you specify the
-        column you are matching.
-
-        >>> get_where(some_column=83)
-        ResultsGenerator()
-
-        >>> get_where(4) # no primary keys defined!
-        NoPrimaryKey()
-
-        """
-        # All args/kwargs are combined in an SQL And comparison
-        operator_group = args_to_comp(And(), self, *a, **kw)
-
-        order_by = None
-        if self.order_by:
-            order_by = self.order_by
-        elif self.pks:
-            order_by = str(self.pks[0]) + ' ASC'
-        query = Select(self.name, operator_group).order_by(order_by)
-        return ResultsGenerator(self, query, self.db)
-
-    def get_one(self, *a, **kw):
-        """
-        Get a single row as a Dict from the Database that matches the arguments
-        provided to this method.  See Table.get_where for more details.
-
-        If more than one row could be returned, this will raise an
-        UnexpectedRows error.
-        """
-        rgen = self.get_where(*a, **kw)
-        try:
-            i = next(rgen)
-        except StopIteration:
-            return None
-        try:
-            next(rgen)
-        except StopIteration:  # Should only be one result
-            pass
-        else:
-            raise UnexpectedRows('More than one row selected.')
-        return i
-
-    def get_raw(self, sql_query, *a):
-        """
-        Get all rows returned by the raw SQL query provided, as Dicts.  Expects
-        that the query will only return columns from this instance's table.
-
-        Extra arguments and keyword arguments pare passed to the query builder as variables.
-        """
-        query = RawQuery(sql_query, *a)
-        return ResultsGenerator(self, query, self.db)
-
-    def count(self):
-        """
-        Get the count of rows in this table.
-        """
-        self.curs.execute('SELECT COUNT(*) FROM {table}'.format(
-            table=self.name))
-        return int(self.curs.fetchone()[0])
-
-    @property
-    def columns(self):
-        """
-        Get a list of columns of a table.
-        """
-        if self.db.kind == 'sqlite3':
-            key = 'name'
-        else:
-            key = 'column_name'
-        return [i[key] for i in self.columns_info]
-
-    @property
-    def columns_info(self):
-        """
-        Get a dictionary that contains information about all columns of this
-        table.
-        """
-        if self.cached_columns_info:
-            return self.cached_columns_info
-
-        if self.db.kind == 'sqlite3':
-            sql = "PRAGMA TABLE_INFO(" + str(self.name) + ")"
-            self.curs.execute(sql)
-            self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
-        else:
-            sql = "SELECT * FROM information_schema.columns WHERE table_name=%s"
-            self.curs.execute(sql, [self.name, ])
-            self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
-        return self.cached_columns_info
-
-    @property
-    def column_names(self):
-        if not self.cached_column_names:
-            if self.db.kind == 'sqlite3':
-                self.cached_column_names = set(i['name'] for i in
-                                               self.columns_info)
-            else:
-                self.cached_column_names = set(i['column_name'] for i in
-                                               self.columns_info)
-        return self.cached_column_names
-
-    def __setitem__(self, ref_name, ref):
-        """
-        Create reference that will be gotten by all Dicts created from this
-        table.
-
-        Example:
-            Person['manager'] = Person['manager_id'] == Person['id']
-
-        For more examples see Table's doc.
-        """
-        if ref.column1.table != self:
-            # Dict.__getitem__ expects the columns to be in a particular order,
-            # fix any order issues.
-            ref.column1, ref.column2 = ref.column2, ref.column1
-        self.fks[ref.column1.column] = ref_name
-        self.refs[ref_name] = ref
-
-    def __getitem__(self, ref_name):
-        """
-        Get a reference if it has already been created.  Otherwise, return a
-        Column object which is used to create a reference.
-        """
-        if ref_name in self.refs:
-            return self.refs[ref_name]
-        return self.db.column(self, ref_name)
+CursorHint = Union[sqlite3.Cursor, DictCursor]
 
 
 class Dict(dict):
@@ -642,9 +114,9 @@ class Dict(dict):
     """
 
     def __init__(self, table, *a, **kw):
-        self._table = table
+        self._table: Table = table
         self._in_db = False
-        self._curs = table.db.curs
+        self._curs: CursorHint = table.db.curs
         super(Dict, self).__init__(*a, **kw)
         self._old_pk_and = None
 
@@ -795,3 +267,550 @@ class Dict(dict):
     # Copy docs for methods that recreate dict() functionality
     __getitem__.__doc__ += dict.__getitem__.__doc__
     get.__doc__ = dict.get.__doc__
+
+
+class RawQuery:
+    """
+    Used only for Table.get_raw.  Merely returns the provided args when build is called.
+    """
+
+    def __init__(self, sql_query, *args):
+        self.sql_query = sql_query
+        self.args = args
+
+    def build(self):
+        return self.sql_query, self.args
+
+
+class ResultsGenerator:
+    """
+    This class replicates a Generator, the query will not be executed and no
+    results will be fetched until "__next__" is called.  Results are cached and
+    will not be gotten again.  To get new results if they have been changed,
+    create a new ResultsGenerator instance, or flush your Dict.
+    """
+
+    def __init__(self, table, query: QueryHint, db):
+        self.table: Table = table
+        self.query = query
+        self.cache = []
+        self.completed = False
+        self.executed = False
+        self.db_kind = db.kind
+        self.db: DictDB = db
+        self.curs: CursorHint = self.db.get_cursor()
+        self._nocache = False
+
+    def __iter__(self):
+        if self.completed:
+            return iter(self.cache)
+        else:
+            return self
+
+    def __next__(self) -> Dict:
+        self.__execute_once()
+        d = self.curs.fetchone()
+        if not d:
+            self.completed = True
+            raise StopIteration
+        # Convert returned dictionary to a Dict
+        d = self.table(d)
+        d._in_db = True
+        if self._nocache is False:
+            self.cache.append(d)
+        return d
+
+    def __execute_once(self):
+        if not self.executed:
+            self.executed = True
+            sql, values = self.query.build()
+            self.curs.execute(sql, values)
+
+    # for python 2.7
+    next = __next__
+
+    def __len__(self) -> int:
+        self.__execute_once()
+        if self.db_kind == 'sqlite3':
+            # sqlite3's cursor.rowcount doesn't support select statements
+            # returns a 0 because this method is called when a ResultsGenerator
+            # is converted into a list()
+            return 0
+        return self.curs.rowcount
+
+    def __getitem__(self, i) -> Dict:
+        if isinstance(i, int) and i >= 0:
+            try:
+                return self.cache[i]
+            except IndexError:
+                # Haven't gotten that far yet, get the rest
+                pass
+            while i >= 0 and i <= len(self.cache):
+                try:
+                    return next(self)
+                except StopIteration:
+                    if self._nocache == True:
+                        raise NoCache('Caching has been disabled.')
+                    else:
+                        raise IndexError('No row of that index')
+
+        if not self.completed:
+            # Get all rows
+            list(self)
+        return self.cache[i]
+
+    def nocache(self):
+        """
+        Return a new ResultsGenerator that will not cache the results.
+        """
+        results = ResultsGenerator(self.table, self.query._copy(), self.db)
+        results._nocache = True
+        return results
+
+    def refine(self, *a, **kw):
+        """
+        Return a new ResultsGenerator with a refined query.  Arguments provided
+        are expected to be Operators/Comparisons.  Keyword Arguments are
+        converted into == Comparisons.
+
+        Arguments:
+            .refine(Person['name']=='steve', Person['foo']=='bar')
+
+        Keyword Arguments:
+            .refine(name='steve', foo='bar') # Same refinement as the above
+                                             # example
+        """
+        query = self.query._copy()
+        query = args_to_comp(query, self.table, *a, **kw)
+        return ResultsGenerator(self.table, query, self.db)
+
+    def order_by(self, order_by):
+        """
+        Return a new ResultsGenerator with a modified ORDER BY clause.  Expects
+        a raw SQL string.
+
+        Examples:
+            .order_by('id ASC')
+            .order_by('entrydate DESC')
+        """
+        query = self.query._copy().order_by(order_by)
+        return ResultsGenerator(self.table, query, self.db)
+
+    def limit(self, limit):
+        """
+        Return a new ResultsGenerator with a modified LIMIT clause.  Expects a
+        raw SQL string.
+
+        Examples:
+            .limit(10)
+            .limit('ALL')
+        """
+        query = self.query._copy().limit(limit)
+        return ResultsGenerator(self.table, query, self.db)
+
+    def offset(self, offset):
+        """
+        Return a new ResultsGenerator with a modified OFFSET clause.  Expects a
+        raw SQL string.
+
+        Example:
+            .offset(10)
+        """
+        query = self.query._copy().offset(offset)
+        return ResultsGenerator(self.table, query, self.db)
+
+
+class Table(object):
+    """
+    A representation of a DB table.  You will primarily retrieve rows (Dicts)
+    from the database using the get_where and get_one methods.
+
+    Insert into this table:
+
+    >>> your_table(some_column='some value', other=False)
+    {'some_column':'some value', 'other':False}
+
+    Get all rows that need to be updated:
+
+    >>> list(table.get_where(outdated=True))
+    [Dict(), Dict(), Dict(), Dict()]
+
+    Get a single row (will raise an UnexpectedRow error if more than one row
+    could have been returned):
+
+    >>> table.get_one(id=12)
+    Dict()
+    >>> table.get_one(manager_id=14)
+    Dict()
+    >>> table.get_one(id=500) # id does not exist
+    None
+
+    You can reference another table using setitem.  Link to an employee's
+    manager using the manager's id, and the employee's manager_id.
+
+    >>> Person = db['person']
+    >>> Person['manager'] = Person['manager_id'] == Person['id']
+    >>> bob = Person(name='Bob')
+    >>> bob['manager']
+    Dict()
+
+    The foreign key should be on the right side of the Comparison.
+    >>> Person['manager'] = Person['manager_id'] == Person['id'] # right
+    >>> Person['manager'] = Person['id'] == Person['manager_id'] # wrong
+
+    Reference a manager's subordinates using their collective manager_id's.
+    Again, the foreign key is on the right.
+
+    >>> Person['subordinates'] = Person['id'].many(Person['manager_id'])
+    >>> list(bob['manager'])
+    [Dict(), Dict()]
+
+    Table.get_where returns a generator object, this makes it so you won't have
+    an entire table's object in memory at once, they are generated when gotten:
+
+    >>> bob['subordinates']
+    ResultsGenerator()
+    >>> for sub in bob['subordinates']:
+    >>>     print(sub)
+    Dict()
+    Dict()
+    Dict()
+
+    Get a count of all rows in this table:
+
+    >>> Person.count()
+    3
+    """
+
+    def __init__(self, table_name, db):
+        self.name = table_name
+        self.db = db
+        self.curs = db.curs
+        self.pks = []
+        self.refs = {}
+        self._refresh_pks()
+        self.order_by = None
+        self.fks = {}
+        self.cached_columns_info = None
+        self.cached_column_names = None
+        # Detect json column types for this table's columns
+        type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
+        data_types = [i[type_column_name].lower() for i in self.columns_info]
+        self.has_json = True if \
+            [i for i in _json_column_types if i in data_types] \
+            else False
+
+    def _refresh_pks(self):
+        """
+        Get a list of Primary Keys set for this table in the DB.
+        """
+        if self.db.kind == 'sqlite3':
+            self.curs.execute('pragma table_info(%s)' % self.name)
+            self.pks = [i['name'] for i in self.curs.fetchall() if i['pk']]
+
+        elif self.db.kind == 'postgresql':
+            self.curs.execute('''SELECT a.attname
+                    FROM pg_index i
+                    JOIN pg_attribute a ON a.attrelid = i.indrelid
+                    AND a.attnum = ANY(i.indkey)
+                    WHERE i.indrelid = '%s'::regclass
+                    AND i.indisprimary;''' % self.name)
+            self.pks = [i[0] for i in self.curs.fetchall()]
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return 'Table({0}, {1})'.format(self.name, self.pks)
+
+    def __call__(self, *a, **kw) -> Dict:
+        """
+        Used to insert a row into this table.
+        """
+        d = Dict(self, *a, **kw)
+        for ref_name in self.refs:
+            d[ref_name] = None
+        return d
+
+    def get_where(self, *a, **kw) -> ResultsGenerator:
+        """
+        Get all rows as Dicts where column values are as specified.  This always
+        returns a generator-like object ResultsGenerator.
+
+        If you provide only arguments, they will be paired in their respective
+        order to the primary keys defined or this table.  If the primary keys
+        of this table was ('id',) only:
+
+            get_where(4) is equal to get_where(id=4)
+
+            get_where(4, 5) would raise a NoPrimaryKey error because there is
+                            only one primary key.
+
+        Primary keys are defined automatically during the init of the Table, but
+        you can overwrite that by changing .pks:
+
+        >>> your_table.pks = ['id', 'some_column', 'whatever_you_want']
+
+            get_where(4, 5, 6) is now equal to get_where(id=4, some_column=5,
+                                                    whatever_you_want=6)
+
+        If there were two primary keys, such as in a join table (id, group):
+
+            get_where(4, 5) is equal to get_where(id=4, group=5)
+
+        You cannot use this method without primary keys, unless you specify the
+        column you are matching.
+
+        >>> get_where(some_column=83)
+        ResultsGenerator()
+
+        >>> get_where(4) # no primary keys defined!
+        NoPrimaryKey()
+
+        """
+        # All args/kwargs are combined in an SQL And comparison
+        operator_group = args_to_comp(And(), self, *a, **kw)
+
+        order_by = None
+        if self.order_by:
+            order_by = self.order_by
+        elif self.pks:
+            order_by = str(self.pks[0]) + ' ASC'
+        query = Select(self.name, operator_group).order_by(order_by)
+        return ResultsGenerator(self, query, self.db)
+
+    def get_one(self, *a, **kw) -> Optional[Dict]:
+        """
+        Get a single row as a Dict from the Database that matches the arguments
+        provided to this method.  See Table.get_where for more details.
+
+        If more than one row could be returned, this will raise an
+        UnexpectedRows error.
+        """
+        rgen = self.get_where(*a, **kw)
+        try:
+            i = next(rgen)
+        except StopIteration:
+            return None
+        try:
+            next(rgen)
+        except StopIteration:  # Should only be one result
+            pass
+        else:
+            raise UnexpectedRows('More than one row selected.')
+        return i
+
+    def get_raw(self, sql_query, *a) -> ResultsGenerator:
+        """
+        Get all rows returned by the raw SQL query provided, as Dicts.  Expects
+        that the query will only return columns from this instance's table.
+
+        Extra arguments and keyword arguments pare passed to the query builder as variables.
+        """
+        query = RawQuery(sql_query, *a)
+        return ResultsGenerator(self, query, self.db)
+
+    def count(self) -> int:
+        """
+        Get the count of rows in this table.
+        """
+        self.curs.execute('SELECT COUNT(*) FROM {table}'.format(
+            table=self.name))
+        return int(self.curs.fetchone()[0])
+
+    @property
+    def columns(self) -> List[str]:
+        """
+        Get a list of columns of a table.
+        """
+        if self.db.kind == 'sqlite3':
+            key = 'name'
+        else:
+            key = 'column_name'
+        return [i[key] for i in self.columns_info]
+
+    @property
+    def columns_info(self) -> List[dict]:
+        """
+        Get a dictionary that contains information about all columns of this
+        table.
+        """
+        if self.cached_columns_info:
+            return self.cached_columns_info
+
+        if self.db.kind == 'sqlite3':
+            sql = "PRAGMA TABLE_INFO(" + str(self.name) + ")"
+            self.curs.execute(sql)
+            self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
+        else:
+            sql = "SELECT * FROM information_schema.columns WHERE table_name=%s"
+            self.curs.execute(sql, [self.name, ])
+            self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
+        return self.cached_columns_info
+
+    @property
+    def column_names(self) -> set:
+        if not self.cached_column_names:
+            if self.db.kind == 'sqlite3':
+                self.cached_column_names = set(i['name'] for i in
+                                               self.columns_info)
+            else:
+                self.cached_column_names = set(i['column_name'] for i in
+                                               self.columns_info)
+        return self.cached_column_names
+
+    def __setitem__(self, ref_name, ref):
+        """
+        Create reference that will be gotten by all Dicts created from this
+        table.
+
+        Example:
+            Person['manager'] = Person['manager_id'] == Person['id']
+
+        For more examples see Table's doc.
+        """
+        if ref.column1.table != self:
+            # Dict.__getitem__ expects the columns to be in a particular order,
+            # fix any order issues.
+            ref.column1, ref.column2 = ref.column2, ref.column1
+        self.fks[ref.column1.column] = ref_name
+        self.refs[ref_name] = ref
+
+    def __getitem__(self, ref_name) -> Union[Column, SqliteColumn]:
+        """
+        Get a reference if it has already been created.  Otherwise, return a
+        Column object which is used to create a reference.
+        """
+        if ref_name in self.refs:
+            return self.refs[ref_name]
+        return self.db.column(self, ref_name)
+
+
+class DictDB(dict):
+    """
+    Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
+    Table instance for each table, and keep them in this DictDB using the
+    table's name as a key.
+
+    >>> db = DictDB(your_db_connection)
+    >>> db['table1']
+    Table('table1')
+
+    >>> db['other_table']
+    Table('other_table')
+
+    If your tables have changed while your DictDB instance existed, you can call
+    DictDB.refresh_tables() to have it rebuild all Table objects.
+    """
+
+    def __init__(self, db_conn):
+        self._real_getitem = super().__getitem__
+        self.conn = db_conn
+        if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
+            self.kind = 'sqlite3'
+            self.insert = SqliteInsert
+            self.update = SqliteUpdate
+            self.column = SqliteColumn
+        else:
+            self.kind = 'postgresql'
+            self.insert = Insert
+            self.update = Update
+            self.column = Column
+        self.select = Select
+        self.delete = Delete
+
+        self.curs = self.get_cursor()
+        self.refresh_tables()
+        self.conn.rollback()
+        super(DictDB, self).__init__()
+
+    def __getitem__(self, item: str) -> Table:
+        return self._real_getitem(item)
+
+    @classmethod
+    def table_factory(cls) -> Table:
+        return Table
+
+    def __list_tables(self):
+        if self.kind == 'sqlite3':
+            self.curs.execute('SELECT name FROM sqlite_master WHERE type ='
+                              '"table"')
+        else:
+            self.curs.execute('''SELECT DISTINCT table_name
+                    FROM information_schema.columns
+                    WHERE table_schema='public' ''')
+        return self.curs.fetchall()
+
+    def get_cursor(self) -> CursorHint:
+        """
+        Returns a cursor from the provided database connection that DictORM
+        objects expect.
+        """
+        if self.kind == 'sqlite3':
+            self.conn.row_factory = sqlite3.Row
+            curs = self.conn.cursor()
+            return curs
+        elif self.kind == 'postgresql':
+            curs = self.conn.cursor(cursor_factory=DictCursor)
+            return curs
+
+    def refresh_tables(self):
+        """
+        Create all Table instances from all tables found in the database.
+        """
+        if self.keys():
+            # Reset this DictDB because it contains old tables
+            super(DictDB, self).__init__()
+        table_cls = self.table_factory()
+        for table in self.__list_tables():
+            if self.kind == 'sqlite3':
+                self[table['name']] = table_cls(table['name'], self)
+            else:
+                self[table['table_name']] = table_cls(table['table_name'], self)
+
+    @contextmanager
+    def transaction(self, commit=False):
+        """
+        Context manager to rollback changes in case of an error.
+
+        :param commit: Commit changes on close, if True.
+        :return:
+        """
+        try:
+            yield
+        except:
+            self.conn.rollback()
+            raise
+        else:
+            # Commit if no exceptions occur
+            if commit:
+                self.conn.commit()
+
+
+def args_to_comp(operator: Operator, table: Table, *args, **kwargs):
+    """
+    Add arguments to the provided operator paired with their respective primary
+    key.
+    """
+    operator = operator or And()
+    pk_uses = 0
+    pks = table.pks
+    for val in args:
+        if isinstance(val, (Comparison, Operator)):
+            # Already a Comparison/Operator, just add it
+            operator += (val,)
+            continue
+        if not table.pks:
+            raise NoPrimaryKey('No Primary Keys(s) defined for ' + str(table))
+        try:
+            # Create a Comparison using the next Primary Key
+            operator += (table[pks[pk_uses]] == val,)
+        except IndexError:
+            raise NoPrimaryKey('Not enough Primary Keys(s) defined for ' +
+                               str(table))
+        pk_uses += 1
+
+    for k, v in kwargs.items():
+        operator += table[k] == v
+
+    return operator
+
+
+_json_column_types = ('json', 'jsonb')
