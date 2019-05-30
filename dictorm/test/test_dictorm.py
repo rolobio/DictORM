@@ -92,7 +92,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         self.tearDown()
         self.curs.execute('''
         CREATE TABLE person (
-            id SERIAL PRIMARY KEY,
+            id BIGSERIAL PRIMARY KEY,
             name VARCHAR(100),
             other INTEGER,
             manager_id INTEGER REFERENCES person(id)
@@ -913,7 +913,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         """
         Person = self.db['person']
         test_info = [
-            {'column_name': 'id', 'data_type': 'integer'},
+            {'column_name': 'id', 'data_type': 'bigint'},
             {'column_name': 'name', 'data_type': 'character varying'},
             {'column_name': 'other', 'data_type': 'integer'},
             {'column_name': 'manager_id', 'data_type': 'integer'},
