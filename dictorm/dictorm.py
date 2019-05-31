@@ -461,9 +461,6 @@ class Table(object):
         self.fks = {}
         self.cached_columns_info = None
         self.cached_column_names = None
-        # Detect json column types for this table's columns
-        type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
-        data_types = [i[type_column_name].lower() for i in self.columns_info]
 
     def _refresh_pks(self):
         """
