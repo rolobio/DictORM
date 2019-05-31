@@ -1,7 +1,7 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 from typing import Union, Optional, List
 
-__version__ = '4.0'
+__version__ = '4.1'
 
 from contextlib import contextmanager
 from itertools import chain
@@ -107,7 +107,7 @@ class Dict(dict):
     """
 
     def __init__(self, table, *a, **kw):
-        self._table: Table = table
+        self.table: Table = table
         self._in_db = False
         self._curs: CursorHint = table.db.curs
         super(Dict, self).__init__(*a, **kw)
@@ -123,7 +123,7 @@ class Dict(dict):
         All original column/values will bet inserted/updated by this method.
         All references will be flushed as well.
         """
-        if self._table.refs:
+        if self.table.refs:
             for i in self.values():
                 if isinstance(i, Dict):
                     i.flush()
@@ -131,29 +131,29 @@ class Dict(dict):
         # This will be sent to the DB, don't convert dicts to json unless
         # the table has json columns.
         items = self.no_refs()
-        if self._table.has_json:
+        if self.table.has_json:
             items = _json_dicts(items)
 
         # Insert/Update only with columns present on the table, this allows custom
         # instances of Dicts to be inserted even if they have columns not on the table
-        items = {k: v for k, v in items.items() if k in self._table.column_names}
+        items = {k: v for k, v in items.items() if k in self.table.column_names}
 
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = self._table.db.insert(self._table.name, **items
-                                          ).returning('*')
+            query = self.table.db.insert(self.table.name, **items
+                                         ).returning('*')
             d = self.__execute_query(query)
             self._in_db = True
         else:
             # Update this dictionary's row
-            if not self._table.pks:
+            if not self.table.pks:
                 raise NoPrimaryKey(
                     'Cannot update to {0}, no primary keys defined.'.format(
-                        self._table))
+                        self.table))
             # Update without references, "wheres" are the primary values
-            query = self._table.db.update(self._table.name, **items
-                                          ).where(self._old_pk_and or self.pk_and()).returning('*')
+            query = self.table.db.update(self.table.name, **items
+                                         ).where(self._old_pk_and or self.pk_and()).returning('*')
             d = self.__execute_query(query)
 
         if d:
@@ -166,7 +166,7 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary keys
         to be specified.
         """
-        query = self._table.db.delete(self._table.name).where(
+        query = self.table.db.delete(self.table.name).where(
             self._old_pk_and or self.pk_and())
         return self.__execute_query(query)
 
@@ -188,8 +188,8 @@ class Dict(dict):
         Return an And() of all this Dict's primary key and values. i.e.
         And(id=1, other_primary=4)
         """
-        return And(*[self._table[k] == v for k, v in self.items() if k in \
-                     self._table.pks])
+        return And(*[self.table[k] == v for k, v in self.items() if k in \
+                     self.table.pks])
 
     def no_pks(self):
         """
@@ -197,20 +197,20 @@ class Dict(dict):
         this Dict in the Database.  This should be used when doing an update of
         another Dict.
         """
-        return {k: v for k, v in self.items() if k not in self._table.pks}
+        return {k: v for k, v in self.items() if k not in self.table.pks}
 
     def no_refs(self):
         """
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
-        return {k: v for k, v in self.items() if k not in self._table.refs}
+        return {k: v for k, v in self.items() if k not in self.table.refs}
 
     def references(self):
         """
         Return a dictionary of only the referenced rows.
         """
-        return {k: v for k, v in self.items() if k in self._table.refs}
+        return {k: v for k, v in self.items() if k in self.table.refs}
 
     def __getitem__(self, key):
         """
@@ -218,7 +218,7 @@ class Dict(dict):
         referenced row, get that row first.  Will only get a referenced row
         once, until the referenced row's foreign key is changed.
         """
-        ref = self._table.refs.get(key)
+        ref = self.table.refs.get(key)
         if not ref and key not in self:
             raise KeyError(str(key))
         # Only get the referenced row once, if it has a value, the reference's
@@ -252,7 +252,7 @@ class Dict(dict):
         Set self[key] to value.  If key is a reference's matching foreign key,
         set the reference to None.
         """
-        ref = self._table.fks.get(key)
+        ref = self.table.fks.get(key)
         if ref:
             super(Dict, self).__setitem__(ref, None)
         return super(Dict, self).__setitem__(key, value)
@@ -548,11 +548,15 @@ class Table(object):
         You cannot use this method without primary keys, unless you specify the
         column you are matching.
 
-        >>> get_where(some_column=83)
+        >>> your_table.get_where(some_column=83)
         ResultsGenerator()
 
-        >>> get_where(4) # no primary keys defined!
+        >>> your_table.get_where(4) # no primary keys defined!
         NoPrimaryKey()
+
+        Check if a Dict belongs to this Table:
+        >>> bob in Person
+        True
 
         """
         # All args/kwargs are combined in an SQL And comparison
@@ -671,6 +675,21 @@ class Table(object):
         if ref_name in self.refs:
             return self.refs[ref_name]
         return self.db.column(self, ref_name)
+
+    def __contains__(self, item: Dict):
+        """
+        Compare a row's table to myself.  If the tables match, the row is a member of this
+        table.
+
+        Example:
+            >>> bob in Person
+            True
+            >>> bob in Car
+            False
+        """
+        if isinstance(item, Dict):
+            return item.table == self
+        raise ValueError('Cannot check if item is in this Table because it is not a Dict.')
 
 
 class DictDB(dict):
