@@ -1,7 +1,7 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 from typing import Union, Optional, List
 
-__version__ = '4.0'
+__version__ = '4.1'
 
 from contextlib import contextmanager
 from itertools import chain
