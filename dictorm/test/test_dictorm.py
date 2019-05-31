@@ -1225,17 +1225,6 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         p.flush()
         self.assertEqual(Possession.get_one()['description'], {'foo': 'baz'})
 
-        # Non-json row doesn't call json_dicts
-        original = dictorm.set_json_dicts(error)
-        self.assertRaises(Exception, p.flush)
-        try:
-            Person = self.db['person']
-            bob = Person(name='Bob')
-            # Shouldn't raise Exception from "error" function
-            bob.flush()
-        finally:
-            dictorm.set_json_dicts(original)
-
     def test_offset(self):
         """
         Postgres allows offset without limit, but not Sqlite
