@@ -4,7 +4,7 @@ Provide Sqlite3 support by making simple changes to dictorm.pg classes.
 from .pg import Column as PostgresqlColumn
 from .pg import Comparison as PostgresqlComparison
 from .pg import Insert as PostgresqlInsert
-from .pg import Select, And
+from .pg import Select
 from .pg import Update as PostgresqlUpdate
 
 
