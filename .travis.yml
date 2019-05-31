@@ -34,6 +34,8 @@ script:
   - "green -rvv"
   # Test installation
   - "python setup.py install"
+  # Output the current version
+  - "python -m dictorm.version"
   # Verify that dictorm can be imported
   - "python -c 'from dictorm import *'"
 services:

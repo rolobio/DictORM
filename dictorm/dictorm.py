@@ -1,11 +1,10 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 from typing import Union, Optional, List
 
-__version__ = '4.1'
+__version__ = '4.1.1'
 
 from contextlib import contextmanager
 from itertools import chain
-from json import dumps
 from sys import modules
 
 from .pg import Select, Insert, Update, Delete
@@ -17,7 +16,10 @@ from .sqlite import Update as SqliteUpdate
 
 db_package_imported = False
 try:  # pragma: no cover
-    from psycopg2.extras import DictCursor
+    from psycopg2.extras import DictCursor, Json
+    from psycopg2.extensions import register_adapter
+
+    register_adapter(dict, Json)
 
     CursorHint = DictCursor
 
@@ -27,6 +29,9 @@ except ImportError:  # pragma: no cover
 
 try:  # pragma: no cover
     import sqlite3
+    from json import dumps
+
+    sqlite3.register_adapter(dict, dumps)
 
     CursorHint = sqlite3.Cursor
 
@@ -49,31 +54,6 @@ class UnexpectedRows(Exception):
 
 class NoCache(Exception):
     pass
-
-
-global _json_dicts
-
-
-def _json_dicts(d):
-    """
-    Convert all dictionaries contained in this object into JSON strings.
-    """
-    for key, value in d.items():
-        if isinstance(value, dict):
-            d[key] = dumps(value)
-    return d
-
-
-def set_json_dicts(func):
-    """
-    Used only for testing
-
-    :param func:
-    :return:
-    """
-    global _json_dicts
-    original, _json_dicts = _json_dicts, func
-    return original
 
 
 class Dict(dict):
@@ -115,7 +95,7 @@ class Dict(dict):
 
     def flush(self):
         """
-        Insert this dictionary into it's table if its no yet in the Database, or
+        Insert this dictionary into it's table if its not yet in the Database, or
         Update it's row if it is already in the database.  This method relies
         heavily on the primary keys of the row's respective table.  If no
         primary keys are specified, this method will not function!
@@ -131,8 +111,6 @@ class Dict(dict):
         # This will be sent to the DB, don't convert dicts to json unless
         # the table has json columns.
         items = self.no_refs()
-        if self.table.has_json:
-            items = _json_dicts(items)
 
         # Insert/Update only with columns present on the table, this allows custom
         # instances of Dicts to be inserted even if they have columns not on the table
@@ -483,12 +461,6 @@ class Table(object):
         self.fks = {}
         self.cached_columns_info = None
         self.cached_column_names = None
-        # Detect json column types for this table's columns
-        type_column_name = 'type' if db.kind == 'sqlite3' else 'data_type'
-        data_types = [i[type_column_name].lower() for i in self.columns_info]
-        self.has_json = True if \
-            [i for i in _json_column_types if i in data_types] \
-            else False
 
     def _refresh_pks(self):
         """
@@ -820,6 +792,3 @@ def args_to_comp(operator: Operator, table: Table, *args, **kwargs):
         operator += table[k] == v
 
     return operator
-
-
-_json_column_types = ('json', 'jsonb')
