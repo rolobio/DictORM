@@ -603,13 +603,13 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         alice = Person(name='Alice', manager_id=bob['id']).flush()
         self.assertEqual(alice['manager'], bob)
 
-        original_get_where = alice._table.get_where
-        alice._table.get_where = error
+        original_get_where = alice.table.get_where
+        alice.table.get_where = error
         self.assertEqual(alice['manager'], bob)
 
         steve = Person(name='Steve').flush()
 
-        alice._table.get_where = original_get_where
+        alice.table.get_where = original_get_where
         alice['manager_id'] = steve['id']
         alice.flush()
         self.assertEqualNoRefs(alice['manager'], steve)
@@ -647,8 +647,8 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
 
         will = Person(name='Will').flush()
         bob = Person(name='Bob').flush()
-        self.assertEqual(will._table, bob._table)
-        self.assertIs(will._table, bob._table)
+        self.assertEqual(will.table, bob.table)
+        self.assertIs(will.table, bob.table)
 
         Car = self.db['car']
         self.assertNotEqual(Person, Car)
@@ -659,10 +659,10 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         will.flush()
         will['car']['license_plate'] = 'foo'
 
-        self.assertEqual(stratus._table, Car)
-        self.assertIs(stratus._table, Car)
-        self.assertEqual(will['car']._table, Car)
-        self.assertIs(will['car']._table, Car)
+        self.assertEqual(stratus.table, Car)
+        self.assertIs(stratus.table, Car)
+        self.assertEqual(will['car'].table, Car)
+        self.assertIs(will['car'].table, Car)
 
     def test_real(self):
         """
@@ -836,8 +836,8 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         bob['manager_id'] = bill['id']
 
         self.assertEqual(bob['manager'], bill)
-        old_get_one = bob._table.get_one
-        bob._table.get_one = error
+        old_get_one = bob.table.get_one
+        bob.table.get_one = error
         # Error fuction shouldn't be called, since manager is cached
         self.assertEqual(bob['manager'], bill)
 
@@ -845,7 +845,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         Person['car'] = Person['car_id'] == Car['id']
         Person['manager_car'] = Person['manager'].substratum('car')
 
-        bob._table.get_one = old_get_one
+        bob.table.get_one = old_get_one
         self.assertEqual(bob['manager_car'], None)
         bill_car = Car(name='Prius').flush()
         bill['car_id'] = bill_car['id']
@@ -875,7 +875,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         for sub in subordinates:
             assert isinstance(sub, dictorm.Dict)
         # Error would be raised if subordinates isn't cached
-        bob._table.get_where = error
+        bob.table.get_where = error
         for sub in subordinates:
             assert isinstance(sub, dictorm.Dict)
 
@@ -1321,6 +1321,20 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             list(Person.get_where(Person['id'].In([2, 3]))),
             list(Person.get_where(Person['id'].Any([2, 3])))
         )
+
+    def test_contains(self):
+        """
+        A Dict can be matched to the Table it originates from.
+        """
+        Person, Car = self.db['person'], self.db['car']
+        steve = Person(name='Steve').flush()
+        steve_car = Car(name='Stratus', person_id=steve['id']).flush()
+        self.assertTrue(steve in Person)
+        self.assertFalse(steve in Car)
+        self.assertFalse(steve_car in Person)
+        self.assertTrue(steve_car in Car)
+
+        self.assertRaises(ValueError, Person.__contains__, 'foo')
 
 
 class SqliteTestBase(object):

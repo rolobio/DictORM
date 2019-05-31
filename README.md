@@ -356,6 +356,17 @@ bob['manager_id'] = None
 [aly,]
 ```
 
+### Check if a Dict belongs to a Table
+```python
+>>> bob = Person(name='bob').flush()
+>>> bob.table
+Person
+>>> bob in Person
+True
+>>> bob in Car
+False
+```
+
 ### Advanced query'ing
 ```python
 # DictORM supports many simple expressions.  It is by no means exhaustive, but
