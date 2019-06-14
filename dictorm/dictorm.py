@@ -1,7 +1,7 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 from typing import Union, Optional, List
 
-__version__ = '4.1.1'
+__version__ = '4.1.2'
 
 from contextlib import contextmanager
 from itertools import chain
@@ -16,6 +16,7 @@ from .sqlite import Update as SqliteUpdate
 
 db_package_imported = False
 try:  # pragma: no cover
+    from psycopg2.extras import _connection
     from psycopg2.extras import DictCursor, Json
     from psycopg2.extensions import register_adapter
 
@@ -470,7 +471,7 @@ class Table(object):
             self.curs.execute('pragma table_info(%s)' % self.name)
             self.pks = [i['name'] for i in self.curs.fetchall() if i['pk']]
 
-        elif self.db.kind == 'postgresql':
+        elif self.db.kind == POSTGRES_KIND:
             self.curs.execute('''SELECT a.attname
                     FROM pg_index i
                     JOIN pg_attribute a ON a.attrelid = i.indrelid
@@ -480,7 +481,7 @@ class Table(object):
             self.pks = [i[0] for i in self.curs.fetchall()]
 
     def __repr__(self) -> str:  # pragma: no cover
-        return 'Table({0}, {1})'.format(self.name, self.pks)
+        return f'Table({self.name}, {self.pks})'
 
     def __call__(self, *a, **kw) -> Dict:
         """
@@ -563,7 +564,7 @@ class Table(object):
             raise UnexpectedRows('More than one row selected.')
         return i
 
-    def get_raw(self, sql_query, *a) -> ResultsGenerator:
+    def get_raw(self, sql_query: str, *a) -> ResultsGenerator:
         """
         Get all rows returned by the raw SQL query provided, as Dicts.  Expects
         that the query will only return columns from this instance's table.
@@ -622,7 +623,7 @@ class Table(object):
                                                self.columns_info)
         return self.cached_column_names
 
-    def __setitem__(self, ref_name, ref):
+    def __setitem__(self, ref_name: str, ref):
         """
         Create reference that will be gotten by all Dicts created from this
         table.
@@ -639,7 +640,7 @@ class Table(object):
         self.fks[ref.column1.column] = ref_name
         self.refs[ref_name] = ref
 
-    def __getitem__(self, ref_name) -> Union[Column, SqliteColumn]:
+    def __getitem__(self, ref_name: str) -> Union[Column, SqliteColumn]:
         """
         Get a reference if it has already been created.  Otherwise, return a
         Column object which is used to create a reference.
@@ -664,6 +665,10 @@ class Table(object):
         raise ValueError('Cannot check if item is in this Table because it is not a Dict.')
 
 
+SQLITE_KIND = 'sqlite3'
+POSTGRES_KIND = 'postgresql'
+
+
 class DictDB(dict):
     """
     Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
@@ -681,16 +686,16 @@ class DictDB(dict):
     DictDB.refresh_tables() to have it rebuild all Table objects.
     """
 
-    def __init__(self, db_conn):
+    def __init__(self, db_conn: Union[sqlite3.Connection, _connection]):
         self._real_getitem = super().__getitem__
         self.conn = db_conn
         if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
-            self.kind = 'sqlite3'
+            self.kind = SQLITE_KIND
             self.insert = SqliteInsert
             self.update = SqliteUpdate
             self.column = SqliteColumn
         else:
-            self.kind = 'postgresql'
+            self.kind = POSTGRES_KIND
             self.insert = Insert
             self.update = Update
             self.column = Column
@@ -702,6 +707,9 @@ class DictDB(dict):
         self.conn.rollback()
         super(DictDB, self).__init__()
 
+    def __repr__(self):  # pragma: no cover
+        return f'DictDB({self.kind}, {self.conn})'
+
     def __getitem__(self, item: str) -> Table:
         return self._real_getitem(item)
 
@@ -710,7 +718,7 @@ class DictDB(dict):
         return Table
 
     def __list_tables(self):
-        if self.kind == 'sqlite3':
+        if self.kind == SQLITE_KIND:
             self.curs.execute('SELECT name FROM sqlite_master WHERE type ='
                               '"table"')
         else:
@@ -724,11 +732,11 @@ class DictDB(dict):
         Returns a cursor from the provided database connection that DictORM
         objects expect.
         """
-        if self.kind == 'sqlite3':
+        if self.kind == SQLITE_KIND:
             self.conn.row_factory = sqlite3.Row
             curs = self.conn.cursor()
             return curs
-        elif self.kind == 'postgresql':
+        elif self.kind == POSTGRES_KIND:
             curs = self.conn.cursor(cursor_factory=DictCursor)
             return curs
 
@@ -740,14 +748,13 @@ class DictDB(dict):
             # Reset this DictDB because it contains old tables
             super(DictDB, self).__init__()
         table_cls = self.table_factory()
+        name_key = 'name' if self.kind == SQLITE_KIND else 'table_name'
         for table in self.__list_tables():
-            if self.kind == 'sqlite3':
-                self[table['name']] = table_cls(table['name'], self)
-            else:
-                self[table['table_name']] = table_cls(table['table_name'], self)
+            name = table[name_key]
+            self[name] = table_cls(name, self)
 
     @contextmanager
-    def transaction(self, commit=False):
+    def transaction(self, commit: bool=False):
         """
         Context manager to rollback changes in case of an error.
 
@@ -756,7 +763,7 @@ class DictDB(dict):
         """
         try:
             yield
-        except:
+        except Exception:
             self.conn.rollback()
             raise
         else:
