@@ -15,10 +15,13 @@ from .sqlite import Column as SqliteColumn
 from .sqlite import Update as SqliteUpdate
 
 db_package_imported = False
+db_conn_type = None
 try:  # pragma: no cover
     from psycopg2.extras import _connection
     from psycopg2.extras import DictCursor, Json
     from psycopg2.extensions import register_adapter
+
+    db_conn_type = _connection
 
     register_adapter(dict, Json)
 
@@ -31,6 +34,8 @@ except ImportError:  # pragma: no cover
 try:  # pragma: no cover
     import sqlite3
     from json import dumps
+
+    db_conn_type = Union[sqlite3.Connection, db_conn_type] if db_conn_type else sqlite3.Connection
 
     sqlite3.register_adapter(dict, dumps)
 
@@ -686,7 +691,7 @@ class DictDB(dict):
     DictDB.refresh_tables() to have it rebuild all Table objects.
     """
 
-    def __init__(self, db_conn: Union[sqlite3.Connection, _connection]):
+    def __init__(self, db_conn: db_conn_type):
         self._real_getitem = super().__getitem__
         self.conn = db_conn
         if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
@@ -754,7 +759,7 @@ class DictDB(dict):
             self[name] = table_cls(name, self)
 
     @contextmanager
-    def transaction(self, commit: bool=False):
+    def transaction(self, commit: bool = False):
         """
         Context manager to rollback changes in case of an error.
 
