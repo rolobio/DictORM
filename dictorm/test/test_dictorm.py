@@ -177,7 +177,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         self.assertEqual(list(Person.get_where()), [bob, alice])
 
         # get_where accepts a tuple of ids, and returns those rows
-        if self.db.kind != 'sqlite3':
+        if self.db.kind != dictorm.DBKind.sqlite3:
             self.assertEqual(list(Person.get_where(Person['id'].In([1, 3]))),
                              [bob, alice])
 

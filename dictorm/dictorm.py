@@ -1,4 +1,5 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
+from enum import Enum, auto
 from typing import Union, Optional, List
 
 __version__ = '4.1.2'
@@ -60,6 +61,11 @@ class UnexpectedRows(Exception):
 
 class NoCache(Exception):
     pass
+
+
+class DBKind(Enum):
+    postgres = auto()
+    sqlite3 = auto()
 
 
 class Dict(dict):
@@ -305,7 +311,7 @@ class ResultsGenerator:
 
     def __len__(self) -> int:
         self.__execute_once()
-        if self.db_kind == 'sqlite3':
+        if self.db_kind == DBKind.sqlite3:
             # sqlite3's cursor.rowcount doesn't support select statements
             # returns a 0 because this method is called when a ResultsGenerator
             # is converted into a list()
@@ -472,11 +478,11 @@ class Table(object):
         """
         Get a list of Primary Keys set for this table in the DB.
         """
-        if self.db.kind == 'sqlite3':
+        if self.db.kind == DBKind.sqlite3:
             self.curs.execute('pragma table_info(%s)' % self.name)
             self.pks = [i['name'] for i in self.curs.fetchall() if i['pk']]
 
-        elif self.db.kind == POSTGRES_KIND:
+        elif self.db.kind == DBKind.postgres:
             self.curs.execute('''SELECT a.attname
                     FROM pg_index i
                     JOIN pg_attribute a ON a.attrelid = i.indrelid
@@ -539,7 +545,7 @@ class Table(object):
         """
         # When column names are quoted in an SQLite statement and the column doesn't exist, SQLite doesn't raise
         # an exception.  We'll raise an exception if any columns don't exist.
-        if self.db.kind == 'sqlite3':
+        if self.db.kind == DBKind.sqlite3:
             bad_columns = set(kw.keys()).difference(self.column_names)
             if bad_columns:
                 raise sqlite3.OperationalError(f'no such column: {bad_columns.pop()}')
@@ -599,7 +605,7 @@ class Table(object):
         """
         Get a list of columns of a table.
         """
-        if self.db.kind == 'sqlite3':
+        if self.db.kind == DBKind.sqlite3:
             key = 'name'
         else:
             key = 'column_name'
@@ -614,7 +620,7 @@ class Table(object):
         if self.cached_columns_info:
             return self.cached_columns_info
 
-        if self.db.kind == 'sqlite3':
+        if self.db.kind == DBKind.sqlite3:
             sql = "PRAGMA TABLE_INFO(" + str(self.name) + ")"
             self.curs.execute(sql)
             self.cached_columns_info = [dict(i) for i in self.curs.fetchall()]
@@ -627,7 +633,7 @@ class Table(object):
     @property
     def column_names(self) -> set:
         if not self.cached_column_names:
-            if self.db.kind == 'sqlite3':
+            if self.db.kind == DBKind.sqlite3:
                 self.cached_column_names = set(i['name'] for i in
                                                self.columns_info)
             else:
@@ -677,10 +683,6 @@ class Table(object):
         raise ValueError('Cannot check if item is in this Table because it is not a Dict.')
 
 
-SQLITE_KIND = 'sqlite3'
-POSTGRES_KIND = 'postgresql'
-
-
 class DictDB(dict):
     """
     Get all the tables from the provided Psycopg2/Sqlite3 connection.  Create a
@@ -702,12 +704,12 @@ class DictDB(dict):
         self._real_getitem = super().__getitem__
         self.conn = db_conn
         if 'sqlite3' in modules and isinstance(db_conn, sqlite3.Connection):
-            self.kind = SQLITE_KIND
+            self.kind = DBKind.sqlite3
             self.insert = SqliteInsert
             self.update = SqliteUpdate
             self.column = SqliteColumn
         else:
-            self.kind = POSTGRES_KIND
+            self.kind = DBKind.postgres
             self.insert = Insert
             self.update = Update
             self.column = Column
@@ -730,7 +732,7 @@ class DictDB(dict):
         return Table
 
     def __list_tables(self):
-        if self.kind == SQLITE_KIND:
+        if self.kind == DBKind.sqlite3:
             self.curs.execute('SELECT name FROM sqlite_master WHERE type ='
                               '"table"')
         else:
@@ -744,11 +746,11 @@ class DictDB(dict):
         Returns a cursor from the provided database connection that DictORM
         objects expect.
         """
-        if self.kind == SQLITE_KIND:
+        if self.kind == DBKind.sqlite3:
             self.conn.row_factory = sqlite3.Row
             curs = self.conn.cursor()
             return curs
-        elif self.kind == POSTGRES_KIND:
+        elif self.kind == DBKind.postgres:
             curs = self.conn.cursor(cursor_factory=DictCursor)
             return curs
 
@@ -760,7 +762,7 @@ class DictDB(dict):
             # Reset this DictDB because it contains old tables
             super(DictDB, self).__init__()
         table_cls = self.table_factory()
-        name_key = 'name' if self.kind == SQLITE_KIND else 'table_name'
+        name_key = 'name' if self.kind == DBKind.sqlite3 else 'table_name'
         for table in self.__list_tables():
             name = table[name_key]
             self[name] = table_cls(name, self)
