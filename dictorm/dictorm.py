@@ -1,8 +1,10 @@
 """What if you could insert a Python dictionary into the database?  DictORM allows you to select/insert/update rows of a database as if they were Python Dictionaries."""
 import enum
+import sqlite3
+from json import dumps
 from typing import Union, Optional, List
 
-__version__ = '4.1.3'
+__version__ = '4.1.4'
 
 from contextlib import contextmanager
 from itertools import chain
@@ -15,40 +17,22 @@ from .sqlite import Insert as SqliteInsert
 from .sqlite import Column as SqliteColumn
 from .sqlite import Update as SqliteUpdate
 
-db_package_imported = False
-db_conn_type = None
+db_conn_type = sqlite3.Connection
+CursorHint = sqlite3.Cursor
+sqlite3.register_adapter(dict, dumps)
+
 try:  # pragma: no cover
     from psycopg2.extras import _connection
     from psycopg2.extras import DictCursor, Json
     from psycopg2.extensions import register_adapter
 
-    db_conn_type = _connection
+    db_conn_type = Union[db_conn_type, _connection]
 
     register_adapter(dict, Json)
 
-    CursorHint = DictCursor
-
-    db_package_imported = True
+    CursorHint = Union[CursorHint, DictCursor]
 except ImportError:  # pragma: no cover
     pass
-
-try:  # pragma: no cover
-    import sqlite3
-    from json import dumps
-
-    db_conn_type = Union[sqlite3.Connection, db_conn_type] if db_conn_type else sqlite3.Connection
-
-    sqlite3.register_adapter(dict, dumps)
-
-    CursorHint = sqlite3.Cursor
-
-    db_package_imported = True
-except ImportError:  # pragma: no cover
-    pass
-
-if not db_package_imported:  # pragma: no cover
-    raise ImportError('Failed to import psycopg2 or sqlite3.  These are the'
-                      'only supported Databases and you must import one of them')
 
 
 class NoPrimaryKey(Exception):
