@@ -63,10 +63,6 @@ class ExtraTestMethods:
 JSONB_SUPPORT = {
     '902': 'JSON',
     '903': 'JSON',
-    '904': 'JSONB',
-    '905': 'JSONB',
-    '906': 'JSONB',
-    '100': 'JSONB',
 }
 
 
@@ -117,7 +113,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             person_id INTEGER,
             description {JSON_OR_JSONB}
         );
-        '''.format(JSON_OR_JSONB=JSONB_SUPPORT[major_version]))
+        '''.format(JSON_OR_JSONB=JSONB_SUPPORT.get(major_version, 'JSONB')))
         self.conn.commit()
         self.db.refresh_tables()
 
@@ -1325,6 +1321,20 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
 
         self.assertRaises(ValueError, Person.__contains__, 'foo')
 
+    def test_arbitrary_get_keywords(self):
+        """
+        Table.get_one and Table.get_where shouldn't accept arbitrary keywords.
+        """
+        Person = self.db['person']
+        self.assertRaises(psycopg2.errors.UndefinedColumn, Person.get_one, foo='bar')
+        self.conn.rollback()
+        try:
+            result = list(Person.get_where(foo='bar'))
+            print(result)
+            raise Exception('get_where did not raise UndefinedColumn')
+        except psycopg2.errors.UndefinedColumn:
+            pass
+
 
 class SqliteTestBase(object):
 
@@ -1489,6 +1499,19 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
 
         persons = Person.get_raw('SELECT * FROM person WHERE id=?', aly['id'])
         self.assertEqual(list(persons), [aly])
+
+    def test_arbitrary_get_keywords(self):
+        """
+        Table.get_one and Table.get_where shouldn't accept arbitrary keywords.
+        """
+        Person = self.db['person']
+        self.assertRaises(sqlite3.OperationalError, Person.get_one, foo='bar')
+        try:
+            result = list(Person.get_where(foo='bar'))
+            print(result)
+            raise Exception('get_where did not raise UndefinedColumn')
+        except sqlite3.OperationalError as e:
+            pass
 
     # These tests are inherited from Postgres, but they don't function for Sqlite
     test_any = None

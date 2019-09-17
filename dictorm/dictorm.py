@@ -537,6 +537,13 @@ class Table(object):
         True
 
         """
+        # When column names are quoted in an SQLite statement and the column doesn't exist, SQLite doesn't raise
+        # an exception.  We'll raise an exception if any columns don't exist.
+        if self.db.kind == 'sqlite3':
+            bad_columns = set(kw.keys()).difference(self.column_names)
+            if bad_columns:
+                raise sqlite3.OperationalError(f'no such column: {bad_columns.pop()}')
+
         # All args/kwargs are combined in an SQL And comparison
         operator_group = args_to_comp(And(), self, *a, **kw)
 
