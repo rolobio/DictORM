@@ -1330,9 +1330,8 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         self.conn.rollback()
         try:
             result = list(Person.get_where(foo='bar'))
-            print(result)
             raise Exception('get_where did not raise UndefinedColumn')
-        except psycopg2.errors.UndefinedColumn:
+        except psycopg2.errors.UndefinedColumn as e:
             pass
 
 
@@ -1508,7 +1507,6 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         self.assertRaises(sqlite3.OperationalError, Person.get_one, foo='bar')
         try:
             result = list(Person.get_where(foo='bar'))
-            print(result)
             raise Exception('get_where did not raise UndefinedColumn')
         except sqlite3.OperationalError as e:
             pass
