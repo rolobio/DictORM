@@ -624,7 +624,7 @@ class Table(object):
 
     @property
     def column_names(self) -> set:
-        if not self.cached_column_names:
+        if not self.cached_column_names:  # pragma: no cover
             if self.db.kind == DBKind.sqlite3:
                 self.cached_column_names = set(i['name'] for i in
                                                self.columns_info)

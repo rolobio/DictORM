@@ -897,22 +897,6 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         self.assertEqual(sorted(Person.columns),
                          ['car_id', 'id', 'manager_id', 'name', 'other'])
 
-    def test_column_info(self):
-        """
-        Table.columns is a method that gets a list of a table's columns
-        """
-        Person = self.db['person']
-        test_info = [
-            {'column_name': 'id', 'data_type': 'bigint'},
-            {'column_name': 'name', 'data_type': 'character varying'},
-            {'column_name': 'other', 'data_type': 'integer'},
-            {'column_name': 'manager_id', 'data_type': 'integer'},
-            {'column_name': 'car_id', 'data_type': 'integer'},
-        ]
-        self.assertEqual(len(test_info), len(Person.columns_info))
-        for i, j in zip(test_info, Person.columns_info):
-            self.assertDictContains(j, i)
-
     def test_like(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
@@ -1178,7 +1162,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         try:
             Person.curs.execute = error
             # Error shouldn't be raised
-            self.assertEqual(Person.columns, col_vals)
+            self.assertEqual(set(Person.columns), set(col_vals))
         finally:
             Person.curs.execute = original_execute
 
@@ -1350,23 +1334,6 @@ class TestPostgres12(TestPostgresql):
         else:
             self.skipTest('These tests only apply to Postgres 12+')
 
-    def test_column_info(self):
-        """
-        Table.columns is a method that gets a list of a table's columns
-        """
-        Car = self.db['car']
-        test_info = [
-            {'column_name': 'id', 'data_type': 'integer'},
-            {'column_name': 'license_plate', 'data_type': 'text'},
-            {'column_name': 'name', 'data_type': 'text'},
-            {'column_name': 'person_id', 'data_type': 'integer'},
-            {'column_name': 'width', 'data_type': 'integer'},
-            {'column_name': 'height', 'data_type': 'integer'},
-            {'column_name': 'area', 'data_type': 'integer'},
-        ]
-        for i, j in zip_longest(test_info, Car.columns_info):
-            self.assertDictContains(j, i)
-
     def test_generated_columns(self):
         """
         You can't update a generated column.
@@ -1514,22 +1481,6 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         results = list(NoPk.get_where(foo='bar'))
         self.assertEqual(len(results), 1)
         self.assertEqual(results, [{'foo': 'bar'}, ])
-
-    def test_column_info(self):
-        """
-        Table.columns is a method that gets a list of a table's columns
-        """
-        Person = self.db['person']
-        test_info = [
-            {'name': 'id', 'type': 'INTEGER'},
-            {'name': 'name', 'type': 'TEXT'},
-            {'name': 'other', 'type': 'INTEGER'},
-            {'name': 'manager_id', 'type': 'INTEGER'},
-            {'name': 'car_id', 'type': 'INTEGER'},
-        ]
-        self.assertEqual(len(test_info), len(Person.columns_info))
-        for i, j in zip(test_info, map(dict, Person.columns_info)):
-            self.assertDictContains(j, i)
 
     def test_raw(self):
         """
