@@ -487,7 +487,7 @@ returns a ResultsGenerator that creates Dicts from the person table.
 # Testing
 ```bash
 # Get postgres container
-sudo docker run --name dictorm -e POSTGRES_PASSWORD=dictorm -p 54321:5432 -d postgres:9.6
+sudo docker run --name dictorm -e POSTGRES_PASSWORD=dictorm -p 54321:5432 -d postgres:12
 # Install test requirements & run:
 pip install -e .[testing]
 python setup.py test

@@ -1,5 +1,4 @@
 #! /usr/bin/env python
-import os
 import sqlite3
 import unittest
 
@@ -14,10 +13,8 @@ test_db_login = {
     'password': 'dictorm',
     'host': 'localhost',
     'port': '54321',
+    'connect_timeout': 3,
 }
-
-if 'CI' in os.environ.keys():
-    test_db_login['port'] = 5432
 
 
 def _no_refs(o):
@@ -41,7 +38,7 @@ class ExtraTestMethods:
     def assertDictContains(cls, d1, d2):
         missing = set(d2.items()).difference(set(d1.items()))
         if missing:
-            raise TypeError('{0} missing does not contain {1}'.format(d1, dict(missing)))
+            raise TypeError('{0} does not contain {1}'.format(d1, missing))
 
     @classmethod
     def assertRaisesAny(cls, exps, func, a=None, kw=None):
@@ -74,9 +71,9 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
 
-        # Change the schema depending on which versin of Postgres we're using
+        # Change the schema depending on which version of Postgres we're using
         server_version = str(self.conn.server_version)
-        major_version = server_version[:3]
+        self.major_version = major_version = server_version[:3]
 
         self.db = dictorm.DictDB(self.conn)
         self.curs = self.db.curs
@@ -101,7 +98,9 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             id SERIAL PRIMARY KEY,
             license_plate TEXT,
             name TEXT,
-            person_id INTEGER REFERENCES person(id)
+            person_id INTEGER REFERENCES person(id),
+            width INTEGER,
+            height INTEGER
         );
         ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
         CREATE TABLE no_pk (foo VARCHAR(10));
@@ -895,24 +894,8 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         Table.columns is a method that gets a list of a table's columns
         """
         Person = self.db['person']
-        self.assertEqual(Person.columns,
-                         ['id', 'name', 'other', 'manager_id', 'car_id'])
-
-    def test_column_info(self):
-        """
-        Table.columns is a method that gets a list of a table's columns
-        """
-        Person = self.db['person']
-        test_info = [
-            {'column_name': 'id', 'data_type': 'bigint'},
-            {'column_name': 'name', 'data_type': 'character varying'},
-            {'column_name': 'other', 'data_type': 'integer'},
-            {'column_name': 'manager_id', 'data_type': 'integer'},
-            {'column_name': 'car_id', 'data_type': 'integer'},
-        ]
-        self.assertEqual(len(test_info), len(Person.columns_info))
-        for i, j in zip(test_info, Person.columns_info):
-            self.assertDictContains(j, i)
+        self.assertEqual(sorted(Person.columns),
+                         ['car_id', 'id', 'manager_id', 'name', 'other'])
 
     def test_like(self):
         Person = self.db['person']
@@ -1058,7 +1041,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         self.assertIn('manager_id', bob)
 
         # An invalid column name raises an error
-        bob[' "; DELETE FROM person;'] = 'Bob'
+        self.assertRaises(dictorm.CannotUpdateColumn, bob.__setitem__, ' "; DELETE FROM person;', 'Bob')
 
     def test_operators(self):
         Person = self.db['person']
@@ -1174,12 +1157,12 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         original_execute = self.curs.execute
 
         col_vals = ['id', 'name', 'other', 'manager_id', 'car_id']
-        self.assertEqual(Person.columns, col_vals)
+        self.assertEqual(set(Person.columns), set(col_vals))
 
         try:
             Person.curs.execute = error
             # Error shouldn't be raised
-            self.assertEqual(Person.columns, col_vals)
+            self.assertEqual(set(Person.columns), set(col_vals))
         finally:
             Person.curs.execute = original_execute
 
@@ -1335,6 +1318,86 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             pass
 
 
+class TestPostgres12(ExtraTestMethods, unittest.TestCase):
+
+    def setUp(self):
+        self.conn = psycopg2.connect(**test_db_login)
+
+        # Change the schema depending on which version of Postgres we're using
+        server_version = str(self.conn.server_version)
+        major_version = server_version[:3]
+
+        if not 900 >= int(major_version) >= 120:
+            self.skipTest('These tests only apply to Postgres 12+')
+
+        self.db = dictorm.DictDB(self.conn)
+        self.curs = self.db.curs
+        self.tearDown()
+        self.curs.execute('''
+        CREATE TABLE person (
+            id BIGSERIAL PRIMARY KEY,
+            name VARCHAR(100),
+            other INTEGER,
+            manager_id INTEGER REFERENCES person(id)
+        );
+        CREATE TABLE department (
+            id SERIAL PRIMARY KEY,
+            name TEXT
+        );
+        CREATE TABLE person_department (
+            person_id INTEGER REFERENCES person(id),
+            department_id INTEGER REFERENCES department(id),
+            PRIMARY KEY (person_id, department_id)
+        );
+        CREATE TABLE car (
+            id SERIAL PRIMARY KEY,
+            license_plate TEXT,
+            name TEXT,
+            person_id INTEGER REFERENCES person(id),
+            width INTEGER,
+            height INTEGER,
+            area INTEGER GENERATED ALWAYS AS (width * height) STORED
+        );
+        ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
+        CREATE TABLE no_pk (foo VARCHAR(10));
+        CREATE TABLE station (
+            person_id INTEGER
+        );
+        CREATE TABLE possession (
+            id SERIAL PRIMARY KEY,
+            person_id INTEGER,
+            description JSONB
+        );
+        ''')
+        self.conn.commit()
+        self.db.refresh_tables()
+
+    def tearDown(self):
+        self.conn.rollback()
+        self.curs.execute('''DROP SCHEMA public CASCADE;
+                CREATE SCHEMA public;
+                GRANT ALL ON SCHEMA public TO postgres;
+                GRANT ALL ON SCHEMA public TO public;''')
+        self.conn.commit()
+
+    def test_generated_columns(self):
+        """
+        You can't update a generated column.
+        """
+        Car = self.db['car']
+        steve_car = Car(name='Stratus').flush()
+        self.assertRaises(dictorm.CannotUpdateColumn, steve_car.__setitem__, 'area', 10)
+        self.assertEqual(steve_car['area'], None)
+
+        # But the car can be updated normally
+        steve_car['width'] = 3
+        steve_car['height'] = 4
+        self.assertEqual(steve_car['area'], None)
+        steve_car.flush()
+
+        self.assertEqual(steve_car['area'], 12)
+
+
 class SqliteTestBase(object):
 
     def setUp(self):
@@ -1470,22 +1533,6 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
         self.assertEqual(len(results), 1)
         self.assertEqual(results, [{'foo': 'bar'}, ])
 
-    def test_column_info(self):
-        """
-        Table.columns is a method that gets a list of a table's columns
-        """
-        Person = self.db['person']
-        test_info = [
-            {'name': 'id', 'type': 'INTEGER'},
-            {'name': 'name', 'type': 'TEXT'},
-            {'name': 'other', 'type': 'INTEGER'},
-            {'name': 'manager_id', 'type': 'INTEGER'},
-            {'name': 'car_id', 'type': 'INTEGER'},
-        ]
-        self.assertEqual(len(test_info), len(Person.columns_info))
-        for i, j in zip(test_info, map(dict, Person.columns_info)):
-            self.assertDictContains(j, i)
-
     def test_raw(self):
         """
         A raw SQL query can be executed using a Table.  It expects that the query will select
@@ -1521,6 +1568,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_order_by2 = None
     test_second_cursor = None
     test_varchar = None
+    test_generated_columns = None
 
 
 if __name__ == '__main__':

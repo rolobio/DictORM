@@ -1,34 +1,30 @@
 os:
   - linux
 dist: xenial  # for Python 3.7
+services:
+  - docker
 language: python
 python:
   - "3.6"
   - "3.7"
-  - "3.7-dev"
+  - "3.8"
+  - "3.8-dev"
 cache: pip
 env:
-  - PG_VERSION=9.2
-  - PG_VERSION=9.3
   - PG_VERSION=9.4
-  - PG_VERSION=9.5
   - PG_VERSION=9.6
   - PG_VERSION=10
-addons:
-  postgresql: "10"
-  apt:
-    packages:
-      - postgresql-10
-      - postgresql-client-10
+  - PG_VERSION=11
+  - PG_VERSION=12
 before_install:
-  # Copy postgres config for version 10
-  - sudo cp /etc/postgresql/{9.6,10}/main/pg_hba.conf
-  # Stop any postgres, then start a specific version of postgres to test against
-  - sudo service postgresql stop && sudo service postgresql start $PG_VERSION
+  # Use the official Postgres images
+  - docker pull postgres:$PG_VERSION
+  - docker run -p 54321:5432 -d postgres:$PG_VERSION
+  - docker ps -a
 install:
   - "pip install -e .[testing]"
 before_script:
-  - psql -c 'create database dictorm;' -U postgres
+  - psql -c 'create database dictorm;' -U postgres -h 127.0.0.1 -p 54321
 script:
   # Run tests verbosely, with coverage
   - "green -rvv"
@@ -38,8 +34,6 @@ script:
   - "python -m dictorm.version"
   # Verify that dictorm can be imported
   - "python -c 'from dictorm import *'"
-services:
-  - postgresql
 after_success:
   # Submit coverage report to coveralls
   - coveralls
