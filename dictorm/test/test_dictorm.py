@@ -41,7 +41,7 @@ class ExtraTestMethods:
     def assertDictContains(cls, d1, d2):
         missing = set(d2.items()).difference(set(d1.items()))
         if missing:
-            raise TypeError('{0} missing does not contain {1}'.format(d1, dict(missing)))
+            raise TypeError('{0} does not contain {1}'.format(d1, missing))
 
     @classmethod
     def assertRaisesAny(cls, exps, func, a=None, kw=None):
@@ -101,7 +101,10 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             id SERIAL PRIMARY KEY,
             license_plate TEXT,
             name TEXT,
-            person_id INTEGER REFERENCES person(id)
+            person_id INTEGER REFERENCES person(id),
+            width INTEGER,
+            height INTEGER,
+            area INTEGER GENERATED ALWAYS AS (width * height) STORED
         );
         ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
         CREATE TABLE no_pk (foo VARCHAR(10));
@@ -895,8 +898,8 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         Table.columns is a method that gets a list of a table's columns
         """
         Person = self.db['person']
-        self.assertEqual(Person.columns,
-                         ['id', 'name', 'other', 'manager_id', 'car_id'])
+        self.assertEqual(sorted(Person.columns),
+                         ['car_id', 'id', 'manager_id', 'name', 'other'])
 
     def test_column_info(self):
         """
@@ -912,6 +915,20 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         ]
         self.assertEqual(len(test_info), len(Person.columns_info))
         for i, j in zip(test_info, Person.columns_info):
+            self.assertDictContains(j, i)
+
+        Car = self.db['car']
+        test_info = [
+            {'column_name': 'id', 'data_type': 'integer'},
+            {'column_name': 'license_plate', 'data_type': 'text'},
+            {'column_name': 'name', 'data_type': 'text'},
+            {'column_name': 'person_id', 'data_type': 'integer'},
+            {'column_name': 'width', 'data_type': 'integer'},
+            {'column_name': 'height', 'data_type': 'integer'},
+            {'column_name': 'area', 'data_type': 'integer'},
+        ]
+        self.assertEqual(len(test_info), len(Car.columns_info))
+        for i, j in zip(test_info, Car.columns_info):
             self.assertDictContains(j, i)
 
     def test_like(self):
@@ -1058,7 +1075,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         self.assertIn('manager_id', bob)
 
         # An invalid column name raises an error
-        bob[' "; DELETE FROM person;'] = 'Bob'
+        self.assertRaises(dictorm.CannotUpdateColumn, bob.__setitem__, ' "; DELETE FROM person;', 'Bob')
 
     def test_operators(self):
         Person = self.db['person']
@@ -1174,7 +1191,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         original_execute = self.curs.execute
 
         col_vals = ['id', 'name', 'other', 'manager_id', 'car_id']
-        self.assertEqual(Person.columns, col_vals)
+        self.assertEqual(set(Person.columns), set(col_vals))
 
         try:
             Person.curs.execute = error
@@ -1333,6 +1350,18 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             raise Exception('get_where did not raise UndefinedColumn')
         except psycopg2.errors.UndefinedColumn as e:
             pass
+
+    def test_generated_columns(self):
+        """
+        You can't update a generated column.
+        """
+        Car = self.db['car']
+        steve_car = Car(name='Stratus').flush()
+        self.assertRaises(dictorm.CannotUpdateColumn, steve_car.__setitem__, 'area', 10)
+
+        # But the car can be updated normally
+        steve_car['name'] = 'Ford'
+        steve_car.flush()
 
 
 class SqliteTestBase(object):
@@ -1521,6 +1550,7 @@ class TestSqlite(SqliteTestBase, TestPostgresql):
     test_order_by2 = None
     test_second_cursor = None
     test_varchar = None
+    test_generated_columns = None
 
 
 if __name__ == '__main__':

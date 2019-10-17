@@ -47,6 +47,10 @@ class NoCache(Exception):
     pass
 
 
+class CannotUpdateColumn(Exception):
+    pass
+
+
 class DBKind(enum.Enum):
     postgres = enum.auto()
     sqlite3 = enum.auto()
@@ -110,7 +114,7 @@ class Dict(dict):
 
         # Insert/Update only with columns present on the table, this allows custom
         # instances of Dicts to be inserted even if they have columns not on the table
-        items = {k: v for k, v in items.items() if k in self.table.column_names}
+        items = {k: v for k, v in items.items() if k in self.table.updateable_column_names}
 
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
@@ -229,6 +233,9 @@ class Dict(dict):
         ref = self.table.fks.get(key)
         if ref:
             super(Dict, self).__setitem__(ref, None)
+        if key not in self.table.updateable_column_names:
+            raise CannotUpdateColumn(
+                f'Column "{key}" cannot be updated, it may not exist or it may be a special column.')
         return super(Dict, self).__setitem__(key, value)
 
     # Copy docs for methods that recreate dict() functionality
@@ -455,6 +462,7 @@ class Table(object):
         self._refresh_pks()
         self.order_by = None
         self.fks = {}
+        self._updateable_column_names = set()
         self.cached_columns_info = None
         self.cached_column_names = None
 
@@ -625,6 +633,26 @@ class Table(object):
                                                self.columns_info)
         return self.cached_column_names
 
+    @property
+    def updateable_column_names(self) -> set:
+        if self._updateable_column_names:
+            return self._updateable_column_names
+        # These are generated columns, the can't be updated
+        if self.db.kind == DBKind.sqlite3:
+            column_key = 'name'
+        else:
+            column_key = 'column_name'
+
+        self._updateable_column_names = set()
+
+        # Postgres generated columns
+        self._updateable_column_names |= {i[column_key] for i in self.columns_info if
+                                          not i.get('generation_expression')}
+        # Referenced columns
+        self._updateable_column_names |= self.refs.keys()
+
+        return self._updateable_column_names
+
     def __setitem__(self, ref_name: str, ref):
         """
         Create reference that will be gotten by all Dicts created from this
@@ -641,6 +669,7 @@ class Table(object):
             ref.column1, ref.column2 = ref.column2, ref.column1
         self.fks[ref.column1.column] = ref_name
         self.refs[ref_name] = ref
+        self._updateable_column_names = None
 
     def __getitem__(self, ref_name: str) -> Union[Column, SqliteColumn]:
         """
