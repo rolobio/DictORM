@@ -19,12 +19,12 @@ env:
 before_install:
   # Use the official Postgres images
   - docker pull postgres:$PG_VERSION
-  - docker run -d postgres:$PG_VERSION
+  - docker run -p 54321:5432 -d postgres:$PG_VERSION
   - docker ps -a
 install:
   - "pip install -e .[testing]"
 before_script:
-  - psql -c 'create database dictorm;' -U postgres -h 127.0.0.1 -p 5432
+  - psql -c 'create database dictorm;' -U postgres -h 127.0.0.1 -p 54321
 script:
   # Run tests verbosely, with coverage
   - "green -rvv"
