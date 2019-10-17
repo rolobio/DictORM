@@ -1337,7 +1337,8 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
 class TestPostgres12(TestPostgresql):
 
     def _at_least_12(self):
-        return int(self.major_version[:3]) >= 120
+        # version 9 is 900, version 12 is 120, annoying
+        return 900 >= int(self.major_version) >= 120
 
     def setUp(self):
         super().setUp()
