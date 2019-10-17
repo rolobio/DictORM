@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 import sqlite3
 import unittest
-from itertools import zip_longest
 
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -14,6 +13,7 @@ test_db_login = {
     'password': 'dictorm',
     'host': 'localhost',
     'port': '54321',
+    'connect_timeout': 3,
 }
 
 
@@ -1318,21 +1318,67 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             pass
 
 
-class TestPostgres12(TestPostgresql):
-
-    def _at_least_12(self):
-        # version 9 is 900, version 12 is 120, annoying
-        return 900 >= int(self.major_version) >= 120
+class TestPostgres12(ExtraTestMethods, unittest.TestCase):
 
     def setUp(self):
-        super().setUp()
-        if self._at_least_12():
-            # Add a generated column for Postgres 12+
-            self.curs.execute('ALTER TABLE car ADD COLUMN area INTEGER GENERATED ALWAYS AS (width * height) STORED')
-            self.conn.commit()
-            self.db.refresh_tables()
-        else:
+        self.conn = psycopg2.connect(**test_db_login)
+
+        # Change the schema depending on which version of Postgres we're using
+        server_version = str(self.conn.server_version)
+        major_version = server_version[:3]
+
+        if not 900 >= int(major_version) >= 120:
             self.skipTest('These tests only apply to Postgres 12+')
+
+        self.db = dictorm.DictDB(self.conn)
+        self.curs = self.db.curs
+        self.tearDown()
+        self.curs.execute('''
+        CREATE TABLE person (
+            id BIGSERIAL PRIMARY KEY,
+            name VARCHAR(100),
+            other INTEGER,
+            manager_id INTEGER REFERENCES person(id)
+        );
+        CREATE TABLE department (
+            id SERIAL PRIMARY KEY,
+            name TEXT
+        );
+        CREATE TABLE person_department (
+            person_id INTEGER REFERENCES person(id),
+            department_id INTEGER REFERENCES department(id),
+            PRIMARY KEY (person_id, department_id)
+        );
+        CREATE TABLE car (
+            id SERIAL PRIMARY KEY,
+            license_plate TEXT,
+            name TEXT,
+            person_id INTEGER REFERENCES person(id),
+            width INTEGER,
+            height INTEGER,
+            area INTEGER GENERATED ALWAYS AS (width * height) STORED
+        );
+        ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
+        CREATE TABLE no_pk (foo VARCHAR(10));
+        CREATE TABLE station (
+            person_id INTEGER
+        );
+        CREATE TABLE possession (
+            id SERIAL PRIMARY KEY,
+            person_id INTEGER,
+            description JSONB
+        );
+        ''')
+        self.conn.commit()
+        self.db.refresh_tables()
+
+    def tearDown(self):
+        self.conn.rollback()
+        self.curs.execute('''DROP SCHEMA public CASCADE;
+                CREATE SCHEMA public;
+                GRANT ALL ON SCHEMA public TO postgres;
+                GRANT ALL ON SCHEMA public TO public;''')
+        self.conn.commit()
 
     def test_generated_columns(self):
         """
@@ -1343,8 +1389,11 @@ class TestPostgres12(TestPostgresql):
         self.assertRaises(dictorm.CannotUpdateColumn, steve_car.__setitem__, 'area', 10)
 
         # But the car can be updated normally
-        steve_car['name'] = 'Ford'
+        steve_car['width'] = 3
+        steve_car['height'] = 4
         steve_car.flush()
+
+        self.assertEqual(steve_car['area'], 12)
 
 
 class SqliteTestBase(object):
