@@ -74,7 +74,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
     def setUp(self):
         self.conn = psycopg2.connect(**test_db_login)
 
-        # Change the schema depending on which versin of Postgres we're using
+        # Change the schema depending on which version of Postgres we're using
         server_version = str(self.conn.server_version)
         major_version = server_version[:3]
 
