@@ -1387,10 +1387,12 @@ class TestPostgres12(ExtraTestMethods, unittest.TestCase):
         Car = self.db['car']
         steve_car = Car(name='Stratus').flush()
         self.assertRaises(dictorm.CannotUpdateColumn, steve_car.__setitem__, 'area', 10)
+        self.assertEqual(steve_car['area'], None)
 
         # But the car can be updated normally
         steve_car['width'] = 3
         steve_car['height'] = 4
+        self.assertEqual(steve_car['area'], None)
         steve_car.flush()
 
         self.assertEqual(steve_car['area'], 12)
