@@ -16,9 +16,6 @@ test_db_login = {
     'port': '54321',
 }
 
-if 'CI' in os.environ.keys():
-    test_db_login['port'] = 5432
-
 
 def _no_refs(o):
     if isinstance(o, dictorm.Dict):
