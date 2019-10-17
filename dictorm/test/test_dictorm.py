@@ -1,7 +1,7 @@
 #! /usr/bin/env python
-import os
 import sqlite3
 import unittest
+from itertools import zip_longest
 
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -73,7 +73,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
 
         # Change the schema depending on which version of Postgres we're using
         server_version = str(self.conn.server_version)
-        major_version = server_version[:3]
+        self.major_version = major_version = server_version[:3]
 
         self.db = dictorm.DictDB(self.conn)
         self.curs = self.db.curs
@@ -100,8 +100,7 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             name TEXT,
             person_id INTEGER REFERENCES person(id),
             width INTEGER,
-            height INTEGER,
-            area INTEGER GENERATED ALWAYS AS (width * height) STORED
+            height INTEGER
         );
         ALTER TABLE person ADD COLUMN car_id INTEGER REFERENCES car(id);
         CREATE TABLE no_pk (foo VARCHAR(10));
@@ -914,20 +913,6 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
         for i, j in zip(test_info, Person.columns_info):
             self.assertDictContains(j, i)
 
-        Car = self.db['car']
-        test_info = [
-            {'column_name': 'id', 'data_type': 'integer'},
-            {'column_name': 'license_plate', 'data_type': 'text'},
-            {'column_name': 'name', 'data_type': 'text'},
-            {'column_name': 'person_id', 'data_type': 'integer'},
-            {'column_name': 'width', 'data_type': 'integer'},
-            {'column_name': 'height', 'data_type': 'integer'},
-            {'column_name': 'area', 'data_type': 'integer'},
-        ]
-        self.assertEqual(len(test_info), len(Car.columns_info))
-        for i, j in zip(test_info, Car.columns_info):
-            self.assertDictContains(j, i)
-
     def test_like(self):
         Person = self.db['person']
         bob = Person(name='Bob').flush()
@@ -1347,6 +1332,39 @@ class TestPostgresql(ExtraTestMethods, unittest.TestCase):
             raise Exception('get_where did not raise UndefinedColumn')
         except psycopg2.errors.UndefinedColumn as e:
             pass
+
+
+class TestPostgres12(TestPostgresql):
+
+    def _at_least_12(self):
+        return int(self.major_version[:3]) >= 120
+
+    def setUp(self):
+        super().setUp()
+        if self._at_least_12():
+            # Add a generated column for Postgres 12+
+            self.curs.execute('ALTER TABLE car ADD COLUMN area INTEGER GENERATED ALWAYS AS (width * height) STORED')
+            self.conn.commit()
+            self.db.refresh_tables()
+        else:
+            self.skipTest('These tests only apply to Postgres 12+')
+
+    def test_column_info(self):
+        """
+        Table.columns is a method that gets a list of a table's columns
+        """
+        Car = self.db['car']
+        test_info = [
+            {'column_name': 'id', 'data_type': 'integer'},
+            {'column_name': 'license_plate', 'data_type': 'text'},
+            {'column_name': 'name', 'data_type': 'text'},
+            {'column_name': 'person_id', 'data_type': 'integer'},
+            {'column_name': 'width', 'data_type': 'integer'},
+            {'column_name': 'height', 'data_type': 'integer'},
+            {'column_name': 'area', 'data_type': 'integer'},
+        ]
+        for i, j in zip_longest(test_info, Car.columns_info):
+            self.assertDictContains(j, i)
 
     def test_generated_columns(self):
         """
