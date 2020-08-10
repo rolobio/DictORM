@@ -9,6 +9,7 @@ python:
   - "3.7"
   - "3.8"
   - "3.8-dev"
+  - "3.9-dev"
 cache: pip
 env:
   - PG_VERSION=9.4
@@ -16,6 +17,7 @@ env:
   - PG_VERSION=10
   - PG_VERSION=11
   - PG_VERSION=12
+  - PG_VERSION=13
 before_install:
   # Use the official Postgres images
   - docker pull postgres:$PG_VERSION
