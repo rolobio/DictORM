@@ -4,7 +4,7 @@ import sqlite3
 from json import dumps
 from typing import Union, Optional, List
 
-__version__ = '4.1.5'
+__version__ = '4.2'
 
 from contextlib import contextmanager
 from itertools import chain
