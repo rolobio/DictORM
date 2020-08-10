@@ -34,6 +34,21 @@ try:  # pragma: no cover
 except ImportError:  # pragma: no cover
     pass
 
+__all__ = [
+    '__version__',
+    'And',
+    'CannotUpdateColumn',
+    'DBKind',
+    'Dict',
+    'DictDB',
+    'NoCache',
+    'NoPrimaryKey',
+    'RawQuery',
+    'ResultsGenerator',
+    'Table',
+    'UnexpectedRows',
+]
+
 
 class NoPrimaryKey(Exception):
     pass

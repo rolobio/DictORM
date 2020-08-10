@@ -11,9 +11,23 @@ from typing import Union
 global sort_keys
 sort_keys = False
 
+__all__ = [
+    'And',
+    'Column',
+    'Comparison',
+    'Delete',
+    'Insert',
+    'Null',
+    'Operator',
+    'Or',
+    'Select',
+    'set_sort_keys',
+    'Update',
+]
+
 
 def set_sort_keys(val):
-    "Used only for testing"
+    """Used only for testing"""
     global sort_keys
     sort_keys = val
 
