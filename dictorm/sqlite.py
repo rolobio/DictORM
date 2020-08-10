@@ -7,6 +7,15 @@ from .pg import Insert as PostgresqlInsert
 from .pg import Select, And
 from .pg import Update as PostgresqlUpdate
 
+__all__ = [
+    'And',
+    'Column',
+    'Comparison',
+    'Insert',
+    'Select',
+    'Update',
+]
+
 
 class Comparison(PostgresqlComparison):
     interpolation_str = '?'
