@@ -19,7 +19,7 @@ env:
 before_install:
   # Use the official Postgres images
   - docker pull postgres:$PG_VERSION
-  - docker run -p 54321:5432 -d postgres:$PG_VERSION
+  - docker run -p 54321:5432 -e POSTGRES_PASSWORD=dictorm -d postgres:$PG_VERSION
   - docker ps -a
 install:
   - "pip install -e .[testing]"
