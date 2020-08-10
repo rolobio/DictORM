@@ -40,16 +40,6 @@ class ExtraTestMethods:
         if missing:
             raise TypeError('{0} does not contain {1}'.format(d1, missing))
 
-    @classmethod
-    def assertRaisesAny(cls, exps, func, a=None, kw=None):
-        a = a or []
-        kw = kw or {}
-        try:
-            func(*a, **kw)
-        except Exception as e:
-            if isinstance(e, exps): return
-        raise Exception('Did not raise one of the exceptions provided!')
-
     def assertEqualNoRefs(self, a, b):
         return self.assertEqual(_no_refs(a), _no_refs(b))
 
